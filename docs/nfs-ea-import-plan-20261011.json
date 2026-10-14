@@ -1,0 +1,886 @@
+{
+  "schemaVersion": 1,
+  "schema": "nfs-ea-import-plan/1 (own schema; not gamehub-cli datastore: that tool lacks hardlink/clone/registry ops)",
+  "id": "nfs-ea-import-20261011",
+  "status": "PLAN ONLY - not applied; Phase 2 is run by the user with EA stopped",
+  "doc": "/Volumes/ExT2/GameHub/docs/nfs-ea-import-plan-20261011.md",
+  "volume": "/Volumes/ExT2",
+  "protected": [
+    "/Volumes/ExT2/Bundles",
+    "/Users/gc/Library/Application Support/NFS2015Mac/Data/Prefix.internal-old-20261010",
+    "/Users/gc/Library/Application Support/BF3Mac/Data/Prefix.internal-old-20261010"
+  ],
+  "allowedRoots": [
+    "/Volumes/ExT2/GameHub/EA Games/Need for Speed",
+    "/Volumes/ExT2/GameHub/Relocated/NFS2015Mac/Data/Prefix/drive_c/Program Files/EA Games/Need for Speed",
+    "/Volumes/ExT2/GameHub/Prefix/system.reg (written only by wine reg import in S5 / reg delete in R1; the documented last-resort manual-append fallback in S5 edits it directly with no wine process running)",
+    "/Volumes/ExT2/GameHub/Prefix/drive_c/ProgramData/Electronic Arts/EA Services/License/1024486.dlf (rollback R2 only)",
+    "/Volumes/ExT2/GameHub/Prefix/drive_c/users/crossover/Documents/Need For Speed (new, optional S6b)",
+    "/Volumes/ExT2/GameHub/Prefix/drive_c/ProgramData/EA Desktop (R4 only, moved aside first)",
+    "/Volumes/ExT2/GameHub/Backups/nfs-ea-import-<ts>"
+  ],
+  "paths": {
+    "SP": "/Volumes/ExT2/GameHub/Prefix",
+    "OP": "/Volumes/ExT2/GameHub/Relocated/NFS2015Mac/Data/Prefix",
+    "OPALIAS": "/Users/gc/Library/Application Support/NFS2015Mac/Data/Prefix",
+    "OLD": "/Volumes/ExT2/GameHub/Relocated/NFS2015Mac/Data/Prefix/drive_c/Program Files/EA Games/Need for Speed",
+    "NEW": "/Volumes/ExT2/GameHub/EA Games/Need for Speed",
+    "RT": "/Volumes/ExT2/GameHub/Runtimes/hub-0-winemacfs-dxmtrtv",
+    "regFile": "/Volumes/ExT2/GameHub/docs/nfs-ea-import-20261011/nfs-import.reg",
+    "dryrun": "/Volumes/ExT2/GameHub/docs/nfs-ea-import-20261011/nfs-ea-import-dryrun.sh"
+  },
+  "env": [
+    "PATH=/usr/bin:/bin:/usr/sbin:/sbin",
+    "LANG=en_US.UTF-8",
+    "USER=Player",
+    "HOME=/Users/gc/Library/Application Support/BF3Mac/RuntimeHome/Player",
+    "TMPDIR=/Users/gc/Library/Application Support/BF3Mac/Temporary",
+    "WINEPREFIX=/Volumes/ExT2/GameHub/Prefix",
+    "WINEDEBUG=-all",
+    "WINEMSYNC=1",
+    "ROSETTA_X87_PATH=/Volumes/ExT2/GameHub/Runtimes/hub-0-helpers/x87sidecar",
+    "WINEDLLOVERRIDES=winemenubuilder.exe=d"
+  ],
+  "envNote": "Bash array W=(env -i <these>) in step S0; start-ea.sh's environment minus graphics-only variables. WINEMSYNC=1 is required. USER=Player does not change the Wine profile name, which is `crossover` in SP. Use it for every wine/wineserver command.",
+  "backupDir": "/Volumes/ExT2/GameHub/Backups/nfs-ea-import-<ts>",
+  "backupLayout": [
+    "files/shared",
+    "files/old-nfs",
+    "SHA256SUMS",
+    "SHA256SUMS.meta",
+    "journal.txt",
+    "game-inventory-before.tsv",
+    "nfs-import.reg",
+    "log-offsets.txt",
+    "lic-bad-before.txt",
+    "reg-counts-before.txt",
+    "rolled-back/"
+  ],
+  "waiting": "No sleep. Events: wineserver -w; ~/.agent-harness/bin/work wait --log PATH PATTERN --timeout 570 (exit 124 = call again).",
+  "decisions": [
+    {
+      "id": "D1",
+      "title": "Target path",
+      "text": "NEW=/Volumes/ExT2/GameHub/EA Games/Need for Speed (E:\\EA Games\\Need for Speed\\), outside the library root E:\\EA Games\\BF4\\ on purpose; installCheck detection does not depend on the library root."
+    },
+    {
+      "id": "D2",
+      "title": "Hard-link mirror, not symlink",
+      "text": "Rename OLD to NEW (same device, same inodes), then recreate OLD as a real tree of 144 hard links. The old wrapper resolves components below drive_c with GuestPath.resolve(followingLinks:false) and throws 'A Windows folder entry is a link: <name>' (GameHub/work/wt-hub-a/Sources/LauncherCore/GuestPath.swift:82-84 via Sources/NFS2015Core/NFS2015Install.swift:171-172, every launch; identical to commit 13d1f4f and the bundle). It checks only isSymbolicLink. Caveat: EA updates (write-new+rename) diverge NEW from the mirror and keep the old inodes alive (disk use grows by the patched size)."
+    },
+    {
+      "id": "D3",
+      "title": "Registry",
+      "text": "Only the NFS-prefix shape in the 32-bit view HKLM\\SOFTWARE\\Wow6432Node\\EA Games\\Need for Speed, Install Dir rewritten to E:\\\\EA Games\\\\Need for Speed\\\\, imported with wine reg import while EA is stopped."
+    },
+    {
+      "id": "D4",
+      "title": "No InstallData/Uninstall/GDF fabrication",
+      "text": "The NFS prefix proves EA marks NFS Installed without them. Non-fatal: 'Could not parse uninstallCommandLine=[] of offerId=[Origin.OFR.50.0000810]'."
+    },
+    {
+      "id": "D5",
+      "title": "Licence not copied",
+      "text": "The licence binds to more than the machash (BF3 70619.dlf mismatch after e: was added although machash stayed constant). NFS's dlf was issued with c:+z:; the shared prefix is c:+e:+z:. Never add or remove drive letters in SP."
+    },
+    {
+      "id": "D6",
+      "title": "Activation budget",
+      "text": "First Play = 1 EA activation (EA's published user-agreement limit: 5 unique machines/activations per rolling 24 h; not verified here) plus a possible Denuvo activation; no other runtime switch or sign-in that day."
+    },
+    {
+      "id": "D7",
+      "title": "Old prefix",
+      "text": "Only change: its game folder's files become hard links. Registry, licence, saves and runtime untouched."
+    }
+  ],
+  "licence": {
+    "contentId": 1024486,
+    "softwareId": "Origin.SFT.50.0000347",
+    "offerId": "Origin.OFR.50.0000810",
+    "slug": "need-for-speed",
+    "oldFile": "/Volumes/ExT2/GameHub/Relocated/NFS2015Mac/Data/Prefix/drive_c/ProgramData/Electronic Arts/EA Services/License/1024486.dlf",
+    "oldFileBytes": 1889,
+    "sharedDir": "/Volumes/ExT2/GameHub/Prefix/drive_c/ProgramData/Electronic Arts/EA Services/License",
+    "sharedHas": [
+      "1007968.dlf",
+      "16425782.dlf",
+      "70619.dlf",
+      "71503.dlf"
+    ],
+    "machash": "d1920624b6654b648e83b7732a233cc23636a0c9",
+    "machashIdenticalInBothPrefixes": true,
+    "action": "do not copy; EA issues a fresh 1024486.dlf on first Play",
+    "activationCap": "EA's published user-agreement limit: 5 unique machines/activations per rolling 24 h (not verified here)",
+    "failureSignature": [
+      "Mismatched machine hash in license",
+      "License Failure 3"
+    ],
+    "failureTest": "licence-failure line count in gl_log_*.log (UTF-16LE) after Play greater than before Play (L1 > L0); old BF3 lines already exist (10 at the dry-run) and carry no content ID",
+    "recovery": "R2: move the new dlf aside, retry once"
+  },
+  "registry": {
+    "file": "/Volumes/ExT2/GameHub/docs/nfs-ea-import-20261011/nfs-import.reg",
+    "key": "HKLM\\SOFTWARE\\Wow6432Node\\EA Games\\Need for Speed",
+    "view": "32-bit (Wow6432Node)",
+    "values": {
+      "Install Dir": "E:\\\\EA Games\\\\Need for Speed\\\\",
+      "Locale": "en_US",
+      "Product GUID": "{F8643E83-A868-4EE8-A0B9-389386830453}"
+    },
+    "rollback": "reg delete of that key (and the native key only if a touchup created it); never the parent EA Games"
+  },
+  "steps": [
+    {
+      "id": "S0",
+      "title": "Variables",
+      "notes": "Run `bash` first (login shell is fish). TS=${TS:-...}; for a new window or rollback set TS=<original> and paste S0. Defines BK, W (env -i array), helpers jr/inv/stopped/lic_bad. Wine user profile inside SP is `crossover`. No set -e in the interactive shell; later blocks are ( set -euo pipefail ... ) subshells.",
+      "requiresNoWine": false,
+      "preconditions": [],
+      "commands": [
+        "PATH=/usr/bin:/bin:/usr/sbin:/sbin\nTS=${TS:-$(date -u +%Y%m%dT%H%M%SZ)}\nH=/Volumes/ExT2/GameHub\nSP=$H/Prefix\nOP=$H/Relocated/NFS2015Mac/Data/Prefix\nOPALIAS=\"/Users/gc/Library/Application Support/NFS2015Mac/Data/Prefix\"\nOLD=\"$OP/drive_c/Program Files/EA Games/Need for Speed\"\nNEW=\"$H/EA Games/Need for Speed\"\nRT=$H/Runtimes/hub-0-winemacfs-dxmtrtv\nPLAN=$H/docs/nfs-ea-import-20261011\nREG=$PLAN/nfs-import.reg\nDRY=$PLAN/nfs-ea-import-dryrun.sh\nBK=$H/Backups/nfs-ea-import-$TS\nWORK=$HOME/.agent-harness/bin/work\nBR=\"/Users/gc/Library/Application Support/BF3Mac\"\nSPLIC=\"$SP/drive_c/ProgramData/Electronic Arts/EA Services/License\"\nLOGD=\"$SP/drive_c/ProgramData/EA Desktop/Logs\"\nBSV=\"$LOGD/EABackgroundServiceVerbose.log\"\nHDR='[Software\\\\Wow6432Node\\\\EA Games\\\\Need for Speed]'\nW=(env -i PATH=/usr/bin:/bin:/usr/sbin:/sbin LANG=en_US.UTF-8 USER=Player HOME=\"$BR/RuntimeHome/Player\" TMPDIR=\"$BR/Temporary\" WINEPREFIX=\"$SP\" WINEDEBUG=-all WINEMSYNC=1 ROSETTA_X87_PATH=\"$H/Runtimes/hub-0-helpers/x87sidecar\" WINEDLLOVERRIDES=\"winemenubuilder.exe=d\")\njr() { printf '%s %s\\n' \"$(date -u +%Y-%m-%dT%H:%M:%SZ)\" \"$*\" >> \"$BK/journal.txt\"; }\ninv() { (cd \"$1\" && /usr/bin/find . -type f -print0 | xargs -0 /usr/bin/stat -f '%i%t%l%t%z%t%N') | LC_ALL=C sort -t \"$(printf '\\t')\" -k4,4; }\nstopped() { local o; o=$(/bin/bash \"$DRY\" --gate) || true; printf '%s\\n' \"$o\" | grep -q '^DRYRUN gate ' || { echo \"dry-run did not run\"; return 1; }; ! printf '%s\\n' \"$o\" | grep -E '^\\[FAIL\\] (noWineProcess|prefixNotInUse|old wrapper)'; }\nlic_bad() { for f in \"$SP/drive_c/ProgramData/EA Logs\"/gl_log_*.log; do iconv -f UTF-16LE -t UTF-8 \"$f\" 2>/dev/null; done | grep -acE 'Mismatched machine hash|License Failure' || true; }\necho \"TS=$TS\"; echo \"BK=$BK\""
+      ],
+      "verify": [],
+      "verifyCommands": [],
+      "fallbackCommands": [],
+      "rollback": []
+    },
+    {
+      "id": "S1",
+      "title": "Stop everything, then run the apply gate",
+      "notes": "Pause BF1 and any download in EA's Downloads queue (the installer-process count cannot see downloads), then Quit EA from its menu; also quit games and the old NFS wrapper. Wait for the shared wineserver to exit (no sleep), then the gate must pass every check. Fallback: taskkill list, last resort wineserver -k.",
+      "requiresNoWine": false,
+      "preconditions": [
+        {
+          "type": "manual",
+          "text": "BF1 and other downloads paused or finished in EA's Downloads queue"
+        }
+      ],
+      "commands": [
+        "\"${W[@]}\" \"$RT/bin/wineserver\" -w; echo \"wineserver -w rc=$?\"\n/bin/bash \"$DRY\" --gate; echo \"gate rc=$?\""
+      ],
+      "verify": [
+        {
+          "type": "noWineProcess",
+          "pattern": "wineserver|wine-preloader|/bin/wine|x87sidecar|\\.exe|NFS2015Launcher|NFS2015Session"
+        },
+        {
+          "type": "prefixNotInUse",
+          "path": "/Volumes/ExT2/GameHub/Prefix",
+          "aliases": [
+            "/Volumes/ExT2/GameHub/Relocated/BF3Mac/Data/Prefix",
+            "/Users/gc/Library/Application Support/BF3Mac/Data/Prefix"
+          ],
+          "method": "no open file under the prefix (one lsof -nP -F n), no holder of /tmp/.wine-<uid>/server-<hex st_dev>-<hex st_ino>/socket (also /private/tmp), no process command line naming the prefix"
+        },
+        {
+          "type": "prefixNotInUse",
+          "path": "/Volumes/ExT2/GameHub/Relocated/NFS2015Mac/Data/Prefix",
+          "aliases": [
+            "/Users/gc/Library/Application Support/NFS2015Mac/Data/Prefix"
+          ]
+        },
+        {
+          "type": "noWineProcess",
+          "name": "old wrapper not running",
+          "pattern": "NFS2015Launcher|NFS2015Session|Need for Speed Bundled"
+        },
+        {
+          "type": "notSymlink",
+          "path": "/Volumes/ExT2/GameHub/Relocated/NFS2015Mac/Data/Prefix/drive_c/Program Files/EA Games/Need for Speed"
+        },
+        {
+          "type": "fileCount",
+          "path": "/Volumes/ExT2/GameHub/Relocated/NFS2015Mac/Data/Prefix/drive_c/Program Files/EA Games/Need for Speed",
+          "kind": "file",
+          "expect": 144
+        },
+        {
+          "type": "fileCount",
+          "path": "/Volumes/ExT2/GameHub/Relocated/NFS2015Mac/Data/Prefix/drive_c/Program Files/EA Games/Need for Speed",
+          "kind": "symlink",
+          "expect": 0
+        },
+        {
+          "type": "linkCount",
+          "path": "/Volumes/ExT2/GameHub/Relocated/NFS2015Mac/Data/Prefix/drive_c/Program Files/EA Games/Need for Speed",
+          "scope": "all files",
+          "expect": 1
+        },
+        {
+          "type": "totalBytes",
+          "path": "/Volumes/ExT2/GameHub/Relocated/NFS2015Mac/Data/Prefix/drive_c/Program Files/EA Games/Need for Speed",
+          "expect": 14639595955
+        },
+        {
+          "type": "exists",
+          "path": "/Volumes/ExT2/GameHub/Relocated/NFS2015Mac/Data/Prefix/drive_c/Program Files/EA Games/Need for Speed/NFS16.exe"
+        },
+        {
+          "type": "absent",
+          "path": "/Volumes/ExT2/GameHub/EA Games/Need for Speed"
+        },
+        {
+          "type": "exists",
+          "path": "/Volumes/ExT2/GameHub/EA Games"
+        },
+        {
+          "type": "sameDevice",
+          "paths": [
+            "/Volumes/ExT2/GameHub/Relocated/NFS2015Mac/Data/Prefix/drive_c/Program Files/EA Games/Need for Speed",
+            "/Volumes/ExT2/GameHub/EA Games",
+            "/Volumes/ExT2/GameHub/Prefix"
+          ]
+        },
+        {
+          "type": "textContains",
+          "path": "/Volumes/ExT2/GameHub/Prefix/dosdevices/e:",
+          "readlink": "/Volumes/ExT2/GameHub"
+        },
+        {
+          "type": "textContains",
+          "path": "/Volumes/ExT2/GameHub/Prefix/dosdevices/z:",
+          "readlink": "/"
+        },
+        {
+          "type": "regSectionAbsent",
+          "hive": "/Volumes/ExT2/GameHub/Prefix/system.reg",
+          "header": "[Software\\\\Wow6432Node\\\\EA Games\\\\Need for Speed]"
+        },
+        {
+          "type": "regSectionPresent",
+          "hive": "/Volumes/ExT2/GameHub/Relocated/NFS2015Mac/Data/Prefix/system.reg",
+          "header": "[Software\\\\Wow6432Node\\\\EA Games\\\\Need for Speed]",
+          "values": {
+            "Install Dir": "C:\\\\Program Files\\\\EA Games\\\\Need for Speed\\\\",
+            "Locale": "en_US",
+            "Product GUID": "{F8643E83-A868-4EE8-A0B9-389386830453}"
+          }
+        },
+        {
+          "type": "absent",
+          "path": "/Volumes/ExT2/GameHub/Prefix/drive_c/ProgramData/Electronic Arts/EA Services/License/1024486.dlf"
+        },
+        {
+          "type": "exists",
+          "path": "/Volumes/ExT2/GameHub/Runtimes/hub-0-winemacfs-dxmtrtv/bin/wine",
+          "executable": true
+        },
+        {
+          "type": "exists",
+          "path": "/Volumes/ExT2/GameHub/Runtimes/hub-0-winemacfs-dxmtrtv/bin/wineserver",
+          "executable": true
+        },
+        {
+          "type": "exists",
+          "path": "/Volumes/ExT2/GameHub/bin/start-ea.sh",
+          "executable": true
+        },
+        {
+          "type": "exists",
+          "path": "~/.agent-harness/bin/work",
+          "executable": true
+        },
+        {
+          "type": "exists",
+          "path": "/Volumes/ExT2/GameHub/Backups",
+          "writable": true
+        },
+        {
+          "type": "textContains",
+          "path": "/Volumes/ExT2/GameHub/docs/nfs-ea-import-20261011/nfs-import.reg",
+          "text": "REGEDIT4",
+          "line": 1
+        },
+        {
+          "type": "freeSpace",
+          "path": "/Volumes/ExT2/GameHub",
+          "minKiB": 1048576
+        },
+        {
+          "type": "absent",
+          "path": "/Volumes/ExT2/GameHub/Prefix/drive_c/users/crossover/Documents/Need For Speed",
+          "name": "S6b target free"
+        }
+      ],
+      "verifyCommands": [],
+      "fallbackCommands": [
+        "for p in EADesktop.exe EACefSubProcess.exe EABackgroundService.exe EAGEP.exe; do \"${W[@]}\" \"$RT/bin/wine\" taskkill /f /im \"$p\"; done\n\"${W[@]}\" \"$RT/bin/wineserver\" -w\n# last resort only, loses unflushed EA state:\n\"${W[@]}\" \"$RT/bin/wineserver\" -k; \"${W[@]}\" \"$RT/bin/wineserver\" -w"
+      ],
+      "rollback": []
+    },
+    {
+      "id": "S2",
+      "title": "Backups (no wine)",
+      "notes": "Cloned copies (cp -c) of both prefixes' three .reg files, shared ProgramData/EA Desktop and License dirs, old License dir, the .reg file. Game data is NOT copied, only an inode inventory. SHA256SUMS relative to files/; SHA256SUMS.meta covers game-inventory-before.tsv and nfs-import.reg.",
+      "requiresNoWine": true,
+      "preconditions": [
+        {
+          "type": "stopped",
+          "note": "first line of every mutating block: dry-run --gate with no FAIL on noWineProcess / prefixNotInUse / old wrapper"
+        },
+        {
+          "type": "absent",
+          "path": "/Volumes/ExT2/GameHub/Backups/nfs-ea-import-<ts>"
+        }
+      ],
+      "commands": [
+        "( set -euo pipefail\n  stopped || { echo \"wine/EA/old wrapper still running: quit them and re-run S1\"; exit 1; }\n  [ ! -e \"$BK\" ] || { echo \"BK exists: $BK\"; exit 1; }\n  mkdir -p \"$BK/files/shared\" \"$BK/files/old-nfs\"\n  jr \"S2 start: stopped check passed (EA, games, old wrapper not running)\"\n  for f in system.reg user.reg userdef.reg; do\n    /bin/cp -c -p \"$SP/$f\" \"$BK/files/shared/$f\"\n    /bin/cp -c -p \"$OP/$f\" \"$BK/files/old-nfs/$f\"\n  done\n  mkdir -p \"$BK/files/shared/ProgramData/Electronic Arts/EA Services\" \"$BK/files/old-nfs/ProgramData/Electronic Arts/EA Services\"\n  /bin/cp -c -R -p \"$SP/drive_c/ProgramData/EA Desktop\" \"$BK/files/shared/ProgramData/EA Desktop\"\n  /bin/cp -c -R -p \"$SPLIC\" \"$BK/files/shared/ProgramData/Electronic Arts/EA Services/License\"\n  /bin/cp -c -R -p \"$OP/drive_c/ProgramData/Electronic Arts/EA Services/License\" \"$BK/files/old-nfs/ProgramData/Electronic Arts/EA Services/License\"\n  /bin/cp -p \"$REG\" \"$BK/nfs-import.reg\"\n  inv \"$OLD\" > \"$BK/game-inventory-before.tsv\"\n  [ \"$(wc -l < \"$BK/game-inventory-before.tsv\" | tr -d ' ')\" = 144 ] || { echo \"inventory is not 144 lines\"; exit 1; }\n  awk -F'\\t' '$2 != 1 { bad++ } END { exit bad > 0 }' \"$BK/game-inventory-before.tsv\" || { echo \"a game file has link count != 1\"; exit 1; }\n  ( cd \"$BK/files\" && /usr/bin/find . -type f -print0 | LC_ALL=C sort -z | xargs -0 /usr/bin/shasum -a 256 ) > \"$BK/SHA256SUMS\"\n  ( cd \"$BK/files\" && /usr/bin/shasum -a 256 -c ../SHA256SUMS > /dev/null )\n  ( cd \"$BK\" && /usr/bin/shasum -a 256 game-inventory-before.tsv nfs-import.reg > SHA256SUMS.meta && /usr/bin/shasum -a 256 -c SHA256SUMS.meta > /dev/null )\n  jr \"S2 OK: $(wc -l < \"$BK/SHA256SUMS\" | tr -d ' ') files hashed, inventory 144 lines\"\n  echo \"S2 OK: $BK\" ); echo \"S2 rc=$?\""
+      ],
+      "verify": [
+        {
+          "type": "exists",
+          "path": "/Volumes/ExT2/GameHub/Backups/nfs-ea-import-<ts>/SHA256SUMS"
+        },
+        {
+          "type": "exists",
+          "path": "/Volumes/ExT2/GameHub/Backups/nfs-ea-import-<ts>/SHA256SUMS.meta"
+        },
+        {
+          "type": "fileCount",
+          "path": "/Volumes/ExT2/GameHub/Backups/nfs-ea-import-<ts>/game-inventory-before.tsv",
+          "kind": "lines",
+          "expect": 144
+        },
+        {
+          "type": "shasumVerify",
+          "dir": "/Volumes/ExT2/GameHub/Backups/nfs-ea-import-<ts>/files",
+          "sums": "/Volumes/ExT2/GameHub/Backups/nfs-ea-import-<ts>/SHA256SUMS"
+        },
+        {
+          "type": "shasumVerify",
+          "dir": "/Volumes/ExT2/GameHub/Backups/nfs-ea-import-<ts>",
+          "sums": "/Volumes/ExT2/GameHub/Backups/nfs-ea-import-<ts>/SHA256SUMS.meta"
+        }
+      ],
+      "verifyCommands": [],
+      "fallbackCommands": [],
+      "rollback": []
+    },
+    {
+      "id": "S3",
+      "title": "Move the game folder (rename, not copy)",
+      "notes": "mv -n OLD NEW on the same APFS device. BSD mv -n exits 0 when it does nothing, so existence is checked after. The inode inventory must be identical afterwards.",
+      "requiresNoWine": true,
+      "preconditions": [
+        {
+          "type": "stopped",
+          "note": "first line of every mutating block: dry-run --gate with no FAIL on noWineProcess / prefixNotInUse / old wrapper"
+        },
+        {
+          "type": "notSymlink",
+          "path": "/Volumes/ExT2/GameHub/Relocated/NFS2015Mac/Data/Prefix/drive_c/Program Files/EA Games/Need for Speed"
+        },
+        {
+          "type": "absent",
+          "path": "/Volumes/ExT2/GameHub/EA Games/Need for Speed"
+        },
+        {
+          "type": "sameDevice",
+          "paths": [
+            "/Volumes/ExT2/GameHub/Relocated/NFS2015Mac/Data/Prefix/drive_c/Program Files/EA Games/Need for Speed",
+            "/Volumes/ExT2/GameHub/EA Games"
+          ]
+        }
+      ],
+      "commands": [
+        "( set -euo pipefail\n  stopped || { echo \"wine/EA/old wrapper still running: quit them and re-run S1\"; exit 1; }\n  [ -f \"$BK/game-inventory-before.tsv\" ] || { echo \"S2 not done, or BK is wrong: set TS to the original value\"; exit 1; }\n  [ -d \"$OLD\" ] && [ ! -L \"$OLD\" ] || { echo \"OLD is not a real directory\"; exit 1; }\n  [ ! -e \"$NEW\" ] && [ ! -L \"$NEW\" ] || { echo \"NEW already exists\"; exit 1; }\n  /bin/df -k \"$H\" | awk 'NR==2{print $4}' > \"$BK/free-kb-before.txt\"\n  jr \"S3 mv start\"\n  /bin/mv -n \"$OLD\" \"$NEW\"\n  [ ! -e \"$OLD\" ] || { echo \"OLD still exists after mv (BSD mv -n exits 0 when it does nothing)\"; exit 1; }\n  [ -d \"$NEW\" ] || { echo \"NEW missing after mv\"; exit 1; }\n  inv \"$NEW\" > \"$BK/game-inventory-after-move.tsv\"\n  cmp \"$BK/game-inventory-before.tsv\" \"$BK/game-inventory-after-move.tsv\" || { echo \"inventory differs: not a pure rename\"; exit 1; }\n  jr \"S3 OK: renamed, 144 inodes identical\"\n  echo \"S3 OK\" ); echo \"S3 rc=$?\""
+      ],
+      "verify": [
+        {
+          "type": "absent",
+          "path": "/Volumes/ExT2/GameHub/Relocated/NFS2015Mac/Data/Prefix/drive_c/Program Files/EA Games/Need for Speed"
+        },
+        {
+          "type": "inodeInventoryEquals",
+          "a": "/Volumes/ExT2/GameHub/EA Games/Need for Speed",
+          "b": "/Volumes/ExT2/GameHub/Backups/nfs-ea-import-<ts>/game-inventory-before.tsv",
+          "fields": "inode,size,name"
+        },
+        {
+          "type": "linkCount",
+          "path": "/Volumes/ExT2/GameHub/EA Games/Need for Speed",
+          "scope": "all files",
+          "expect": 1
+        }
+      ],
+      "verifyCommands": [],
+      "fallbackCommands": [],
+      "rollback": [
+        "( set -euo pipefail\n  [ -f \"$BK/game-inventory-before.tsv\" ] || { echo \"BK is wrong: set TS to the original value\"; exit 1; }\n  stopped || { echo \"wine/EA/old wrapper still running: quit them and re-run S1\"; exit 1; }\n  [ -d \"$NEW\" ] && [ ! -L \"$NEW\" ] || { echo \"NEW missing\"; exit 1; }\n  if [ -e \"$OLD\" ]; then\n    inv \"$OLD\" > \"$BK/rollback-old.tsv\"; inv \"$NEW\" > \"$BK/rollback-new.tsv\"\n    cmp \"$BK/rollback-old.tsv\" \"$BK/rollback-new.tsv\" || { echo \"STOP: OLD mirror and NEW differ (EA patched a file?). Nothing deleted. Decide by hand.\"; exit 1; }\n    rm -r \"$OLD\"\n  fi\n  [ ! -e \"$OLD\" ] || { echo \"OLD still exists\"; exit 1; }\n  /bin/mv -n \"$NEW\" \"$OLD\"\n  [ ! -e \"$NEW\" ] || { echo \"NEW still exists: mv did not move it\"; exit 1; }\n  inv \"$OLD\" > \"$BK/rollback-after.tsv\"\n  cmp \"$BK/game-inventory-before.tsv\" \"$BK/rollback-after.tsv\" || { echo \"inventory differs from game-inventory-before.tsv\"; exit 1; }\n  jr \"R3 OK: game folder back at OLD, inventory identical to before\"\n  echo \"R3 OK\" ); echo \"R3 rc=$?\""
+      ]
+    },
+    {
+      "id": "S4",
+      "title": "Hard-link mirror at the old location",
+      "notes": "Real directory tree at OLD with 144 hard links to NEW. No symlink anywhere (old wrapper throws 'A Windows folder entry is a link'). If it stops midway run R0 (S4-undo).",
+      "requiresNoWine": true,
+      "preconditions": [
+        {
+          "type": "stopped",
+          "note": "first line of every mutating block: dry-run --gate with no FAIL on noWineProcess / prefixNotInUse / old wrapper"
+        },
+        {
+          "type": "absent",
+          "path": "/Volumes/ExT2/GameHub/Relocated/NFS2015Mac/Data/Prefix/drive_c/Program Files/EA Games/Need for Speed"
+        },
+        {
+          "type": "notSymlink",
+          "path": "/Volumes/ExT2/GameHub/EA Games/Need for Speed"
+        },
+        {
+          "type": "inodeInventoryEquals",
+          "a": "/Volumes/ExT2/GameHub/EA Games/Need for Speed",
+          "b": "/Volumes/ExT2/GameHub/Backups/nfs-ea-import-<ts>/game-inventory-before.tsv",
+          "fields": "inode,size,name"
+        }
+      ],
+      "commands": [
+        "( set -euo pipefail\n  stopped || { echo \"wine/EA/old wrapper still running: quit them and re-run S1\"; exit 1; }\n  [ ! -e \"$OLD\" ] && [ ! -L \"$OLD\" ] || { echo \"OLD exists\"; exit 1; }\n  [ -d \"$NEW\" ] && [ ! -L \"$NEW\" ] || { echo \"NEW missing\"; exit 1; }\n  mkdir \"$OLD\"\n  (cd \"$NEW\" && /usr/bin/find . -mindepth 1 -type d -print0) | while IFS= read -r -d '' d; do\n    mkdir -p \"$OLD/$d\" || { echo \"mkdir failed: $d\"; exit 1; }\n  done\n  (cd \"$NEW\" && /usr/bin/find . -type f -print0) | while IFS= read -r -d '' f; do\n    /bin/ln \"$NEW/$f\" \"$OLD/$f\" || { echo \"ln failed: $f\"; exit 1; }\n  done\n  jr \"S4 mirror created\"\n  [ ! -L \"$OLD\" ] || { echo \"OLD is a symlink\"; exit 1; }\n  [ \"$(/usr/bin/find \"$OLD\" -type f | wc -l | tr -d ' ')\" = 144 ] || { echo \"OLD file count != 144\"; exit 1; }\n  [ \"$(/usr/bin/find \"$OLD\" -type l | wc -l | tr -d ' ')\" = 0 ] || { echo \"symlink under OLD\"; exit 1; }\n  [ \"$(/usr/bin/find \"$OLD\" -type d | wc -l | tr -d ' ')\" = \"$(/usr/bin/find \"$NEW\" -type d | wc -l | tr -d ' ')\" ] || { echo \"directory count differs\"; exit 1; }\n  inv \"$OLD\" > \"$BK/game-inventory-mirror-old.tsv\"\n  inv \"$NEW\" > \"$BK/game-inventory-mirror-new.tsv\"\n  cmp \"$BK/game-inventory-mirror-old.tsv\" \"$BK/game-inventory-mirror-new.tsv\" || { echo \"OLD and NEW differ (inode/size/name)\"; exit 1; }\n  awk -F'\\t' '$2 != 2 { bad++ } END { exit bad > 0 }' \"$BK/game-inventory-mirror-new.tsv\" || { echo \"link count != 2\"; exit 1; }\n  cut -f1,3,4 \"$BK/game-inventory-before.tsv\" | cmp - <(cut -f1,3,4 \"$BK/game-inventory-mirror-new.tsv\") || { echo \"inodes differ from before S3\"; exit 1; }\n  F0=$(cat \"$BK/free-kb-before.txt\"); F1=$(/bin/df -k \"$H\" | awk 'NR==2{print $4}')\n  [ $((F0 - F1)) -lt 102400 ] || { echo \"free space dropped by $((F0 - F1)) KiB: data was copied?\"; exit 1; }\n  jr \"S4 OK: 144 hard links, 0 symlinks, free-space delta $((F0 - F1)) KiB\"\n  echo \"S4 OK\" ); echo \"S4 rc=$?\""
+      ],
+      "verify": [
+        {
+          "type": "notSymlink",
+          "path": "/Volumes/ExT2/GameHub/Relocated/NFS2015Mac/Data/Prefix/drive_c/Program Files/EA Games/Need for Speed"
+        },
+        {
+          "type": "fileCount",
+          "path": "/Volumes/ExT2/GameHub/Relocated/NFS2015Mac/Data/Prefix/drive_c/Program Files/EA Games/Need for Speed",
+          "kind": "file",
+          "expect": 144
+        },
+        {
+          "type": "fileCount",
+          "path": "/Volumes/ExT2/GameHub/Relocated/NFS2015Mac/Data/Prefix/drive_c/Program Files/EA Games/Need for Speed",
+          "kind": "symlink",
+          "expect": 0
+        },
+        {
+          "type": "linkCount",
+          "path": "/Volumes/ExT2/GameHub/EA Games/Need for Speed",
+          "scope": "all files",
+          "expect": 2
+        },
+        {
+          "type": "sameFile",
+          "a": "/Volumes/ExT2/GameHub/Relocated/NFS2015Mac/Data/Prefix/drive_c/Program Files/EA Games/Need for Speed/<rel>",
+          "b": "/Volumes/ExT2/GameHub/EA Games/Need for Speed/<rel>",
+          "forEach": "all 144 files"
+        },
+        {
+          "type": "freeSpaceDeltaBelow",
+          "path": "/Volumes/ExT2/GameHub",
+          "maxKiB": 102400
+        }
+      ],
+      "verifyCommands": [],
+      "fallbackCommands": [],
+      "rollback": [
+        "( set -euo pipefail\n  stopped || { echo \"wine/EA/old wrapper still running: quit them and re-run S1\"; exit 1; }\n  [ -d \"$OLD\" ] && [ ! -L \"$OLD\" ] || { echo \"OLD is not a real directory: nothing to undo\"; exit 1; }\n  [ -d \"$NEW\" ] || { echo \"NEW missing: do not remove OLD\"; exit 1; }\n  (cd \"$OLD\" && /usr/bin/find . -type f -print0) | while IFS= read -r -d '' f; do [ \"$OLD/$f\" -ef \"$NEW/$f\" ] || { echo \"unique file: $f\"; exit 1; }; done\n  [ \"$(/usr/bin/find \"$OLD\" ! -type f ! -type d | wc -l | tr -d ' ')\" = 0 ] || { echo \"OLD holds symlinks or other non-file entries: inspect by hand\"; exit 1; }\n  rm -r \"$OLD\"\n  [ ! -e \"$OLD\" ] || { echo \"OLD still exists\"; exit 1; }\n  echo \"S4-undo OK\" ); echo \"S4-undo rc=$?\"",
+        "( set -euo pipefail\n  [ -f \"$BK/game-inventory-before.tsv\" ] || { echo \"BK is wrong: set TS to the original value\"; exit 1; }\n  stopped || { echo \"wine/EA/old wrapper still running: quit them and re-run S1\"; exit 1; }\n  [ -d \"$NEW\" ] && [ ! -L \"$NEW\" ] || { echo \"NEW missing\"; exit 1; }\n  if [ -e \"$OLD\" ]; then\n    inv \"$OLD\" > \"$BK/rollback-old.tsv\"; inv \"$NEW\" > \"$BK/rollback-new.tsv\"\n    cmp \"$BK/rollback-old.tsv\" \"$BK/rollback-new.tsv\" || { echo \"STOP: OLD mirror and NEW differ (EA patched a file?). Nothing deleted. Decide by hand.\"; exit 1; }\n    rm -r \"$OLD\"\n  fi\n  [ ! -e \"$OLD\" ] || { echo \"OLD still exists\"; exit 1; }\n  /bin/mv -n \"$NEW\" \"$OLD\"\n  [ ! -e \"$NEW\" ] || { echo \"NEW still exists: mv did not move it\"; exit 1; }\n  inv \"$OLD\" > \"$BK/rollback-after.tsv\"\n  cmp \"$BK/game-inventory-before.tsv\" \"$BK/rollback-after.tsv\" || { echo \"inventory differs from game-inventory-before.tsv\"; exit 1; }\n  jr \"R3 OK: game folder back at OLD, inventory identical to before\"\n  echo \"R3 OK\" ); echo \"R3 rc=$?\""
+      ]
+    },
+    {
+      "id": "S5",
+      "title": "Registry import (wine allowed, EA stopped)",
+      "notes": "wine reg import of nfs-import.reg into the 32-bit view only, then wineserver -k and -w so the hive is flushed. Verify on disk read-only: the section is extracted with awk (header to next '[' line) and the three values are looked up in it; counts of BF3/BF4/Crysis/F1_24 lines must not change. Fallback (not recommended): append the section to system.reg with no wine running.",
+      "requiresNoWine": false,
+      "preconditions": [
+        {
+          "type": "stopped",
+          "note": "first line of every mutating block: dry-run --gate with no FAIL on noWineProcess / prefixNotInUse / old wrapper"
+        },
+        {
+          "type": "regSectionAbsent",
+          "hive": "/Volumes/ExT2/GameHub/Prefix/system.reg",
+          "header": "[Software\\\\Wow6432Node\\\\EA Games\\\\Need for Speed]"
+        },
+        {
+          "type": "textContains",
+          "path": "/Volumes/ExT2/GameHub/docs/nfs-ea-import-20261011/nfs-import.reg",
+          "text": "REGEDIT4"
+        }
+      ],
+      "commands": [
+        "( set -euo pipefail\n  stopped || { echo \"wine/EA/old wrapper still running: quit them and re-run S1\"; exit 1; }\n  [ -f \"$BK/game-inventory-before.tsv\" ] || { echo \"BK is wrong: set TS to the original value\"; exit 1; }\n  for p in 'Battlefield 4' 'Battlefield 3' 'Crysis' 'F1_24' 'Need for Speed'; do\n    printf '%s\\t%s\\n' \"$p\" \"$(grep -cF \"$p\" \"$SP/system.reg\" || true)\"\n  done | tee \"$BK/reg-counts-before.txt\"\n  \"${W[@]}\" \"$RT/bin/wine\" reg import 'Z:\\Volumes\\ExT2\\GameHub\\docs\\nfs-ea-import-20261011\\nfs-import.reg'\n  jr \"S5 reg import rc=0\"\n  \"${W[@]}\" \"$RT/bin/wineserver\" -k || true\n  \"${W[@]}\" \"$RT/bin/wineserver\" -w\n  jr \"S5 wineserver stopped\"\n  echo \"S5 import OK\" ); echo \"S5 rc=$?\""
+      ],
+      "verify": [
+        {
+          "type": "regSectionPresent",
+          "hive": "/Volumes/ExT2/GameHub/Prefix/system.reg",
+          "header": "[Software\\\\Wow6432Node\\\\EA Games\\\\Need for Speed]",
+          "values": {
+            "Install Dir": "E:\\\\EA Games\\\\Need for Speed\\\\",
+            "Locale": "en_US",
+            "Product GUID": "{F8643E83-A868-4EE8-A0B9-389386830453}"
+          }
+        },
+        {
+          "type": "noWineProcess"
+        }
+      ],
+      "verifyCommands": [
+        "( set -euo pipefail\n  SEC=$(HDR=\"$HDR\" awk 'index($0,ENVIRON[\"HDR\"])==1{f=1;next} f&&/^\\[/{exit} f' \"$SP/system.reg\")\n  printf '%s\\n' \"$SEC\"\n  [ \"$(grep -cF \"$HDR\" \"$SP/system.reg\")\" = 1 ] || { echo \"header count != 1\"; exit 1; }\n  for l in '\"Install Dir\"=\"E:\\\\EA Games\\\\Need for Speed\\\\\"' '\"Locale\"=\"en_US\"' '\"Product GUID\"=\"{F8643E83-A868-4EE8-A0B9-389386830453}\"'; do\n    printf '%s\\n' \"$SEC\" | grep -qxF \"$l\" || { echo \"MISSING: $l\"; exit 1; }\n  done\n  for p in 'Battlefield 4' 'Battlefield 3' 'Crysis' 'F1_24'; do\n    before=$(awk -F'\\t' -v p=\"$p\" '$1 == p { print $2 }' \"$BK/reg-counts-before.txt\")\n    now=$(grep -cF \"$p\" \"$SP/system.reg\" || true)\n    [ \"$before\" = \"$now\" ] || { echo \"COUNT CHANGED for $p: $before -> $now\"; exit 1; }\n  done\n  jr \"S5 verified: NFS key present, other game keys unchanged\"\n  echo \"S5 verify OK\" ); echo \"S5 verify rc=$?\""
+      ],
+      "fallbackCommands": [
+        "( set -euo pipefail\n  stopped || { echo \"wine/EA/old wrapper still running: quit them and re-run S1\"; exit 1; }\n  /bin/cp -c -p \"$SP/system.reg\" \"$BK/files/shared/system.reg.pre-manual-edit\"\n  printf '\\n[Software\\\\\\\\Wow6432Node\\\\\\\\EA Games\\\\\\\\Need for Speed] %s\\n\"Install Dir\"=\"E:\\\\\\\\EA Games\\\\\\\\Need for Speed\\\\\\\\\"\\n\"Locale\"=\"en_US\"\\n\"Product GUID\"=\"{F8643E83-A868-4EE8-A0B9-389386830453}\"\\n' \"$(date +%s)\" >> \"$SP/system.reg\"\n  echo \"appended\" ); echo \"manual-edit rc=$?\""
+      ],
+      "rollback": [
+        "( set -euo pipefail\n  [ -f \"$BK/game-inventory-before.tsv\" ] || { echo \"BK is wrong: set TS to the original value\"; exit 1; }\n  stopped || { echo \"wine/EA/old wrapper still running: quit them and re-run S1\"; exit 1; }\n  if \"${W[@]}\" \"$RT/bin/wine\" reg query 'HKLM\\SOFTWARE\\Wow6432Node\\EA Games\\Need for Speed' >/dev/null 2>&1; then\n    \"${W[@]}\" \"$RT/bin/wine\" reg delete 'HKLM\\SOFTWARE\\Wow6432Node\\EA Games\\Need for Speed' /f\n  fi\n  if \"${W[@]}\" \"$RT/bin/wine\" reg query 'HKLM\\SOFTWARE\\EA Games\\Need for Speed' >/dev/null 2>&1; then\n    \"${W[@]}\" \"$RT/bin/wine\" reg delete 'HKLM\\SOFTWARE\\EA Games\\Need for Speed' /f\n  fi\n  \"${W[@]}\" \"$RT/bin/wineserver\" -k || true\n  \"${W[@]}\" \"$RT/bin/wineserver\" -w\n  [ \"$(grep -cF \"$HDR\" \"$SP/system.reg\" || true)\" = 0 ] || { echo \"NFS key still present\"; exit 1; }\n  grep -nE 'Need for Speed|F8643E83' \"$SP/system.reg\" || echo \"no NFS leftovers\"\n  jr \"R1 NFS registry keys removed\"\n  echo \"R1 OK\" ); echo \"R1 rc=$?\""
+      ]
+    },
+    {
+      "id": "S6b",
+      "title": "Copy NFS settings (optional; after S5, BEFORE S6, EA stopped)",
+      "notes": "Wine user in SP is `crossover`, same as the old prefix. Clone Documents\\Need For Speed (~5 MB); guarded by target absent. Nothing backed up because the target is absent.",
+      "requiresNoWine": true,
+      "preconditions": [
+        {
+          "type": "stopped",
+          "note": "first line of every mutating block: dry-run --gate with no FAIL on noWineProcess / prefixNotInUse / old wrapper"
+        },
+        {
+          "type": "exists",
+          "path": "/Volumes/ExT2/GameHub/Relocated/NFS2015Mac/Data/Prefix/drive_c/users/crossover/Documents/Need For Speed"
+        },
+        {
+          "type": "exists",
+          "path": "/Volumes/ExT2/GameHub/Prefix/drive_c/users/crossover/Documents"
+        },
+        {
+          "type": "absent",
+          "path": "/Volumes/ExT2/GameHub/Prefix/drive_c/users/crossover/Documents/Need For Speed"
+        }
+      ],
+      "commands": [
+        "( set -euo pipefail\n  stopped || { echo \"wine/EA/old wrapper still running: quit them and re-run S1\"; exit 1; }\n  SRC=\"$OP/drive_c/users/crossover/Documents/Need For Speed\"\n  DOCS=\"$SP/drive_c/users/crossover/Documents\"\n  [ -d \"$SRC\" ] || { echo \"source missing: $SRC\"; exit 1; }\n  [ -d \"$DOCS\" ] || { echo \"target Documents missing: $DOCS\"; exit 1; }\n  [ ! -e \"$DOCS/Need For Speed\" ] || { echo \"target exists, nothing copied\"; exit 1; }\n  /bin/cp -c -R \"$SRC\" \"$DOCS/\"\n  [ -d \"$DOCS/Need For Speed/settings\" ] || { echo \"copy failed\"; exit 1; }\n  jr \"S6b NFS settings copied\"\n  echo \"S6b OK\" ); echo \"S6b rc=$?\""
+      ],
+      "verify": [
+        {
+          "type": "exists",
+          "path": "/Volumes/ExT2/GameHub/Prefix/drive_c/users/crossover/Documents/Need For Speed/settings"
+        }
+      ],
+      "verifyCommands": [],
+      "fallbackCommands": [],
+      "rollback": []
+    },
+    {
+      "id": "S6",
+      "title": "Start EA and verify detection",
+      "notes": "Records log byte offsets, starts EA, work wait --log only when the stale-match count is 0 (it scans from offset 0), then verifies four lines read only from the recorded offsets (rotated log read whole; .bak searched on a miss). Evidence is from the old prefix's EA 13.805.11.6320; SP runs 13.805.99.0. Contingency: watchPath path [E: still MISS after two waits -> open question (c), native key.",
+      "requiresNoWine": false,
+      "preconditions": [
+        {
+          "type": "regSectionPresent",
+          "hive": "/Volumes/ExT2/GameHub/Prefix/system.reg",
+          "header": "[Software\\\\Wow6432Node\\\\EA Games\\\\Need for Speed]",
+          "values": {
+            "Install Dir": "E:\\\\EA Games\\\\Need for Speed\\\\",
+            "Locale": "en_US",
+            "Product GUID": "{F8643E83-A868-4EE8-A0B9-389386830453}"
+          }
+        },
+        {
+          "type": "noWineProcess"
+        }
+      ],
+      "commands": [
+        "OFF_BSV=$(wc -c < \"$BSV\" | tr -d ' '); OFF_ED=$(wc -c < \"$LOGD/EADesktop.log\" | tr -d ' ')\necho \"${OFF_BSV:-0} ${OFF_ED:-0}\" > \"$BK/log-offsets.txt\"\nSTALE=$(grep -ac 'Located files for software \\[Origin\\.SFT\\.50\\.0000347\\]' \"$BSV\" || true)\necho \"stale matches before start (work wait needs 0): $STALE\"\n/Volumes/ExT2/GameHub/bin/start-ea.sh\nif [ \"$STALE\" = 0 ]; then\n  \"$WORK\" wait --log \"$BSV\" 'Located files for software \\[Origin\\.SFT\\.50\\.0000347\\]\\. Setting state to Installed' --timeout 570\n  echo \"work rc=$? (124 = not yet; run just the wait line again)\"\nelse\n  echo \"stale lines exist: skip work wait and run the verify block below repeatedly\"\nfi"
+      ],
+      "verify": [
+        {
+          "type": "logContains",
+          "path": "/Volumes/ExT2/GameHub/Prefix/drive_c/ProgramData/EA Desktop/Logs/EABackgroundServiceVerbose.log",
+          "text": "watchPath path [E:\\EA Games\\Need for Speed\\NFS16.exe] for software [Origin.SFT.50.0000347]",
+          "sinceOffset": "BK/log-offsets.txt"
+        },
+        {
+          "type": "logContains",
+          "path": "/Volumes/ExT2/GameHub/Prefix/drive_c/ProgramData/EA Desktop/Logs/EABackgroundServiceVerbose.log",
+          "text": "Located files for software [Origin.SFT.50.0000347]. Setting state to Installed",
+          "sinceOffset": "BK/log-offsets.txt"
+        },
+        {
+          "type": "logContains",
+          "path": "/Volumes/ExT2/GameHub/Prefix/drive_c/ProgramData/EA Desktop/Logs/EABackgroundServiceVerbose.log",
+          "text": "launcher.exePath=[[HKEY_LOCAL_MACHINE\\SOFTWARE\\EA Games\\Need for Speed\\Install Dir]NFS16.exe]",
+          "sinceOffset": "BK/log-offsets.txt"
+        },
+        {
+          "type": "logContains",
+          "path": "/Volumes/ExT2/GameHub/Prefix/drive_c/ProgramData/EA Desktop/Logs/EADesktop.log",
+          "text": "IS update: set installInfo for softwareId=[Origin.SFT.50.0000347] baseSlug=[need-for-speed] installedStatus=[Installed]",
+          "sinceOffset": "BK/log-offsets.txt"
+        }
+      ],
+      "verifyCommands": [
+        "( set -u; bad=0\n  read OFF_BSV OFF_ED < \"$BK/log-offsets.txt\"\n  chk() { local f=$1 off=$2 t=$3 sz; sz=$(wc -c < \"$f\" | tr -d ' ')\n    if [ \"$sz\" -lt \"$off\" ]; then off=0; fi\n    if tail -c +\"$((off + 1))\" \"$f\" | grep -aqF -- \"$t\"; then echo \"OK   $t\"\n    elif [ -f \"${f%.log}.bak\" ] && grep -aqF -- \"$t\" \"${f%.log}.bak\"; then echo \"OK   (in .bak) $t\"\n    else echo \"MISS $t\"; bad=1; fi; }\n  chk \"$BSV\" \"$OFF_BSV\" 'watchPath path [E:\\EA Games\\Need for Speed\\NFS16.exe] for software [Origin.SFT.50.0000347]'\n  chk \"$BSV\" \"$OFF_BSV\" 'Located files for software [Origin.SFT.50.0000347]. Setting state to Installed'\n  chk \"$BSV\" \"$OFF_BSV\" 'launcher.exePath=[[HKEY_LOCAL_MACHINE\\SOFTWARE\\EA Games\\Need for Speed\\Install Dir]NFS16.exe]'\n  chk \"$LOGD/EADesktop.log\" \"$OFF_ED\" 'IS update: set installInfo for softwareId=[Origin.SFT.50.0000347] baseSlug=[need-for-speed] installedStatus=[Installed]'\n  exit $bad ); echo \"S6 verify rc=$?\""
+      ],
+      "fallbackCommands": [],
+      "rollback": [
+        "( set -euo pipefail\n  [ -f \"$BK/game-inventory-before.tsv\" ] || { echo \"BK is wrong: set TS to the original value\"; exit 1; }\n  stopped || { echo \"wine/EA/old wrapper still running: quit them and re-run S1\"; exit 1; }\n  mkdir -p \"$BK/rolled-back\"\n  [ ! -e \"$BK/rolled-back/EA Desktop.after\" ] || { echo \"rolled-back/EA Desktop.after already exists\"; exit 1; }\n  /bin/mv -n \"$SP/drive_c/ProgramData/EA Desktop\" \"$BK/rolled-back/EA Desktop.after\"\n  [ ! -e \"$SP/drive_c/ProgramData/EA Desktop\" ] || { echo \"EA Desktop not moved\"; exit 1; }\n  /bin/cp -c -R -p \"$BK/files/shared/ProgramData/EA Desktop\" \"$SP/drive_c/ProgramData/EA Desktop\"\n  jr \"R4 EA Desktop state restored\"; echo \"R4 OK\" ); echo \"R4 rc=$?\""
+      ]
+    },
+    {
+      "id": "S7",
+      "title": "First launch and licence (user-driven)",
+      "notes": "Record L0=lic_bad BEFORE Play, press Play, then L1=lic_bad. Failure iff L1 > L0 (BF3's old Mismatched-machine-hash lines are already in gl_log_2.log and carry no content ID). EA issues a fresh 1024486.dlf (1 EA activation, possibly 1 Denuvo activation). Disable auto-update for NFS in EA before Play.",
+      "requiresNoWine": false,
+      "preconditions": [
+        {
+          "type": "logContains",
+          "path": "/Volumes/ExT2/GameHub/Prefix/drive_c/ProgramData/EA Desktop/Logs/EABackgroundServiceVerbose.log",
+          "text": "Setting state to Installed"
+        }
+      ],
+      "commands": [
+        "L0=$(lic_bad); echo \"$L0\" > \"$BK/lic-bad-before.txt\"; jr \"S7 before Play: licence-failure lines=$L0\"\necho \"licence-failure lines before Play: $L0\""
+      ],
+      "verify": [
+        {
+          "type": "exists",
+          "path": "/Volumes/ExT2/GameHub/Prefix/drive_c/ProgramData/Electronic Arts/EA Services/License/1024486.dlf"
+        },
+        {
+          "type": "logCountNotGreater",
+          "files": "/Volumes/ExT2/GameHub/Prefix/drive_c/ProgramData/EA Logs/gl_log_*.log",
+          "encoding": "UTF-16LE",
+          "pattern": "Mismatched machine hash|License Failure",
+          "baseline": "/Volumes/ExT2/GameHub/Backups/nfs-ea-import-<ts>/lic-bad-before.txt"
+        },
+        {
+          "type": "logContains",
+          "path": "/Volumes/ExT2/GameHub/Prefix/drive_c/ProgramData/Origin/Logs/NFS16_1024486_OnlineActivation_Log.html",
+          "text": "License signature is good"
+        },
+        {
+          "type": "logContains",
+          "path": "/Volumes/ExT2/GameHub/Prefix/drive_c/ProgramData/EA Desktop/Logs/EADesktop.log",
+          "text": "Got exePath=[E:\\EA Games\\Need for Speed\\NFS16.exe]"
+        }
+      ],
+      "verifyCommands": [
+        "( set -u\n  L0=$(cat \"$BK/lic-bad-before.txt\"); L1=$(lic_bad)\n  echo \"licence-failure lines before=$L0 after=$L1 (after > before = failure)\"\n  if [ \"$L1\" -gt \"$L0\" ]; then echo \"LICENCE FAILURE: see R2\"; else echo \"licence OK\"; fi\n  ls -l \"$SPLIC/1024486.dlf\"\n  grep -ac 'License signature is good' \"$SP/drive_c/ProgramData/Origin/Logs/NFS16_1024486_OnlineActivation_Log.html\"\n  grep -ahF 'Got exePath=[E:\\EA Games\\Need for Speed\\NFS16.exe]' \"$LOGD/EADesktop.log\" | tail -1 )"
+      ],
+      "fallbackCommands": [],
+      "rollback": [
+        "( set -euo pipefail\n  [ -f \"$BK/game-inventory-before.tsv\" ] || { echo \"BK is wrong: set TS to the original value\"; exit 1; }\n  stopped || { echo \"wine/EA/old wrapper still running: quit them and re-run S1\"; exit 1; }\n  mkdir -p \"$BK/rolled-back\"\n  if [ -e \"$SPLIC/1024486.dlf\" ]; then\n    [ ! -e \"$BK/rolled-back/1024486.dlf\" ] || { echo \"rolled-back/1024486.dlf already exists\"; exit 1; }\n    /bin/mv -n \"$SPLIC/1024486.dlf\" \"$BK/rolled-back/1024486.dlf\"\n    [ ! -e \"$SPLIC/1024486.dlf\" ] || { echo \"not moved\"; exit 1; }\n  fi\n  jr \"R2 new 1024486.dlf (if any) moved to rolled-back/\"\n  echo \"R2 OK\" ); echo \"R2 rc=$?\""
+      ]
+    },
+    {
+      "id": "S8",
+      "title": "Old wrapper smoke test (optional, later)",
+      "notes": "Launch the old bundle normally. It must not print 'A Windows folder entry is a link' and must find NFS16.exe. Manual step, no commands.",
+      "requiresNoWine": false,
+      "preconditions": [
+        {
+          "type": "noWineProcess",
+          "name": "shared EA not playing NFS"
+        }
+      ],
+      "commands": [],
+      "verify": [
+        {
+          "type": "notSymlink",
+          "path": "/Volumes/ExT2/GameHub/Relocated/NFS2015Mac/Data/Prefix/drive_c/Program Files/EA Games/Need for Speed"
+        },
+        {
+          "type": "exists",
+          "path": "/Volumes/ExT2/GameHub/Relocated/NFS2015Mac/Data/Prefix/drive_c/Program Files/EA Games/Need for Speed/NFS16.exe"
+        }
+      ],
+      "verifyCommands": [],
+      "fallbackCommands": [],
+      "rollback": []
+    }
+  ],
+  "rollback": [
+    {
+      "id": "R0",
+      "title": "S4-undo: remove a half-built mirror (only if every file is a hard link of NEW's and nothing else is in it)",
+      "requiresNoWine": true,
+      "preconditions": [
+        {
+          "type": "stopped",
+          "note": "first line of every mutating block: dry-run --gate with no FAIL on noWineProcess / prefixNotInUse / old wrapper"
+        }
+      ],
+      "commands": [
+        "( set -euo pipefail\n  stopped || { echo \"wine/EA/old wrapper still running: quit them and re-run S1\"; exit 1; }\n  [ -d \"$OLD\" ] && [ ! -L \"$OLD\" ] || { echo \"OLD is not a real directory: nothing to undo\"; exit 1; }\n  [ -d \"$NEW\" ] || { echo \"NEW missing: do not remove OLD\"; exit 1; }\n  (cd \"$OLD\" && /usr/bin/find . -type f -print0) | while IFS= read -r -d '' f; do [ \"$OLD/$f\" -ef \"$NEW/$f\" ] || { echo \"unique file: $f\"; exit 1; }; done\n  [ \"$(/usr/bin/find \"$OLD\" ! -type f ! -type d | wc -l | tr -d ' ')\" = 0 ] || { echo \"OLD holds symlinks or other non-file entries: inspect by hand\"; exit 1; }\n  rm -r \"$OLD\"\n  [ ! -e \"$OLD\" ] || { echo \"OLD still exists\"; exit 1; }\n  echo \"S4-undo OK\" ); echo \"S4-undo rc=$?\""
+      ],
+      "verify": [
+        {
+          "type": "absent",
+          "path": "/Volumes/ExT2/GameHub/Relocated/NFS2015Mac/Data/Prefix/drive_c/Program Files/EA Games/Need for Speed"
+        }
+      ]
+    },
+    {
+      "id": "R1",
+      "title": "Registry: delete only the NFS keys (32-bit and, if a touchup created it, native); never the parent EA Games",
+      "requiresNoWine": false,
+      "preconditions": [
+        {
+          "type": "bkMatches",
+          "file": "game-inventory-before.tsv"
+        },
+        {
+          "type": "stopped",
+          "note": "first line of every mutating block: dry-run --gate with no FAIL on noWineProcess / prefixNotInUse / old wrapper"
+        }
+      ],
+      "commands": [
+        "( set -euo pipefail\n  [ -f \"$BK/game-inventory-before.tsv\" ] || { echo \"BK is wrong: set TS to the original value\"; exit 1; }\n  stopped || { echo \"wine/EA/old wrapper still running: quit them and re-run S1\"; exit 1; }\n  if \"${W[@]}\" \"$RT/bin/wine\" reg query 'HKLM\\SOFTWARE\\Wow6432Node\\EA Games\\Need for Speed' >/dev/null 2>&1; then\n    \"${W[@]}\" \"$RT/bin/wine\" reg delete 'HKLM\\SOFTWARE\\Wow6432Node\\EA Games\\Need for Speed' /f\n  fi\n  if \"${W[@]}\" \"$RT/bin/wine\" reg query 'HKLM\\SOFTWARE\\EA Games\\Need for Speed' >/dev/null 2>&1; then\n    \"${W[@]}\" \"$RT/bin/wine\" reg delete 'HKLM\\SOFTWARE\\EA Games\\Need for Speed' /f\n  fi\n  \"${W[@]}\" \"$RT/bin/wineserver\" -k || true\n  \"${W[@]}\" \"$RT/bin/wineserver\" -w\n  [ \"$(grep -cF \"$HDR\" \"$SP/system.reg\" || true)\" = 0 ] || { echo \"NFS key still present\"; exit 1; }\n  grep -nE 'Need for Speed|F8643E83' \"$SP/system.reg\" || echo \"no NFS leftovers\"\n  jr \"R1 NFS registry keys removed\"\n  echo \"R1 OK\" ); echo \"R1 rc=$?\""
+      ],
+      "verify": [
+        {
+          "type": "regSectionAbsent",
+          "hive": "/Volumes/ExT2/GameHub/Prefix/system.reg",
+          "header": "[Software\\\\Wow6432Node\\\\EA Games\\\\Need for Speed]"
+        }
+      ],
+      "notes": "Lists any remaining 'Need for Speed|F8643E83' lines; review Uninstall entries by hand, never delete automatically. Restoring the whole system.reg is a last resort."
+    },
+    {
+      "id": "R2",
+      "title": "Licence: move a newly issued 1024486.dlf into BK/rolled-back/ (never delete)",
+      "requiresNoWine": true,
+      "preconditions": [
+        {
+          "type": "bkMatches",
+          "file": "game-inventory-before.tsv"
+        },
+        {
+          "type": "stopped",
+          "note": "first line of every mutating block: dry-run --gate with no FAIL on noWineProcess / prefixNotInUse / old wrapper"
+        }
+      ],
+      "commands": [
+        "( set -euo pipefail\n  [ -f \"$BK/game-inventory-before.tsv\" ] || { echo \"BK is wrong: set TS to the original value\"; exit 1; }\n  stopped || { echo \"wine/EA/old wrapper still running: quit them and re-run S1\"; exit 1; }\n  mkdir -p \"$BK/rolled-back\"\n  if [ -e \"$SPLIC/1024486.dlf\" ]; then\n    [ ! -e \"$BK/rolled-back/1024486.dlf\" ] || { echo \"rolled-back/1024486.dlf already exists\"; exit 1; }\n    /bin/mv -n \"$SPLIC/1024486.dlf\" \"$BK/rolled-back/1024486.dlf\"\n    [ ! -e \"$SPLIC/1024486.dlf\" ] || { echo \"not moved\"; exit 1; }\n  fi\n  jr \"R2 new 1024486.dlf (if any) moved to rolled-back/\"\n  echo \"R2 OK\" ); echo \"R2 rc=$?\""
+      ],
+      "verify": [
+        {
+          "type": "absent",
+          "path": "/Volumes/ExT2/GameHub/Prefix/drive_c/ProgramData/Electronic Arts/EA Services/License/1024486.dlf"
+        }
+      ]
+    },
+    {
+      "id": "R3",
+      "title": "Game files: verify mirror==NEW, rm -r the mirror (names only), mv -n NEW back to OLD, post-check both sides",
+      "requiresNoWine": true,
+      "preconditions": [
+        {
+          "type": "bkMatches",
+          "file": "game-inventory-before.tsv"
+        },
+        {
+          "type": "stopped",
+          "note": "first line of every mutating block: dry-run --gate with no FAIL on noWineProcess / prefixNotInUse / old wrapper"
+        },
+        {
+          "type": "inodeInventoryEquals",
+          "a": "/Volumes/ExT2/GameHub/Relocated/NFS2015Mac/Data/Prefix/drive_c/Program Files/EA Games/Need for Speed",
+          "b": "/Volumes/ExT2/GameHub/EA Games/Need for Speed",
+          "note": "if EA patched a file they differ: STOP and decide, nothing is deleted"
+        }
+      ],
+      "commands": [
+        "( set -euo pipefail\n  [ -f \"$BK/game-inventory-before.tsv\" ] || { echo \"BK is wrong: set TS to the original value\"; exit 1; }\n  stopped || { echo \"wine/EA/old wrapper still running: quit them and re-run S1\"; exit 1; }\n  [ -d \"$NEW\" ] && [ ! -L \"$NEW\" ] || { echo \"NEW missing\"; exit 1; }\n  if [ -e \"$OLD\" ]; then\n    inv \"$OLD\" > \"$BK/rollback-old.tsv\"; inv \"$NEW\" > \"$BK/rollback-new.tsv\"\n    cmp \"$BK/rollback-old.tsv\" \"$BK/rollback-new.tsv\" || { echo \"STOP: OLD mirror and NEW differ (EA patched a file?). Nothing deleted. Decide by hand.\"; exit 1; }\n    rm -r \"$OLD\"\n  fi\n  [ ! -e \"$OLD\" ] || { echo \"OLD still exists\"; exit 1; }\n  /bin/mv -n \"$NEW\" \"$OLD\"\n  [ ! -e \"$NEW\" ] || { echo \"NEW still exists: mv did not move it\"; exit 1; }\n  inv \"$OLD\" > \"$BK/rollback-after.tsv\"\n  cmp \"$BK/game-inventory-before.tsv\" \"$BK/rollback-after.tsv\" || { echo \"inventory differs from game-inventory-before.tsv\"; exit 1; }\n  jr \"R3 OK: game folder back at OLD, inventory identical to before\"\n  echo \"R3 OK\" ); echo \"R3 rc=$?\""
+      ],
+      "verify": [
+        {
+          "type": "absent",
+          "path": "/Volumes/ExT2/GameHub/EA Games/Need for Speed"
+        },
+        {
+          "type": "inodeInventoryEquals",
+          "a": "/Volumes/ExT2/GameHub/Relocated/NFS2015Mac/Data/Prefix/drive_c/Program Files/EA Games/Need for Speed",
+          "b": "/Volumes/ExT2/GameHub/Backups/nfs-ea-import-<ts>/game-inventory-before.tsv"
+        }
+      ]
+    },
+    {
+      "id": "R4",
+      "title": "EA state: NFS becomes NotInstalled on next start; restore ProgramData/EA Desktop only if corrupt",
+      "requiresNoWine": true,
+      "preconditions": [
+        {
+          "type": "bkMatches",
+          "file": "game-inventory-before.tsv"
+        },
+        {
+          "type": "stopped",
+          "note": "first line of every mutating block: dry-run --gate with no FAIL on noWineProcess / prefixNotInUse / old wrapper"
+        }
+      ],
+      "commands": [],
+      "fallbackCommands": [
+        "( set -euo pipefail\n  [ -f \"$BK/game-inventory-before.tsv\" ] || { echo \"BK is wrong: set TS to the original value\"; exit 1; }\n  stopped || { echo \"wine/EA/old wrapper still running: quit them and re-run S1\"; exit 1; }\n  mkdir -p \"$BK/rolled-back\"\n  [ ! -e \"$BK/rolled-back/EA Desktop.after\" ] || { echo \"rolled-back/EA Desktop.after already exists\"; exit 1; }\n  /bin/mv -n \"$SP/drive_c/ProgramData/EA Desktop\" \"$BK/rolled-back/EA Desktop.after\"\n  [ ! -e \"$SP/drive_c/ProgramData/EA Desktop\" ] || { echo \"EA Desktop not moved\"; exit 1; }\n  /bin/cp -c -R -p \"$BK/files/shared/ProgramData/EA Desktop\" \"$SP/drive_c/ProgramData/EA Desktop\"\n  jr \"R4 EA Desktop state restored\"; echo \"R4 OK\" ); echo \"R4 rc=$?\""
+      ],
+      "verify": []
+    },
+    {
+      "id": "R5",
+      "title": "Journal",
+      "requiresNoWine": false,
+      "preconditions": [],
+      "commands": [],
+      "notes": "Append jr lines to BK/journal.txt for every rollback step; keep BK."
+    }
+  ],
+  "verificationLogPatterns": {
+    "dir": "/Volumes/ExT2/GameHub/Prefix/drive_c/ProgramData/EA Desktop/Logs",
+    "note": "EA's binaries in SP are 13.805.99.0; evidence from the old prefix's 13.805.11.6320. Read only bytes after the recorded offsets; read a rotated log whole; on a miss also grep the .bak.",
+    "BSV_Installed": {
+      "file": "EABackgroundServiceVerbose.log",
+      "pattern": "Located files for software \\[Origin\\.SFT\\.50\\.0000347\\]\\. Setting state to Installed",
+      "regex": "grep -E"
+    },
+    "BSV_watch": {
+      "file": "EABackgroundServiceVerbose.log",
+      "fixed": "watchPath path [E:\\EA Games\\Need for Speed\\NFS16.exe] for software [Origin.SFT.50.0000347]"
+    },
+    "BSV_launcher": {
+      "file": "EABackgroundServiceVerbose.log",
+      "fixed": "launcher.exePath=[[HKEY_LOCAL_MACHINE\\SOFTWARE\\EA Games\\Need for Speed\\Install Dir]NFS16.exe]"
+    },
+    "ED_IS": {
+      "file": "EADesktop.log",
+      "fixed": "IS update: set installInfo for softwareId=[Origin.SFT.50.0000347] baseSlug=[need-for-speed] installedStatus=[Installed]"
+    },
+    "ED_play": {
+      "file": "EADesktop.log",
+      "fixed": "Got exePath=[E:\\EA Games\\Need for Speed\\NFS16.exe]"
+    },
+    "licenceBaseline": {
+      "files": "/Volumes/ExT2/GameHub/Prefix/drive_c/ProgramData/EA Logs/gl_log_*.log (UTF-16LE)",
+      "pattern": "Mismatched machine hash|License Failure",
+      "rule": "fail iff count after Play > count before Play"
+    },
+    "activationLog": {
+      "file": "/Volumes/ExT2/GameHub/Prefix/drive_c/ProgramData/Origin/Logs/NFS16_1024486_OnlineActivation_Log.html",
+      "fixed": "License signature is good"
+    }
+  },
+  "dryRun": {
+    "script": "/Volumes/ExT2/GameHub/docs/nfs-ea-import-20261011/nfs-ea-import-dryrun.sh",
+    "modes": [
+      "plan",
+      "--gate"
+    ],
+    "exit": {
+      "plan": "0 if fail=0 else 1",
+      "gate": "0 only if every check passes, else 2"
+    },
+    "summaryLine": "DRYRUN <mode> pass=N fail=M expected_fail_now=K",
+    "record": "section 'Dry-run record' of the md"
+  },
+  "openQuestions": [
+    "(a) target is outside the library root E:\\EA Games\\BF4\\ (fine for detection); alternative E:\\EA Games\\BF4\\Need for Speed",
+    "(b) keep the old wrapper at all? if not, skip S4 (OLD disappears; wrapper fails its locate check)",
+    "(c) also add the native 64-bit key? not needed per evidence; it is the contingency if S6 does not detect NFS",
+    "(d) NFS settings (users/crossover/Documents/Need For Speed, ~5 MB): shared prefix uses the same Wine user `crossover`, optional step S6b copies them"
+  ]
+}

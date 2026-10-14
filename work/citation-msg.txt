@@ -1,0 +1,4 @@
+State the swap chain refcount rule without citing a Wine test
+
+The audit keeps Wine test-file citations inside unix/conformance; the
+comment now states the behaviour itself.

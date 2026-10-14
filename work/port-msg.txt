@@ -1,0 +1,11 @@
+Move the back-buffer lock's rect geometry into surface_lock with host tests
+
+Ports the core half of 5c91c3d onto the merged back-buffer lock path:
+`region_offset` (where a writable lock's rect starts inside the
+whole-surface page, refused when it lies outside the page) and
+`writeback_regions` (the source rect and its render-resolution
+counterpart for the write-back, so only the locked rect is resampled
+under render.scale) move into mtld3d-core with unit tests, and
+surface.rs calls them instead of its inline copies. Behaviour is
+unchanged except that an offset equal to the page length is now
+refused rather than mapping an empty tail.

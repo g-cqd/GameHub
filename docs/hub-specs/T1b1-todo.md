@@ -1,0 +1,9 @@
+# T1b part 1 TO DO (Sonnet gate; all required). Worktree /Volumes/ExT2/GameHub/work/wt-hub-a.
+1 ModelTypes.swift conditionMatches: `case "always": return true` (or the enum case). Test: Predicate.all([always]) and Predicate.any([always]) match two different TargetFacts (true for both).
+2 FixTypes.swift ~69: no force unwrap: `if let exe { try Check.exe(exe, field:) } else { guard mode == "disabled", dll.lowercased().hasSuffix(".exe") else { throw ... } }`.
+3 A6 tests: valid exe-less sample (dll "p.exe", mode "disabled"); one test changes only mode ("builtin") -> fragment naming mode; one changes only dll ("d3d9") -> fragment naming dll. Give the two errors distinct messages (e.g. "dllOverride.mode: exe-less override must be disabled" / "dllOverride.dll: exe-less override must name an .exe").
+4 One-field rejection tests from valid samples, each with a fragment unique to its validator: Probe.port 0 and 65536; Probe.log without placeholder; Probe log holdSeconds 601; LaunchStage.passWhen 0 and 5 probes; LaunchStage.failWhen 5; LaunchStage.timeoutSeconds 0 and 901; LaunchStage.scope "bogus"; Recipe.launchStages duplicate ids and 13 stages; xmlAttribute attribute "1bad", value 257 bytes, value with \u{1}, file "x.xml" (no placeholder); drive JSON without lifetime; ReadinessEvent holdSeconds -1; Readiness.log "{gameRoot}/x.log" and "drive_c/x.log"; unknown-key tests for Probe, LaunchStage, xmlAttribute, versionedWindowsPath; versionedWindowsPath child with empty component ("a\\\\b"), > 120 bytes, control char, "/" and ":".
+5 versionedWindowsPath.child: reject "/" and ":" in components (decision).
+6 xmlAttribute.value: allow 0...256 bytes (empty allowed; decision); add an accepted test with "".
+7 Make the window-exe and versionedWindowsPath ".." fragments specific (include the field name).
+Done: HubCoreTests green; report item -> file:line and the final Test run line.

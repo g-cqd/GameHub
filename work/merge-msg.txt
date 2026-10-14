@@ -1,0 +1,43 @@
+Merge upstream athei/mtld3d main (f7cb3f2) into development
+
+Brings development (7d108a4) up to upstream main f7cb3f2 (v0.12.0 and 19
+commits after it): 68 upstream commits since the previous merge base
+b93e752. 29 paths conflicted; every hunk was decided on its merits.
+
+Decisions:
+- Cargo.toml (both workspaces): rust-version 1.99 (ours), version 0.12.0
+  (upstream); the D3D8 crates' Cargo.lock entries follow to 0.12.0.
+- Makefile/CI/CONTRIBUTING: upstream's test-unit-perf (PERF=1 test-unit
+  into target/perf, part of make check) replaces ours; nextest 0.9.146
+  kept; MTL_HUD_ENABLED now defaults in the Makefile as upstream has it.
+- Short vertex strides: upstream's crossing-attribute fetch (#1063) and
+  crossing_read_size supersede our vertex_read_size, which is removed;
+  our NFSMW e2e regression stays beside upstream's crossing tests.
+- Back-buffer locks (surface.rs): our rect-preserving write-back kept
+  (BackbufferSnapshot), its page now upstream's HeldPages for the memory
+  gauge; lockable render targets take upstream's ordered
+  UpdateColorRegionOp (#1117).
+- Additional swap chains: our model kept (own back-buffer storage,
+  presented by the chain's Present, chain retained by the back buffer's
+  public and binding references); upstream's pin mechanism removed. The
+  upstream StretchRect test now ColorFills the additional back buffer's
+  source block, since its storage is no longer the device's.
+- Perf: our atomic API timers kept beside upstream's crossing UP copies
+  and PageBox traffic; upstream's fixed 1 GHz test clock kept, ours
+  removed.
+- Shader cache schema: upstream 79-81 kept, our COLORARG0/ALPHAARG0 key
+  renumbered to 82 (FfStage 9 bytes, FfPsKey 74); upstream's early stop
+  at the first DISABLE stage precedes our ARG0 read.
+- Direct3D9::new(config, extended) keeps our legacy 4:3 mode table;
+  e2e private-log helpers take upstream's shape.
+- Docs: GAMES/COVERAGE rows from both sides; STATUS swap-chain bullet
+  merged; stale MULTIPLYADD/LERP and alias wording corrected.
+- Post-merge fixes: upstream FF tests gain ARG0 fields, filtered_modes
+  reads adapter_modes(), fetch_update -> try_update (Rust 1.99).
+- Includes bfabd76 (encoder ownership tests independent of scheduling).
+
+Host gates (rustc 1.99.0, aarch64-apple-darwin, cargo test standing in
+for nextest): windows core+types 2109 passed (PERF=1 2185), unix 773
+passed 2 ignored (PERF=1 779); clippy native and PERF native, fmt,
+audit, test-isolation, test-e2e-discovery, unix doc: green. Baseline
+development: 1849 / 713+1 failed (the scheduling-dependent test).

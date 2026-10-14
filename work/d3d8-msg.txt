@@ -1,0 +1,9 @@
+Keep the build identity in d3d8.dll so the bundle can be assembled
+
+`make bundle` refuses any shipped DLL that does not contain the build
+identity. d3d8.dll named it only in a log line, and since the DLL installs
+no logger of its own, fat LTO proves its `log` max level is always off and
+removes that line together with the identity, so no bundle could be built
+once d3d8.dll joined it. Direct3DCreate8 now passes the identity through
+`black_box`, which keeps it in the image; a `#[used]` static does not
+survive the PE linker's unreferenced-section removal.

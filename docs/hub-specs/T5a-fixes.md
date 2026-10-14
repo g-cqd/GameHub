@@ -1,0 +1,14 @@
+# T5a fixes from the Sonnet review (apply all; report, do not improvise). Worktree /Volumes/ExT2/GameHub/work/wt-hub-c.
+B1 PEScanner import AND delay loops: exactly 1024 descriptors + terminator ACCEPTED, 1025 rejected. Loop: `while true { guard off + stride <= count else throw truncated; if all-zero { break }; guard n < 1024 else throw "too many"; body; n += 1; off += stride }`; delete the post-loop throw. Tests 1024 ok / 1025 rejected for both tables.
+B2 ExecutableFinder: no early exit at `limit`. Bound work with `visited` counter (max 50_000 entries examined, passed inout through recursion), then sort (size desc, then path) and `prefix(max(0, limit))`. Test: 64 small tool##.exe + one large game.exe -> game.exe first.
+B3 Tests: every temp dir via one helper `makeTempRoot(tag)` = temporaryDirectory/<tag>-<UUID>, created with withIntermediateDirectories: false, removed in defer.
+S4 No triple copy: `read` produces `[UInt8]` once (`Data(contentsOf: url)` WITHOUT .alwaysMapped is acceptable and preferred: avoids SIGBUS on truncation; keep the size limit check before reading); parse works on `[UInt8]` directly (le16/le32 helpers on [UInt8], slices instead of subdata).
+S5 FolderMarkers: per directory build one lowercase-name index from at most 4096 entries; look markers up in the index; lstat only hits; list root once; count every entry toward bounds (256 subdirectories max).
+S6 Symlink checks fail closed: `guard (try? item.resourceValues(forKeys: [.isSymbolicLinkKey]))?.isSymbolicLink == false else { continue }`; per-entry errors `continue` instead of aborting.
+S7 Finder: require `.isRegularFileKey == true` for candidates; apply the name filter before any stat; skip directories whose extension is app, bundle, framework, plugin, kext (package-like).
+S8 Depth: keep reading B (root/1/2/3/x.exe included, root/1/2/3/4/x.exe excluded); document it in the doc comment.
+S9 Empty DLL name rejected ("PE: empty DLL name").
+T10 truncationNeverTraps also asserts the full buffer parses and lengths below the end of the section table throw; reject tests check the error message contains the intended reason; skipsSymlinks fixture also has a real steam_appid.txt and asserts found == ["steam_appid.txt"]; findsExecutables uses == 2; fix coffOffset duplication via PEFixture constant.
+T11 Add: limit -1 -> []; symlinked file `x.exe` not returned; `.EXE` uppercase found; size tie broken by path; symlinked subdirectory containing a marker not matched; delay VA below imageBase skipped.
+Nits: remove unused imageBase param; merge the two descriptor loops into one helper(stride:, nameOffset:); Int(truncatingIfNeeded:) for UInt32 offsets; fix test name typo `recongizes`, arm64 fixture with pe32Plus: true.
+Done: HubCoreTests green + full `swift build`. Report item -> done, final Test run line.

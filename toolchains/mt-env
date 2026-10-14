@@ -1,0 +1,23 @@
+#!/usr/bin/env bash
+# Run a command (normally `make ...`) in the provisioned mtld3d gate environment.
+# The MSVC splat sits in $T/xwin instead of the /opt/xwin windows/.cargo/config.toml
+# names: the extra -Lnative paths join the config's rustflags (cargo joins arrays),
+# and the CFLAGS_<target> variables, set in the real environment, take precedence
+# over the config's [env] table.
+T=/Volumes/ExT2/GameHub/toolchains
+X=$T/xwin
+export RUSTUP_HOME=$T/rustup CARGO_HOME=$T/cargo
+export PATH="$CARGO_HOME/bin:/usr/bin:/bin:/usr/sbin:/sbin:/opt/homebrew/bin"
+export RUST_STABLE=1.99.0 RUST_NIGHTLY=nightly-2026-10-02 NEXTEST_VERSION=0.9.146
+export WINE_SDK="${MT_WINE_SDK:-$(cat $T/wine-sdk-root.txt)}"
+export LLVM_MINGW=$T/llvm-mingw-20261006-ucrt-macos-universal
+unset WINE_INSTALL_DIR RUSTUP_TOOLCHAIN CARGO_TARGET_DIR
+export CARGO_TARGET_I686_PC_WINDOWS_MSVC_RUSTFLAGS="-Lnative=$X/crt/lib/x86 -Lnative=$X/sdk/lib/um/x86 -Lnative=$X/sdk/lib/ucrt/x86"
+export CARGO_TARGET_X86_64_PC_WINDOWS_MSVC_RUSTFLAGS="-Lnative=$X/crt/lib/x86_64 -Lnative=$X/sdk/lib/um/x86_64 -Lnative=$X/sdk/lib/ucrt/x86_64"
+INC="-idirafter $X/crt/include -idirafter $X/sdk/include/ucrt -idirafter $X/sdk/include/um -idirafter $X/sdk/include/shared"
+exec env \
+  "CFLAGS_i686-pc-windows-msvc=-march=pentium4 -fno-omit-frame-pointer $INC" \
+  "CXXFLAGS_i686-pc-windows-msvc=-march=pentium4 -fno-omit-frame-pointer $INC" \
+  "CFLAGS_x86_64-pc-windows-msvc=-march=x86-64-v2 -fno-omit-frame-pointer $INC" \
+  "CXXFLAGS_x86_64-pc-windows-msvc=-march=x86-64-v2 -fno-omit-frame-pointer $INC" \
+  "$@"

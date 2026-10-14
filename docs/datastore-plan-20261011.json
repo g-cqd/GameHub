@@ -1,0 +1,691 @@
+{
+  "schemaVersion": 1,
+  "id": "datastore-20261011",
+  "volume": "/Volumes/ExT2",
+  "protected": [
+    "/Volumes/ExT2/Bundles",
+    "/Volumes/ExT2/GameHub/EA Games",
+    "/Users/gc/Library/Application Support/BF3Mac/Data/Prefix.internal-old-20261010",
+    "/Users/gc/Library/Application Support/NFS2015Mac/Data/Prefix.internal-old-20261010"
+  ],
+  "allowedRoots": [
+    "/Volumes/ExT2",
+    "/Users/gc/Library/Application Support/BF3Mac/Data"
+  ],
+  "backupDir": "/Volumes/ExT2/GameHub/Backups/datastore-20261011",
+  "journal": "/Volumes/ExT2/GameHub/Backups/datastore-20261011/journal.jsonl",
+  "steps": [
+    {
+      "id": "S01-backups-dir",
+      "title": "Capitalise the backups folder and create this plan's backup directory",
+      "notes": "Case-only rename; no compatibility link is left at the old name.",
+      "requiresNoWine": false,
+      "preconditions": [],
+      "operations": [
+        {
+          "op": "rename",
+          "from": "/Volumes/ExT2/GameHub/backups",
+          "to": "/Volumes/ExT2/GameHub/Backups"
+        },
+        {
+          "op": "mkdir",
+          "path": "/Volumes/ExT2/GameHub/Backups/datastore-20261011",
+          "mode": 493
+        }
+      ],
+      "verify": [
+        {
+          "check": "exists",
+          "path": "/Volumes/ExT2/GameHub/Backups/Crysis3-installerdata.xml.orig-20261011",
+          "kind": "file"
+        },
+        {
+          "check": "exists",
+          "path": "/Volumes/ExT2/GameHub/Backups/licenses-20261011",
+          "kind": "directory"
+        }
+      ]
+    },
+    {
+      "id": "S02-hub-tree",
+      "title": "Create the Hub folder tree and move the logs into it",
+      "notes": "Modes are the ones HubPaths.prepareTree uses.",
+      "requiresNoWine": false,
+      "preconditions": [],
+      "operations": [
+        {
+          "op": "mkdir",
+          "path": "/Volumes/ExT2/GameHub/Hub",
+          "mode": 493
+        },
+        {
+          "op": "mkdir",
+          "path": "/Volumes/ExT2/GameHub/Hub/State",
+          "mode": 448
+        },
+        {
+          "op": "mkdir",
+          "path": "/Volumes/ExT2/GameHub/Hub/Home",
+          "mode": 493
+        },
+        {
+          "op": "mkdir",
+          "path": "/Volumes/ExT2/GameHub/Hub/Home/Player",
+          "mode": 493
+        },
+        {
+          "op": "mkdir",
+          "path": "/Volumes/ExT2/GameHub/Hub/Temp",
+          "mode": 493
+        },
+        {
+          "op": "mkdir",
+          "path": "/Volumes/ExT2/GameHub/Hub/Knowledge",
+          "mode": 493
+        },
+        {
+          "op": "rename",
+          "from": "/Volumes/ExT2/GameHub/Logs",
+          "to": "/Volumes/ExT2/GameHub/Hub/Logs"
+        },
+        {
+          "op": "symlink",
+          "path": "/Volumes/ExT2/GameHub/Logs",
+          "target": "Hub/Logs"
+        }
+      ],
+      "verify": []
+    },
+    {
+      "id": "S03-prefix",
+      "title": "Move the shared Wine prefix to GameHub/Prefix",
+      "notes": "Wine may run other prefixes; only this prefix must be idle.",
+      "requiresNoWine": false,
+      "preconditions": [
+        {
+          "check": "prefixNotInUse",
+          "path": "/Volumes/ExT2/GameHub/Relocated/BF3Mac/Data/Prefix",
+          "aliases": [
+            "/Users/gc/Library/Application Support/BF3Mac/Data/Prefix",
+            "/Users/gc/Library/Application Support/BF3Mac"
+          ]
+        },
+        {
+          "check": "quietFor",
+          "path": "/Volumes/ExT2/GameHub/Relocated/BF3Mac/Data/Prefix",
+          "minutes": 10
+        }
+      ],
+      "operations": [
+        {
+          "op": "backup",
+          "path": "/Users/gc/Library/Application Support/BF3Mac/Data/Prefix"
+        },
+        {
+          "op": "rename",
+          "from": "/Volumes/ExT2/GameHub/Relocated/BF3Mac/Data/Prefix",
+          "to": "/Volumes/ExT2/GameHub/Prefix"
+        },
+        {
+          "op": "symlink",
+          "path": "/Volumes/ExT2/GameHub/Relocated/BF3Mac/Data/Prefix",
+          "target": "../../../Prefix"
+        },
+        {
+          "op": "replaceSymlink",
+          "path": "/Users/gc/Library/Application Support/BF3Mac/Data/Prefix",
+          "target": "/Volumes/ExT2/GameHub/Prefix",
+          "expectedTarget": "/Volumes/ExT2/GameHub/Relocated/BF3Mac/Data/Prefix"
+        }
+      ],
+      "verify": [
+        {
+          "check": "sameFile",
+          "a": "/Volumes/ExT2/GameHub/Prefix",
+          "b": "/Users/gc/Library/Application Support/BF3Mac/Data/Prefix"
+        },
+        {
+          "check": "sameFile",
+          "a": "/Volumes/ExT2/GameHub/Prefix",
+          "b": "/Volumes/ExT2/GameHub/Relocated/BF3Mac/Data/Prefix"
+        },
+        {
+          "check": "exists",
+          "path": "/Volumes/ExT2/GameHub/Prefix/system.reg",
+          "kind": "file"
+        },
+        {
+          "check": "exists",
+          "path": "/Volumes/ExT2/GameHub/Prefix/user.reg",
+          "kind": "file"
+        },
+        {
+          "check": "symlinkTarget",
+          "path": "/Volumes/ExT2/GameHub/Prefix/dosdevices/e:",
+          "target": "/Volumes/ExT2/GameHub"
+        },
+        {
+          "check": "symlinkTarget",
+          "path": "/Volumes/ExT2/GameHub/Prefix/dosdevices/c:",
+          "target": "../drive_c"
+        },
+        {
+          "check": "symlinkTarget",
+          "path": "/Volumes/ExT2/GameHub/Prefix/dosdevices/z:",
+          "target": "/"
+        },
+        {
+          "check": "exists",
+          "path": "/Volumes/ExT2/GameHub/Prefix/drive_c/Program Files/Electronic Arts/EA Desktop",
+          "kind": "directory"
+        },
+        {
+          "check": "exists",
+          "path": "/Volumes/ExT2/GameHub/EA Games/BF4/Battlefield 4",
+          "kind": "directory"
+        },
+        {
+          "check": "prefixLocates",
+          "path": "/Users/gc/Library/Application Support/BF3Mac/Data/Prefix",
+          "allowedRoots": [
+            "/Volumes/ExT2/GameHub",
+            "/Users/gc/Library/Application Support/BF3Mac",
+            "/Users/gc/Library/Application Support/NFS2015Mac"
+          ],
+          "resolved": "/Volumes/ExT2/GameHub/Prefix"
+        }
+      ]
+    },
+    {
+      "id": "S04-hub-config",
+      "title": "Write the Hub configuration",
+      "requiresNoWine": false,
+      "preconditions": [
+        {
+          "check": "absent",
+          "path": "/Volumes/ExT2/GameHub/Hub/hub.json"
+        }
+      ],
+      "operations": [
+        {
+          "op": "writeHubConfig",
+          "path": "/Volumes/ExT2/GameHub/Hub/hub.json",
+          "prefix": "/Volumes/ExT2/GameHub/Prefix",
+          "runtime": "hub-0",
+          "runtimeManifest": "/Volumes/ExT2/GameHub/Runtimes/hub-0.manifest",
+          "runtimeManifestSHA256": "278e1d9da269c8c1f28d6a8b93451461b76a069336d9dcbea1496170163a6f9f",
+          "generation": 0
+        }
+      ],
+      "verify": [
+        {
+          "check": "hubConfigValid",
+          "path": "/Volumes/ExT2/GameHub/Hub/hub.json",
+          "prefix": "/Volumes/ExT2/GameHub/Prefix"
+        }
+      ]
+    },
+    {
+      "id": "S05-scripts",
+      "title": "Point the helper scripts at the new prefix, logs and runtime",
+      "notes": "COMPAT block, WINEDEBUG default, HOME, TMPDIR and R are left untouched.",
+      "requiresNoWine": false,
+      "preconditions": [
+        {
+          "check": "exists",
+          "path": "/Volumes/ExT2/GameHub/Runtimes/hub-0-winemacfs/bin/wine",
+          "kind": "file"
+        },
+        {
+          "check": "exists",
+          "path": "/Volumes/ExT2/GameHub/Runtimes/hub-0-helpers/x87sidecar",
+          "kind": "file"
+        }
+      ],
+      "operations": [
+        {
+          "op": "backup",
+          "path": "/Volumes/ExT2/GameHub/bin/start-ea.sh"
+        },
+        {
+          "op": "backup",
+          "path": "/Volumes/ExT2/GameHub/bin/wine-query.sh"
+        },
+        {
+          "op": "rewriteText",
+          "path": "/Volumes/ExT2/GameHub/bin/start-ea.sh",
+          "find": "BUN=\"/Volumes/ExT2/Bundles/Battlefield 3 Bundled 20261009-5ee7913.app/Contents\"",
+          "replace": "RT=\"${HUB_RUNTIME:-/Volumes/ExT2/GameHub/Runtimes/hub-0-winemacfs}\"",
+          "expectedCount": 1
+        },
+        {
+          "op": "rewriteText",
+          "path": "/Volumes/ExT2/GameHub/bin/start-ea.sh",
+          "find": "log=\"/Volumes/ExT2/GameHub/Logs/ea-$ts.log\"",
+          "replace": "log=\"/Volumes/ExT2/GameHub/Hub/Logs/ea-$ts.log\"",
+          "expectedCount": 1
+        },
+        {
+          "op": "rewriteText",
+          "path": "/Volumes/ExT2/GameHub/bin/start-ea.sh",
+          "find": "WINEPREFIX=\"$R/Data/Prefix\"",
+          "replace": "WINEPREFIX=\"/Volumes/ExT2/GameHub/Prefix\"",
+          "expectedCount": 1
+        },
+        {
+          "op": "rewriteText",
+          "path": "/Volumes/ExT2/GameHub/bin/start-ea.sh",
+          "find": "ROSETTA_X87_PATH=\"$BUN/Helpers/x87sidecar\"",
+          "replace": "ROSETTA_X87_PATH=\"/Volumes/ExT2/GameHub/Runtimes/hub-0-helpers/x87sidecar\"",
+          "expectedCount": 1
+        },
+        {
+          "op": "rewriteText",
+          "path": "/Volumes/ExT2/GameHub/bin/start-ea.sh",
+          "find": "\"$BUN/SharedSupport/Wine/bin/wine\"",
+          "replace": "\"$RT/bin/wine\"",
+          "expectedCount": 1
+        },
+        {
+          "op": "rewriteText",
+          "path": "/Volumes/ExT2/GameHub/bin/wine-query.sh",
+          "find": "B=\"/Volumes/ExT2/Bundles/Battlefield 3 Bundled 20261009-5ee7913.app/Contents/SharedSupport/Wine/bin/wine\"",
+          "replace": "B=\"${HUB_RUNTIME:-/Volumes/ExT2/GameHub/Runtimes/hub-0-winemacfs}/bin/wine\"",
+          "expectedCount": 1
+        },
+        {
+          "op": "rewriteText",
+          "path": "/Volumes/ExT2/GameHub/bin/wine-query.sh",
+          "find": "WINEPREFIX=\"$R/Data/Prefix\"",
+          "replace": "WINEPREFIX=\"/Volumes/ExT2/GameHub/Prefix\"",
+          "expectedCount": 1
+        }
+      ],
+      "verify": [
+        {
+          "check": "shellSyntax",
+          "path": "/Volumes/ExT2/GameHub/bin/start-ea.sh"
+        },
+        {
+          "check": "shellSyntax",
+          "path": "/Volumes/ExT2/GameHub/bin/wine-query.sh"
+        },
+        {
+          "check": "textContains",
+          "path": "/Volumes/ExT2/GameHub/bin/start-ea.sh",
+          "text": "RT=\"${HUB_RUNTIME:-/Volumes/ExT2/GameHub/Runtimes/hub-0-winemacfs}\"",
+          "count": 1
+        },
+        {
+          "check": "textContains",
+          "path": "/Volumes/ExT2/GameHub/bin/start-ea.sh",
+          "text": "log=\"/Volumes/ExT2/GameHub/Hub/Logs/ea-$ts.log\"",
+          "count": 1
+        },
+        {
+          "check": "textContains",
+          "path": "/Volumes/ExT2/GameHub/bin/start-ea.sh",
+          "text": "WINEPREFIX=\"/Volumes/ExT2/GameHub/Prefix\"",
+          "count": 1
+        },
+        {
+          "check": "textContains",
+          "path": "/Volumes/ExT2/GameHub/bin/start-ea.sh",
+          "text": "ROSETTA_X87_PATH=\"/Volumes/ExT2/GameHub/Runtimes/hub-0-helpers/x87sidecar\"",
+          "count": 1
+        },
+        {
+          "check": "textContains",
+          "path": "/Volumes/ExT2/GameHub/bin/start-ea.sh",
+          "text": "\"$RT/bin/wine\"",
+          "count": 1
+        },
+        {
+          "check": "textContains",
+          "path": "/Volumes/ExT2/GameHub/bin/wine-query.sh",
+          "text": "B=\"${HUB_RUNTIME:-/Volumes/ExT2/GameHub/Runtimes/hub-0-winemacfs}/bin/wine\"",
+          "count": 1
+        },
+        {
+          "check": "textContains",
+          "path": "/Volumes/ExT2/GameHub/bin/wine-query.sh",
+          "text": "WINEPREFIX=\"/Volumes/ExT2/GameHub/Prefix\"",
+          "count": 1
+        },
+        {
+          "check": "textContains",
+          "path": "/Volumes/ExT2/GameHub/bin/start-ea.sh",
+          "text": "$BUN",
+          "count": 0
+        },
+        {
+          "check": "textContains",
+          "path": "/Volumes/ExT2/GameHub/bin/start-ea.sh",
+          "text": "/Volumes/ExT2/Bundles",
+          "count": 0
+        },
+        {
+          "check": "textContains",
+          "path": "/Volumes/ExT2/GameHub/bin/wine-query.sh",
+          "text": "/Volumes/ExT2/Bundles",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "S06-library",
+      "title": "Create the Library folder and link the EA games into it",
+      "requiresNoWine": false,
+      "preconditions": [],
+      "operations": [
+        {
+          "op": "mkdir",
+          "path": "/Volumes/ExT2/GameHub/Library",
+          "mode": 493
+        },
+        {
+          "op": "symlink",
+          "path": "/Volumes/ExT2/GameHub/Library/EA",
+          "target": "../EA Games"
+        }
+      ],
+      "verify": [
+        {
+          "check": "notSymlink",
+          "path": "/Volumes/ExT2/GameHub/EA Games"
+        },
+        {
+          "check": "exists",
+          "path": "/Volumes/ExT2/GameHub/EA Games",
+          "kind": "directory"
+        }
+      ]
+    },
+    {
+      "id": "S07-steam",
+      "title": "Move the Steam folder into the Library and fix the Windows paths",
+      "requiresNoWine": false,
+      "preconditions": [
+        {
+          "check": "quietFor",
+          "path": "/Volumes/ExT2/Steam",
+          "minutes": 10
+        }
+      ],
+      "operations": [
+        {
+          "op": "rename",
+          "from": "/Volumes/ExT2/Steam",
+          "to": "/Volumes/ExT2/GameHub/Library/Steam"
+        },
+        {
+          "op": "symlink",
+          "path": "/Volumes/ExT2/Steam",
+          "target": "GameHub/Library/Steam"
+        },
+        {
+          "op": "backup",
+          "path": "/Volumes/ExT2/GameHub/Library/Steam/steamapps/libraryfolders.vdf"
+        },
+        {
+          "op": "backup",
+          "path": "/Volumes/ExT2/GameHub/Library/Steam/config/libraryfolders.vdf"
+        },
+        {
+          "op": "backup",
+          "path": "/Volumes/ExT2/GameHub/Library/Steam/steamapps/appmanifest_1359090.acf"
+        },
+        {
+          "op": "backup",
+          "path": "/Volumes/ExT2/GameHub/Library/Steam/steamapps/appmanifest_228980.acf"
+        },
+        {
+          "op": "backup",
+          "path": "/Volumes/ExT2/GameHub/Library/Steam/steamapps/appmanifest_243470.acf"
+        },
+        {
+          "op": "rewriteText",
+          "path": "/Volumes/ExT2/GameHub/Library/Steam/steamapps/libraryfolders.vdf",
+          "find": "\"Z:\\\\Volumes\\\\ExT2\\\\Steam\"",
+          "replace": "\"Z:\\\\Volumes\\\\ExT2\\\\GameHub\\\\Library\\\\Steam\"",
+          "expectedCount": 1
+        },
+        {
+          "op": "rewriteText",
+          "path": "/Volumes/ExT2/GameHub/Library/Steam/config/libraryfolders.vdf",
+          "find": "\"Z:\\\\Volumes\\\\ExT2\\\\Steam\"",
+          "replace": "\"Z:\\\\Volumes\\\\ExT2\\\\GameHub\\\\Library\\\\Steam\"",
+          "expectedCount": 1
+        },
+        {
+          "op": "rewriteText",
+          "path": "/Volumes/ExT2/GameHub/Library/Steam/steamapps/appmanifest_1359090.acf",
+          "find": "Z:\\\\Volumes\\\\ExT2\\\\Steam\\\\steam.exe",
+          "replace": "Z:\\\\Volumes\\\\ExT2\\\\GameHub\\\\Library\\\\Steam\\\\steam.exe",
+          "expectedCount": 1
+        },
+        {
+          "op": "rewriteText",
+          "path": "/Volumes/ExT2/GameHub/Library/Steam/steamapps/appmanifest_228980.acf",
+          "find": "Z:\\\\Volumes\\\\ExT2\\\\Steam\\\\steam.exe",
+          "replace": "Z:\\\\Volumes\\\\ExT2\\\\GameHub\\\\Library\\\\Steam\\\\steam.exe",
+          "expectedCount": 1
+        },
+        {
+          "op": "rewriteText",
+          "path": "/Volumes/ExT2/GameHub/Library/Steam/steamapps/appmanifest_243470.acf",
+          "find": "Z:\\\\Volumes\\\\ExT2\\\\Steam\\\\steam.exe",
+          "replace": "Z:\\\\Volumes\\\\ExT2\\\\GameHub\\\\Library\\\\Steam\\\\steam.exe",
+          "expectedCount": 1
+        }
+      ],
+      "verify": [
+        {
+          "check": "vdfParses",
+          "path": "/Volumes/ExT2/GameHub/Library/Steam/steamapps/libraryfolders.vdf"
+        },
+        {
+          "check": "vdfParses",
+          "path": "/Volumes/ExT2/GameHub/Library/Steam/config/libraryfolders.vdf"
+        },
+        {
+          "check": "textContains",
+          "path": "/Volumes/ExT2/GameHub/Library/Steam/steamapps/libraryfolders.vdf",
+          "text": "\"Z:\\\\Volumes\\\\ExT2\\\\GameHub\\\\Library\\\\Steam\"",
+          "count": 1
+        },
+        {
+          "check": "textContains",
+          "path": "/Volumes/ExT2/GameHub/Library/Steam/config/libraryfolders.vdf",
+          "text": "\"Z:\\\\Volumes\\\\ExT2\\\\GameHub\\\\Library\\\\Steam\"",
+          "count": 1
+        },
+        {
+          "check": "textContains",
+          "path": "/Volumes/ExT2/GameHub/Library/Steam/steamapps/appmanifest_1359090.acf",
+          "text": "Z:\\\\Volumes\\\\ExT2\\\\GameHub\\\\Library\\\\Steam\\\\steam.exe",
+          "count": 1
+        },
+        {
+          "check": "textContains",
+          "path": "/Volumes/ExT2/GameHub/Library/Steam/steamapps/appmanifest_228980.acf",
+          "text": "Z:\\\\Volumes\\\\ExT2\\\\GameHub\\\\Library\\\\Steam\\\\steam.exe",
+          "count": 1
+        },
+        {
+          "check": "textContains",
+          "path": "/Volumes/ExT2/GameHub/Library/Steam/steamapps/appmanifest_243470.acf",
+          "text": "Z:\\\\Volumes\\\\ExT2\\\\GameHub\\\\Library\\\\Steam\\\\steam.exe",
+          "count": 1
+        },
+        {
+          "check": "exists",
+          "path": "/Volumes/ExT2/GameHub/Library/Steam/steam.exe",
+          "kind": "file"
+        },
+        {
+          "check": "sameFile",
+          "a": "/Volumes/ExT2/Steam",
+          "b": "/Volumes/ExT2/GameHub/Library/Steam"
+        }
+      ]
+    },
+    {
+      "id": "S08-steamgames",
+      "title": "Move SteamGames into the Library",
+      "requiresNoWine": false,
+      "preconditions": [
+        {
+          "check": "quietFor",
+          "path": "/Volumes/ExT2/SteamGames",
+          "minutes": 10
+        }
+      ],
+      "operations": [
+        {
+          "op": "rename",
+          "from": "/Volumes/ExT2/SteamGames",
+          "to": "/Volumes/ExT2/GameHub/Library/SteamGames"
+        },
+        {
+          "op": "symlink",
+          "path": "/Volumes/ExT2/SteamGames",
+          "target": "GameHub/Library/SteamGames"
+        }
+      ],
+      "verify": []
+    },
+    {
+      "id": "S09-epic",
+      "title": "Move the Epic Games Store folder into the Library",
+      "requiresNoWine": false,
+      "preconditions": [
+        {
+          "check": "quietFor",
+          "path": "/Volumes/ExT2/EpicGamesStore",
+          "minutes": 10
+        }
+      ],
+      "operations": [
+        {
+          "op": "rename",
+          "from": "/Volumes/ExT2/EpicGamesStore",
+          "to": "/Volumes/ExT2/GameHub/Library/Epic"
+        },
+        {
+          "op": "symlink",
+          "path": "/Volumes/ExT2/EpicGamesStore",
+          "target": "GameHub/Library/Epic"
+        }
+      ],
+      "verify": [
+        {
+          "check": "exists",
+          "path": "/Volumes/ExT2/GameHub/Library/Epic/GTAV/.egstore",
+          "kind": "directory"
+        }
+      ]
+    },
+    {
+      "id": "S10-ubisoft",
+      "title": "Move the Ubisoft Game Launcher folder into the Library",
+      "requiresNoWine": false,
+      "preconditions": [
+        {
+          "check": "quietFor",
+          "path": "/Volumes/ExT2/Ubisoft Game Launcher",
+          "minutes": 10
+        }
+      ],
+      "operations": [
+        {
+          "op": "rename",
+          "from": "/Volumes/ExT2/Ubisoft Game Launcher",
+          "to": "/Volumes/ExT2/GameHub/Library/Ubisoft"
+        },
+        {
+          "op": "symlink",
+          "path": "/Volumes/ExT2/Ubisoft Game Launcher",
+          "target": "GameHub/Library/Ubisoft"
+        }
+      ],
+      "verify": [
+        {
+          "check": "exists",
+          "path": "/Volumes/ExT2/GameHub/Library/Ubisoft/UbisoftConnect.exe",
+          "kind": "file"
+        }
+      ]
+    },
+    {
+      "id": "S11-ea-unregistered",
+      "title": "Move the unregistered EA Games folder into the Library",
+      "requiresNoWine": false,
+      "preconditions": [
+        {
+          "check": "quietFor",
+          "path": "/Volumes/ExT2/EA Games",
+          "minutes": 10
+        }
+      ],
+      "operations": [
+        {
+          "op": "rename",
+          "from": "/Volumes/ExT2/EA Games",
+          "to": "/Volumes/ExT2/GameHub/Library/EA-unregistered"
+        },
+        {
+          "op": "symlink",
+          "path": "/Volumes/ExT2/EA Games",
+          "target": "GameHub/Library/EA-unregistered"
+        }
+      ],
+      "verify": [
+        {
+          "check": "exists",
+          "path": "/Volumes/ExT2/GameHub/Library/EA-unregistered/Battlefield 4",
+          "kind": "directory"
+        },
+        {
+          "check": "notSymlink",
+          "path": "/Volumes/ExT2/GameHub/EA Games"
+        },
+        {
+          "check": "exists",
+          "path": "/Volumes/ExT2/GameHub/EA Games/BF4",
+          "kind": "directory"
+        }
+      ]
+    },
+    {
+      "id": "S12-apps",
+      "title": "Create the Apps and Build folders and link the bundles",
+      "requiresNoWine": false,
+      "preconditions": [],
+      "operations": [
+        {
+          "op": "mkdir",
+          "path": "/Volumes/ExT2/GameHub/Apps",
+          "mode": 493
+        },
+        {
+          "op": "mkdir",
+          "path": "/Volumes/ExT2/GameHub/Build",
+          "mode": 493
+        },
+        {
+          "op": "symlink",
+          "path": "/Volumes/ExT2/GameHub/Apps/Bundles",
+          "target": "../../Bundles"
+        }
+      ],
+      "verify": [
+        {
+          "check": "exists",
+          "path": "/Volumes/ExT2/GameHub/Apps/Bundles",
+          "kind": "directory"
+        }
+      ]
+    }
+  ]
+}

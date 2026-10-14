@@ -1,0 +1,9 @@
+Hold the device across an additional back buffer's last Release
+
+Now that the back buffer retains its swap chain privately, a chain the
+application has released holds no device reference, so the back buffer's
+forwarded reference can be the device's last one. Its final Release
+would then tear the device down inside com_release and finalize the
+chain after it, and the chain's finalize still reaches the device. A
+temporary device reference brackets the chain decrement, so the device
+is released after the chain.

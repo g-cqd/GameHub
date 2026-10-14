@@ -1,0 +1,441 @@
+{
+ "_status": "DRAFT. Not wired into nfs-release/nfs-macos. Structure copied from Packaging/Recipes/nfs2015.json (schemaVersion 1) and validated by eye against Packaging/recipes.py only. NOT run through check_recipes.py. Every value marked TODO is unknown and must NOT be invented.",
+ "_schemaBlockers": [
+  "importRules.machine: recipes.py requires the literal 'i386' (Packaging/recipes.py importRules validator). BF4's shipped main executable bf4.exe is x86_64 PE32+ (verified: MZ/PE header read on mbp23). recipes.py must be extended to accept 'x86_64' before an import-edition BF4 recipe can validate.",
+  "GAME_EXECUTABLES in Packaging/recipes.py is {'nfs2015': 'NFS16.exe'} and DENIED_BACKENDS only covers nfs2015; both need a 'bf4' entry.",
+  "storeClient.offerID is validated as a 1-20 digit decimal string. The value below is a contentID taken from BF4's own __Installer/installerdata.xml, which is NOT proven to be the EA app offerId. Do not ship it unverified.",
+  "There is no schema slot for a second, 32-bit helper executable (BF4WebHelper.exe) that must run alongside the game, nor for a loopback HTTP port. A new key is required.",
+  "There is no schema slot for optional third-party prerequisites the EA installer offers (PunkBuster via -Opt:InstallPB).",
+  "storeClient.offerID is a single 1-20 digit decimal string. BF4's launch URL needs a comma-joined list of 20 ids (see _offerID_notes). recipes.py must accept a list."
+ ],
+ "schemaVersion": 1,
+ "gameID": "bf4",
+ "displayName": "Battlefield 4",
+ "bundleIdentifier": "local.bf4.mac",
+ "bundleVersion": "1",
+ "minimumMacOS": "15.0",
+ "category": "public.app-category.action-games",
+ "launcher": "TODO-BF4Launcher-target-does-not-exist-yet",
+ "session": "TODO-BF4Session-target-does-not-exist-yet",
+ "runtimeProfile": "TODO: no BF4 profile is pinned in Packaging/runtime-inputs.json. A new profile (e.g. bf4-cx11-rebuild-00NN-YYYYMMDD) must be built and pinned; runtime_inputs.verify_inputs rejects an unknown name.",
+ "requiredRuntimeCapabilities": [
+  "dxmtDXGI"
+ ],
+ "_requiredRuntimeCapabilities_notes": "dxmtDXGI is asserted because bf4.exe imports dxgi.dll and d3d11.dll directly (verified from its import table). trapFlagEmulation is TODO: unknown whether BF4 uses the single-step/trap-flag pattern NFS16 needs. x87Sidecar is TODO: bf4.exe is x86_64 so the x87 Rosetta path is unlikely to matter for it, but bf4_x86.exe, ActivationUI.exe (i386) and BF4WebHelper.exe (i386) are 32-bit and may need it.",
+ "editions": [
+  "import"
+ ],
+ "_editions_notes": "import only for the first milestone. A 'bundled' edition would package ~32 GiB of EA game bytes into an .app; whether that is acceptable is a licensing decision for the owner, and NFS2015's bundled edition precedent exists (nfs2015.json has both).",
+ "referencesInstallation": true,
+ "shaderCache": "TODO: recipes.py requires inputs.mtld3dSource when shaderCache is true. BF4 is a D3D11 title served by DXMT, not mtld3d, so this flag is probably false. Unverified.",
+ "runtimeTuning": {
+  "_todo": "TODO: WINE_TF_EMULATION / WINE_TF_MAX_STEPS / WINE_TF_MAX_NS are the only accepted keys. Whether BF4 needs trap-flag emulation at all is unmeasured."
+ },
+ "storeClient": {
+  "name": "EA app",
+  "installRoot": "Program Files/Electronic Arts/EA Desktop",
+  "clientExecutable": "EA Desktop/EADesktop.exe",
+  "clientArguments": [
+   "--in-process-gpu"
+  ],
+  "launcherExecutable": "EA Desktop/EALauncher.exe",
+  "launchURL": "origin2://game/launch/?offerIds={offer}",
+  "offerID": [
+   "1007968",
+   "1011575",
+   "1011576",
+   "1011577",
+   "1010268",
+   "1010269",
+   "1010270",
+   "1010271",
+   "1010958",
+   "1010959",
+   "1010960",
+   "1010961",
+   "1007077",
+   "1016751",
+   "1016757",
+   "1016754",
+   "1015365",
+   "1015364",
+   "1015363",
+   "1015362"
+  ],
+  "_offerID_notes": "CORROBORATED, BUT THE SCHEMA CANNOT EXPRESS IT. recipes.py validates offerID as a 1-20 DIGIT decimal string, i.e. one id. BF4 needs a comma-joined list of 20. The Lutris issue tracker (https://github.com/lutris/lutris/issues/4996) records the working URL as origin2://game/launch/?offerIds=1007968,1011575,1011576,1011577,1010268,1010269,1010270,1010271,1010958,1010959,1010960,1010961,1007077,1016751,1016757,1016754,1015365,1015364,1015363,1015362 - character-for-character the same 20 ids, in the same order, as the <contentIDs> block in the owner's own __Installer/installerdata.xml (verified on mbp23). Two independent sources agreeing on 20 nine-digit numbers in one order is not coincidence: for BF4 the manifest contentIDs ARE the offerIds. ACTION: extend recipes.py to accept a list of ids (or a comma-joined string with a longer bound), then confirm against the owner's own ProgramData/Origin/Logs/*_OnlineActivation_Log.html (where nfs2015's 1024486 came from, per docs/NFS2015-RECIPE.md:43-44) and TRIM any DLC ids the owner does not own.",
+  "signInEvidence": [
+   "AppData/Local/Electronic Arts/EA Desktop"
+  ],
+  "readinessLog": "ProgramData/EA Desktop/Logs/EADesktop.log",
+  "startMarker": "[STARTUP]",
+  "readyEvents": [
+   "login",
+   "client.boot.ready"
+  ],
+  "readinessSeconds": 180,
+  "gameRoot": "Program Files/EA Games/Battlefield 4",
+  "launchChain": [
+   "BFLauncher.exe",
+   "BF4WebHelper.exe",
+   "bf4.exe"
+  ],
+  "leaseTarget": "bf4.exe",
+  "expectedPorts": [
+   3215,
+   3216
+  ]
+ },
+ "controllerDevices": [
+  "TODO: unmeasured. nfs2015.json pins 054C/05C4 and 054C/0CE6 (DualShock 4 / DualSense). bf4.exe imports XINPUT9_1_0.dll and DINPUT8.dll (verified from its import table), so both paths exist."
+ ],
+ "inputs": {
+  "baseApp": "TODO: path to the shared base .app skeleton, as in nfs2015.json inputs.baseApp",
+  "sidecar": "{tools}/inputs/x87sidecar/x87sidecar",
+  "x87Source": "{tools}/inputs/x87sidecar-src",
+  "packaging": "{project}/Packaging",
+  "runtime": "TODO: {games}/wine-rebuild/runtime/wine-00NN once a BF4 profile is built; wine-0011 is the current newest",
+  "runtimeSourceTree": "{games}/wine-rebuild/src/wine",
+  "game": "TODO: no local BF4 install exists. The only copy, /Volumes/ExT2/EA Games/Battlefield 4 on mbp23, is an unfinished DiP skeleton (3165 files, ~1.14 GiB allocated against ~32.4 GiB logical; every .cas is sparse zeros). A real download through the owner's EA account is required first.",
+  "wineMono": "{tools}/inputs/wine-mono",
+  "clientLayer": "{tools}/inputs/client-layer"
+ },
+ "runtimeRetention": [
+  "lib/wine/dxgi/dxmt"
+ ],
+ "thirdPartyLicenses": [
+  {
+   "component": "dxmt",
+   "version": "TODO: pin the DXMT version actually used for BF4",
+   "licence": "MIT",
+   "path": "Licenses/dxmt.txt",
+   "source": "TODO",
+   "sha256": "TODO",
+   "url": "TODO",
+   "tagCommit": "TODO",
+   "blobSHA1": "TODO"
+  }
+ ],
+ "originalFiles": [
+  "bf4.exe",
+  "bf4_x86.exe",
+  "BFLauncher.exe",
+  "BFLauncher_x86.exe",
+  "BF4WebHelper.exe",
+  "BF4X86WebHelper.exe",
+  "EAWebKit.dll",
+  "EAWebKit64.dll",
+  "Engine.BuildInfo_Win32_retail.dll",
+  "Engine.BuildInfo_Win64_retail.dll",
+  "Extension.Twinkle.Codec_Win32_retail.dll",
+  "Extension.Twinkle.Codec_Win64_retail.dll",
+  "Extension.Twinkle.JavaScriptCore_Win64_retail.dll",
+  "d3dcompiler_46.dll",
+  "version.json"
+ ],
+ "_originalFiles_notes": "This is the complete top-level file list of the EA DiP install, verified by ls on mbp23 (names with the _DiP_Staged suffix removed). Extension.Twinkle.JavaScriptCore_Win32_retail.dll was NOT present in the skeleton; confirm against a finished install.",
+ "originalDirectories": {
+  "Core": [],
+  "Data": [],
+  "Support": [],
+  "Update": [],
+  "__Installer": []
+ },
+ "_originalDirectories_notes": "Verified top-level directory set on mbp23. Core = Qt 4 + EA activation (Activation.dll, Activation64.dll, ActivationUI.exe, QtCore4/QtGui4/QtWebKit4/QtNetwork4/QtXml4/QtXmlPatterns4/phonon4, libeay32, ssleay32, codecs/, imageformats/). Data = cas_01..cas_21 + cas.cat + layout.toc + initfs_Win32 + Win32/ (62 chunk dirs incl. XP0-XP6). Update = Update/Patch with its own cas_01..cas_11 set, package.mft, and Win32/ (94 dirs incl. XP0-XP7). __Installer = Cleanup, Touchup, installerdata.xml, GDFBinary_en_US(.dll/_64.dll), vc/vc2012Update3, directx/, punkbuster/, customcomponent/webplugin.",
+ "executableHashes": {
+  "_todo": "TODO: every hash must be computed from a COMPLETE, legitimately downloaded install. The mbp23 skeleton's executables are real PE bytes but the installation is unfinished and its files still carry the _DiP_Staged suffix, so hashing them now would pin a non-shippable state. Candidate paths to pin, mirroring nfs2015.json: bf4.exe, bf4_x86.exe, BFLauncher.exe, BFLauncher_x86.exe, BF4WebHelper.exe, BF4X86WebHelper.exe, EAWebKit.dll, EAWebKit64.dll, Engine.BuildInfo_Win64_retail.dll, Core/Activation.dll, Core/Activation64.dll, Core/ActivationUI.exe, __Installer/Touchup.exe, __Installer/Cleanup.exe, __Installer/installerdata.xml, Support/mnfst.txt, version.json."
+ },
+ "inventorySHA256": "TODO: computed by Packaging over a complete install",
+ "importRules": {
+  "executable": "bf4.exe",
+  "machine": "x86_64",
+  "required": [
+   {
+    "path": "bf4.exe",
+    "minimumSize": 40419608
+   },
+   {
+    "path": "BFLauncher.exe",
+    "minimumSize": 183576
+   },
+   {
+    "path": "BF4WebHelper.exe",
+    "minimumSize": 624408
+   },
+   {
+    "path": "Data/cas.cat",
+    "minimumSize": 4990704
+   },
+   {
+    "path": "Data/layout.toc",
+    "minimumSize": 4352
+   },
+   {
+    "path": "__Installer/installerdata.xml",
+    "minimumSize": 24063
+   }
+  ],
+  "directories": [
+   {
+    "path": "Data",
+    "minimumBytes": 0,
+    "excludedNames": [],
+    "excludedSuffixes": [
+     ".log",
+     ".tmp"
+    ],
+    "excludedDirectories": []
+   },
+   {
+    "path": "Update",
+    "minimumBytes": 0,
+    "excludedNames": [],
+    "excludedSuffixes": [
+     ".log",
+     ".tmp"
+    ],
+    "excludedDirectories": []
+   },
+   {
+    "path": "Core",
+    "minimumBytes": 0,
+    "excludedNames": [],
+    "excludedSuffixes": [
+     ".log",
+     ".tmp"
+    ],
+    "excludedDirectories": []
+   },
+   {
+    "path": "__Installer",
+    "minimumBytes": 0,
+    "excludedNames": [],
+    "excludedSuffixes": [
+     ".log",
+     ".tmp"
+    ],
+    "excludedDirectories": []
+   }
+  ],
+  "pairings": [
+   {
+    "directory": "Data",
+    "primarySuffix": ".cas",
+    "companionSuffix": ".cat"
+   }
+  ],
+  "markers": [
+   {
+    "name": "origin",
+    "patterns": [
+     "version.json",
+     "installerdata.xml"
+    ]
+   },
+   {
+    "name": "dipstaged",
+    "patterns": [
+     "*_dip_staged"
+    ]
+   }
+  ],
+  "knownBuilds": [
+   {
+    "name": "1.8.2.48475",
+    "executableSHA256": "9d9d1a3fca6ffd4c34a543b3fd7b049336ddbd43c0e6c5eee742e51431a6c2aa"
+   }
+  ],
+  "maximumFiles": 30000,
+  "maximumBytes": 48000000000,
+  "rootFiles": [
+   "bf4.exe",
+   "BFLauncher.exe",
+   "BF4WebHelper.exe"
+  ]
+ },
+ "compatibility": [],
+ "defaults": [],
+ "prefixSettings": [
+  {
+   "hive": "HKEY_CURRENT_USER",
+   "path": "Software\\Wine\\Mac Driver",
+   "name": "RetinaMode",
+   "value": "Y",
+   "kind": "string",
+   "reason": "TODO: copied from nfs2015.json; unverified for BF4"
+  }
+ ],
+ "bundledPrefixSettings": [
+  {
+   "hive": "HKEY_LOCAL_MACHINE",
+   "path": "Software\\Wow6432Node\\EA Games\\Battlefield 4",
+   "name": "Install Dir",
+   "value": "C:\\Program Files\\EA Games\\Battlefield 4\\",
+   "kind": "windowsPath",
+   "reason": "installerdata.xml resolves both launchers through [HKEY_LOCAL_MACHINE\\SOFTWARE\\EA Games\\Battlefield 4\\Install Dir] (verified). Whether the Wow6432Node view is the right one, as it is for NFS, is TODO: BFLauncher.exe is 64-bit, so the native (non-Wow) view may be required instead, or both."
+  },
+  {
+   "hive": "HKEY_LOCAL_MACHINE",
+   "path": "Software\\Wow6432Node\\EA Games\\Battlefield 4",
+   "name": "Locale",
+   "value": "en_US",
+   "kind": "string",
+   "reason": "One of the 12 locales installerdata.xml declares (verified)"
+  },
+  {
+   "hive": "HKEY_LOCAL_MACHINE",
+   "path": "Software\\Wow6432Node\\EA Games\\Battlefield 4",
+   "name": "Product GUID",
+   "value": "TODO-VERIFY-{ABADE36E-EC37-413B-8179-B432AD3FACE7}",
+   "kind": "string",
+   "reason": "{ABADE36E-EC37-413B-8179-B432AD3FACE7} is the GUID in installerdata.xml's <uninstall> path (verified). nfs2015.json's Product GUID came from the same place for NFS, so this is a strong candidate, but it is not confirmed that EA writes it under this key for BF4."
+  }
+ ],
+ "renderers": [
+  {
+   "api": "dxgi",
+   "backend": "dxmt",
+   "executable": "bf4.exe",
+   "reason": "TODO UNMEASURED. bf4.exe imports dxgi.dll and d3d11.dll directly (verified from its import table) and carries Dx11, Dx10_1 and Dx10 shader permutations plus D3D11CreateDevice."
+  },
+  {
+   "api": "dxgi",
+   "backend": "dxmt",
+   "executable": "EADesktop.exe",
+   "reason": "Carried over from nfs2015.json, where it is measured"
+  },
+  {
+   "api": "dxgi",
+   "backend": "dxmt",
+   "executable": "EACefSubProcess.exe",
+   "reason": "Carried over from nfs2015.json, where it is measured"
+  }
+ ],
+ "managedRuntime": {
+  "input": "wineMono",
+  "source": "TODO: same wine-mono the NFS recipe pins, if the EA app installer still needs it",
+  "path": "TODO",
+  "version": "TODO",
+  "sha256": "TODO",
+  "url": "TODO",
+  "sourceURL": "TODO",
+  "reason": "The EA app MSI runs a managed custom action; this is a property of the client, not of BF4, so the NFS finding should carry over. Unverified for this client version."
+ },
+ "clientLayer": {
+  "input": "clientLayer",
+  "path": "ClientLayer",
+  "layerSHA256": "TODO",
+  "client": {
+   "name": "EA app",
+   "version": "TODO: whatever version is captured for this build; nfs2015.json pins 13.805.2.6319",
+   "installer": {
+    "fileName": "EAappInstaller.exe",
+    "sha256": "TODO",
+    "bytes": "TODO",
+    "signer": "Electronic Arts, Inc."
+   },
+   "package": {
+    "fileName": "TODO-EAapp-<version>-<build>.msi",
+    "sha256": "TODO",
+    "bytes": "TODO"
+   }
+  }
+ },
+ "runtimeSource": {
+  "input": "packaging",
+  "source": "TODO-BF4Runtime",
+  "path": "TODO-wine-bf4",
+  "repository": "TODO: the owner's fork, https://github.com/g-cqd/wine, or the athei/wine base nfs2015.json uses",
+  "branch": "TODO",
+  "baseRevision": "TODO",
+  "patchCount": "TODO",
+  "archive": "TODO-wine-bf4-source-00NN.tar.gz"
+ },
+ "supportsSP": true,
+ "supportsMP": false,
+ "_multiplayer": {
+  "note": "There is no schema slot for any of this. It is recorded here so the design is not lost.",
+  "launchChain": "EA app -> BFLauncher.exe (x86_64; imports only MSVCR110/MSVCP110; contains the strings '-forceBattlelog', 'BF4WebHelper.exe', 'EALaunchEnv', 'ShellExecuteExA') -> BF4WebHelper.exe (i386) -> bf4.exe. All verified from the shipped binaries on mbp23.",
+  "webHelper": "BF4WebHelper.exe is a local HTTP server, not a browser plugin: it contains 'http::server::server::server', the full HTTP/1.0 status-line table, 'Access-Control-Allow-Origin', 'CreateIoCompletionPort', the string 'bf4.exe', and the PDB path 'C:\\programming\\work\\webplugins\\esnlaunch\\Release\\BF4WebHelper.pdb'. Debug env vars present: BFWEBHELPER_ALWAYS_ACTIVATE, BFWEBHELPER_DEBUG, BFWEBHELPER_IGNORE_ORIGIN_HEADER, BFWEBHELPER_SHOW_MESSAGE, BFWEBHELPER_TEST_MODE, BFWEBHELPER_WAIT_ON_EXIT. All verified.",
+  "unknowns": [
+   "TODO: which TCP port BF4WebHelper binds, and whether it binds 127.0.0.1 only.",
+   "TODO: whether a browser on the macOS host can reach a port bound inside the Wine prefix (it should, since Wine shares the host network stack) or whether the browser must run inside the prefix.",
+   "TODO: the exact argv BF4WebHelper passes to bf4.exe. The game contains '-webmode sparta -requestState State_Sparta' and 'Client.ServerIp', so a direct-join command line exists, but its full form is not established.",
+   "TODO: whether Battlelog (battlelog.battlefield.com) is still serving in 2026 and whether EA shipped an in-game server browser. bf4.exe references receive.keeper.battlelog.com.",
+   "TODO: PunkBuster. installerdata.xml offers it as an OPTIONAL component (flag '-Opt:InstallPB', cancel warning 'You need to have PunkBuster installed in order to play online on ranked servers'), installed by __Installer/punkbuster/redist/pbsvc.exe. pbsvc.exe self-describes as 'PunkBuster Service Installation Program'. Whether PnkBstrA/PnkBstrB run under Wine, and whether they need a kernel driver, is unverified."
+  ]
+ },
+ "_prerequisites": {
+  "note": "From __Installer/installerdata.xml (verified). These are what EA's Touchup installs; under Wine some are supplied by Wine itself.",
+  "vc2012Update3": "__Installer/vc/vc2012Update3/redist/vcredist_x64.exe (7185000 bytes) and vcredist_x86.exe (6552288 bytes). bf4.exe imports MSVCR110.dll and MSVCP110.dll, so the VC++ 2012 runtime is a hard requirement. Manifest declares installedSize 39636173.",
+  "directx": "__Installer/directx/redist/DXSETUP.exe (517976 bytes) + 159 .cab files + DSETUP.dll + dsetup32.dll. Manifest declares installedSize 144378352. Needed for the D3DX/XAudio/XACT side; d3dcompiler_46.dll ships in the game folder (x86_64, imports d3d10.dll and D3DCOMPILER_46.dll).",
+  "punkbuster": "OPTIONAL: __Installer/punkbuster/redist/pbsvc.exe (3894632 bytes), flag -Opt:InstallPB.",
+  "webplugin": "__Installer/customcomponent/webplugin/battlelog-web-plugins.exe (3819328 bytes).",
+  "gdf": "__Installer/GDFBinary_en_US.dll and GDFBinary_en_US_64.dll (339224 bytes each) - Windows Games Explorer metadata; cosmetic, Wine has no Games Explorer.",
+  "touchup": "__Installer/touchup.exe, invoked by the manifest as: install -locale {locale} -installPath \"{installLocation}\" -autologging ; update variant adds -update ; repair variant adds -repair. featureFlags set forceTouchupInstallerAfterUpdate=\"1\" and treatUpdatesAsMandatory=\"1\"."
+ },
+ "_manifestFacts": {
+  "source": "/Volumes/ExT2/EA Games/Battlefield 4/__Installer/installerdata.xml_DiP_Staged on mbp23, 268 lines, read read-only",
+  "generator": "EAInstaller-4.05.02.00",
+  "dipManifestVersion": "4.0",
+  "gameVersion": "1.8.2.48475",
+  "requirements": "osMinVersion=\"6.0\" osReqs64Bit=\"false\"",
+  "featureFlags": "allowMultipleInstances=0 autoUpdateEnabled=1 dynamicContentSupportEnabled=0 enableDifferentialUpdate=1 enableOriginInGameAPI=0 forceTouchupInstallerAfterUpdate=1 languageChangeSupportEnabled=1 treatUpdatesAsMandatory=1 useGameVersionFromManifest=1",
+  "contentIDs": [
+   "1007968",
+   "1011575",
+   "1011576",
+   "1011577",
+   "1010268",
+   "1010269",
+   "1010270",
+   "1010271",
+   "1010958",
+   "1010959",
+   "1010960",
+   "1010961",
+   "1007077",
+   "1016751",
+   "1016757",
+   "1016754",
+   "1015365",
+   "1015364",
+   "1015363",
+   "1015362"
+  ],
+  "uninstallGUID": "{ABADE36E-EC37-413B-8179-B432AD3FACE7}",
+  "launchers": [
+   "uid 1-2, \"Battlefield 4\u2122 (x64)\", filePath [HKLM\\SOFTWARE\\EA Games\\Battlefield 4\\Install Dir]BFLauncher.exe, parameters empty, executeElevated 0, requires64BitOS 1, trial 0",
+   "uid 2-2, \"Battlefield 4\u2122 (x86)\", filePath [HKLM\\SOFTWARE\\EA Games\\Battlefield 4\\Install Dir]BFLauncher_x86.exe, parameters empty, executeElevated 0, requires64BitOS 0, trial 0"
+  ],
+  "installManifest": "/Support/mnfst.txt",
+  "locales": "en_US,fr_FR,it_IT,de_DE,es_ES,pl_PL,ru_RU,pt_BR,ja_JP,cs_CZ,ko_KR,zh_TW"
+ },
+ "_schemaStatusUpdate": {
+  "branch": "nfs-release/macos-app bf4-recipe-schema",
+  "resolved": [
+   "importRules.machine accepts x86_64",
+   "storeClient.offerID accepts a bounded list",
+   "gameExecutable and deniedBackends are recipe fields (built-in nfs2015 denial cannot be removed)",
+   "storeClient.launchChain, leaseTarget, expectedPorts exist"
+  ],
+  "still_blocking": [
+   "importRules requires every required file, including the executable, inside a copied directory (validate_import_rules: Required file is outside every copied directory). bf4.exe, BFLauncher.exe and BF4WebHelper.exe sit at the game folder root, so this draft still cannot validate as an import recipe. Needs a root-files rule in ImportRules (Python and Swift) or a different recognition scheme.",
+   "Frostbite cas/cat pairing is not the 1:1 pairing shape",
+   "No slot for optional prerequisites (PunkBuster)"
+  ]
+ },
+ "_candidate": {
+  "placeholders": [
+   "importRules.directories[Data].minimumBytes (draft said TODO; set to 0)",
+   "importRules.directories[Update].minimumBytes (draft said TODO; set to 0)",
+   "importRules.directories[__Installer] added so installerdata.xml is inside a copied directory",
+   "importRules.markers[origin]: marker patterns may not contain a slash, so the nested path is reduced to its file name",
+   "importRules.knownBuilds: SHA-256 of bf4.exe_DiP_Staged read on the mbp23 skeleton; unconfirmed against a complete install",
+   "importRules.maximumFiles=30000 and maximumBytes=48e9: placeholders at the Swift ceilings (30000 files, 64e9 bytes); measure on a complete install",
+   "supportsMP set to false (draft said TODO)",
+   "storeClient.offerID: the 20 manifest ids, corroborated but not yet confirmed against the owner activation log; DLC ids may need trimming",
+   "storeClient.launchChain/leaseTarget/expectedPorts: from DESIGN.md, unconfirmed at runtime; 3216 unverified"
+  ],
+  "note": "Not a shipped recipe. Unresolved draft TODOs remain elsewhere in this file."
+ }
+}

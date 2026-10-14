@@ -1,0 +1,11 @@
+Retain an additional swap chain privately from its back buffer's public references
+
+Wine's d3d9 conformance test_refcount (device.c:1781) reads an additional
+swap chain's refcount as 1 after GetBackBuffer: the back buffer keeps its
+chain alive without adding to the count the application sees. The fork's
+model, kept through the upstream merge, took a public reference on the
+chain at the back buffer's 0-to-1 edge, which this site caught once the
+conformance suite ran against the merge. The back buffer's public edge now
+retains the chain through its private count, as its binding references
+already did, so the chain is still freed only once neither the
+application nor the device references either object.
