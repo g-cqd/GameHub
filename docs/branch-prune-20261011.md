@@ -1,3 +1,5 @@
+> Historical snapshot (2026-10-15): branch names and paths below reflect the state when written and may no longer exist.
+
 # Branch Prune Record — 2026-10-11
 
 ## Summary

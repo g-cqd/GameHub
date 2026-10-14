@@ -1,3 +1,5 @@
+> Historical snapshot (2026-10-15): branch names and paths below reflect the state when written and may no longer exist.
+
 # Import Need for Speed (2015) into the shared EA app prefix (plan, 2026-10-11)
 
 ## 1. Status
