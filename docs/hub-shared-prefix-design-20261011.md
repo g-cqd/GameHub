@@ -1,3 +1,5 @@
+> Historical snapshot (2026-10-15): branch names and paths below reflect the state when written and may no longer exist.
+
 # Game Hub: one shared prefix, data-driven fixes, one runner (design, 2026-10-11)
 
 Status: approved by the orchestrator for Stage 2-3. Supersedes per-game wrappers for new work (wrappers keep running as-is).

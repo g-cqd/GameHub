@@ -50,13 +50,13 @@ A crash in a game executable does not by itself establish whether the defect is 
 
 | Project | Local checkout | GitHub fork | Working branch | Current pushed revision |
 | --- | --- | --- | --- | --- |
-| mtld3d | `/Users/gc/Developer/mtld3d` | https://github.com/g-cqd/mtld3d | `development` | `5f5331a2d8762356bd49d128271c1b186c31e7ec` |
-| x87sidecar | `/Users/gc/Developer/x87sidecar` | https://github.com/g-cqd/x87sidecar | `development` | `dbd680d4cbe14afa12774d53670a18758f15110e` |
+| mtld3d | `/Users/gc/Developer/mtld3d` | https://github.com/g-cqd/mtld3d | `main` | `5f5331a2d8762356bd49d128271c1b186c31e7ec` |
+| x87sidecar | `/Users/gc/Developer/x87sidecar` | https://github.com/g-cqd/x87sidecar | `main` | `dbd680d4cbe14afa12774d53670a18758f15110e` |
 | Shared engineering skills | `/Users/gc/Developer/skills` | Inspect this checkout's remote when updating | `main` | Last locally verified revision: `e99e650` |
 
-Both code repositories were committed and synchronized with GitHub. Both working trees were clean at handoff preparation. The default branches are `main` for mtld3d and `master` for x87sidecar.
+Both code repositories were committed and synchronized with GitHub. Both working trees were clean at handoff preparation.
 
-The user explicitly wants **only one additional working branch in each of these two repositories**. Keep using `development`. Previous transient branches were consolidated and removed. Do not recreate them or create a separate branch for every experiment without changing that agreement.
+All g-cqd repositories now use a single `main` branch. Do not create topic branches; commit coherent changes directly to main following the repository's commit style. Previous development branches and transient branches have been consolidated and removed.
 
 Read mtld3d's `AGENTS.md` and `CONTRIBUTING.md` first. Then read `README.md`, `docs/STATUS.md`, `docs/CONVENTIONS.md`, `docs/ARCHITECTURE.md`, and `windows/tests/COVERAGE.md`. Read `unix/conformance/CONFORMANCE.md` before changing rendering or shader behavior. These files explain existing choices that may otherwise look like accidental bugs.
 
@@ -277,7 +277,7 @@ Use permanent tests for changed behavior. Prefer a failing regression first, the
 - Keep diagnostic prefixes and artifacts in clearly owned paths. Clean temporary files and processes created by your work when finished; preserve evidence needed to understand a result.
 - Never stop all Wine processes to clean up one test. Stop only the runtime/prefix/processes you own after checking ownership.
 - Do not overwrite live renderer libraries under a running game or another worker's test.
-- Keep `development` as the sole extra branch in each core repository. Commit coherent changes with explicit titles and push authorized work. Do not force-push over another worker.
+- All work goes to the single `main` branch. Commit coherent changes with explicit titles and push authorized work. Do not force-push or rewrite history.
 - Use existing tests and benchmarks, broadening coverage where it tests a real missing behavior. Avoid redundant benchmark runs or asking the user to repeat a route.
 - Treat performance claims as measurements with conditions. Keep first-use shader compilation, warm steady-state performance, and loading time separate.
 - Use the skills repository for debugging, graphics, performance engineering, memory safety, secure coding, testing, review, and delivery guidance. Its installed skills are under `/Users/gc/.agent-harness/skills`. Check the current catalog when selecting them.

@@ -27,9 +27,9 @@ wine-gecko-2.47.4-x86 and wine-gecko-2.47.4-x86_64: FROM any SOURCES.md / notes 
 `https://dl.winehq.org/wine/wine-gecko/2.47.4/<file>`; kind msi. Omit if not found.
 
 ## patches.json
-0001 "Rosetta debug-register state + TF execution-breakpoint delivery" trapFlagEmulation ref "development" commit 8ae3878 verified;
-0002 "Configurable execution-breakpoint budgets" trapFlagEmulation development b9092a7 verified; 0003 "Decode prefixes on PUSHF/POPF in the emulator"
-trapFlagEmulation development c2b2655 verified; 0004 "Execution-breakpoint regression fixture" trapFlagEmulation development f7f4dfe verified;
+0001 "Rosetta debug-register state + TF execution-breakpoint delivery" trapFlagEmulation ref "main" commit 8ae3878 verified;
+0002 "Configurable execution-breakpoint budgets" trapFlagEmulation main b9092a7 verified; 0003 "Decode prefixes on PUSHF/POPF in the emulator"
+trapFlagEmulation main c2b2655 verified; 0004 "Execution-breakpoint regression fixture" trapFlagEmulation main f7f4dfe verified;
 0005 "Crash-context snapshot" crashContextBlock ref "nfs2015-runtime-0010" no commit experimental; 0006 "Crash code windows / page history"
 crashContextCodeWindows nfs2015-runtime-0010 experimental; 0007 "Rosetta exec-page toggles + page trace" rosettaPageExperiments nfs2015-runtime-0010 rejected;
 0008 "Optional W^X emulation for RWX pages" rosettaRwxWxEmulation nfs2015-runtime-0010 experimental; 0009 "TF leak and straddling stores" rosettaRwxWxEmulation
