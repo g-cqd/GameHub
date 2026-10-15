@@ -1,5 +1,7 @@
 # F1 24 with EA anticheat on macOS: current engineering handoff
 
+> **Current state (added 2026-10-15): job 476 is the deployed runtime**, `ntdll.so` SHA-256 `92a0752306fc61a2e21b194f9125d60d92d71b6af5f3dd1aaf5c2e76190858a1` (tag `eaac-job476-92a07523`). The job 475/473 deployment described below is history as of this session's writing (14 Oct).
+
 > Wine source: now at /Users/gc/Developer/wine (moved 2026-10-15), branch `main`. Former `/Volumes/ExT2/GameHub/src/wine` paths in this document are rewritten to that location; `eaac-ntdll-20261014` and `development` mentions are 14 Oct history.
 
 **Updated 14 October 2026 (afternoon session).** This consolidates the known state for a developer resuming the work. The sections below the update block describe the morning state and are kept for provenance; the block directly underneath supersedes them where they conflict. The earlier, uncorrected report is preserved at `/Users/gc/Desktop/EAAC-handoff-report.original-20261014-1033.md`; the compact corrected report is `/Users/gc/Desktop/EAAC-handoff-report.md`.
