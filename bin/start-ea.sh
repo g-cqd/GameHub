@@ -1,4 +1,5 @@
 #!/bin/bash
+# Runtime: $HUB_RUNTIME, default /Volumes/ExT2/GameHub/Runtimes/hub-0-winemacfs-dxmtrtv-noWineVer (winemac-fs + DXMT rtv, no Wine version string)
 RT="${HUB_RUNTIME:-/Volumes/ExT2/GameHub/Runtimes/hub-0-winemacfs-dxmtrtv-noWineVer}"
 R="/Users/gc/Library/Application Support/BF3Mac"
 EA_ROOT="/Volumes/ExT2/GameHub/Prefix/drive_c/Program Files/Electronic Arts/EA Desktop"

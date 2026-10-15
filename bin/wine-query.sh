@@ -1,5 +1,6 @@
 #!/bin/bash
-B="${HUB_RUNTIME:-/Volumes/ExT2/GameHub/Runtimes/hub-0-winemacfs}/bin/wine"
+# Runtime: $HUB_RUNTIME, default /Volumes/ExT2/GameHub/Runtimes/hub-0-winemacfs-dxmtrtv-noWineVer (winemac-fs + DXMT rtv, no Wine version string)
+B="${HUB_RUNTIME:-/Volumes/ExT2/GameHub/Runtimes/hub-0-winemacfs-dxmtrtv-noWineVer}/bin/wine"
 R="/Users/gc/Library/Application Support/BF3Mac"
 for p in "$@"; do
   echo "=== dir $p"
