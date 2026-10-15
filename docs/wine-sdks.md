@@ -9,8 +9,8 @@ Set with `set -Ux NAME value`; reversible with `set -e NAME`.
 | Variable | Value |
 |---|---|
 | `WINE_SDK` | `/Volumes/ExT2/GameHub/toolchains/wine-sdk-cx-26.3.0-5/wine` |
-| `WINE_ARM64` | `/Users/gc/Developer/wine-arm64/install/usr/local` |
-| `WINE_SDK_ARM64X` | `/Users/gc/Developer/wine-arm64/sdk-arm64x` |
+| `WINE_ARM64` | `/Users/gc/Developer/wine/macos-arm64/install/usr/local` |
+| `WINE_SDK_ARM64X` | `/Users/gc/Developer/wine/macos-arm64/sdk-arm64x` |
 
 ### WINE_SDK (x86_64 Wine 11.0 SDK)
 
@@ -29,10 +29,10 @@ Set with `set -Ux NAME value`; reversible with `set -e NAME`.
 
 A directory holding `bin/wine` and `lib/wine`.
 
-**Important:** `wine-arm64/install` is a DESTDIR-style install, so the real tree root is `install/usr/local`, not `install/`. Verified: the Makefile guard `ARM64_REQUIRE_RUNTIME` rejects `.../wine-arm64/install` with "is not an arm64 Wine tree: it needs bin/wine, bin/wineserver and lib/wine/aarch64-windows" and accepts `.../install/usr/local`.
+**Important:** the arm64 install is a DESTDIR-style install, so the real tree root is `install/usr/local`, not `install/`. Verified: the Makefile guard `ARM64_REQUIRE_RUNTIME` rejects `.../macos-arm64/install` with "is not an arm64 Wine tree: it needs bin/wine, bin/wineserver and lib/wine/aarch64-windows" and accepts `.../install/usr/local`.
 
 - `bin/wine`, `wineserver`, `winebuild` are Mach-O 64-bit arm64. `bin/wine --version` = `wine-11.0`. sha256 of `bin/wine`: `dd0db92a219f8de32ce186e4d317bce3430ded1398209fff130c348149610a22`.
-- Source: the wine-arm64 repo (`/Users/gc/Developer/wine-arm64`, branch `arm64-macos`): native arm64 macOS Wine 11.0 plus CodeWeavers patches, athei `cx-26-patched` base rebased, configured `--enable-archs=aarch64,i386` with llvm-mingw 20261006. See its `docs/BRINGUP.md`. About 1.6 GB installed; about 35 min to build at -j3 on a loaded machine.
+- Source: the wine repo itself (`/Users/gc/Developer/wine`, main; the former wine-arm64 repo was merged into it on 2026-10-15): native arm64 macOS Wine 11.0 plus CodeWeavers patches, athei `cx-26-patched` base rebased, configured `--enable-archs=aarch64,i386` with llvm-mingw 20261006. Workspace and bring-up doc: `macos-arm64/` and `macos-arm64/BRINGUP.md`. About 1.6 GB installed; about 35 min to build at -j3 on a loaded machine.
 - `lib/wine` contains `aarch64-unix` (30 files), `aarch64-windows` (1008 files, including `libntdll.a` and `d3d9.dll`) and `i386-windows` (1061 files). There is no `x86_64-windows` directory (no x86_64 PE build).
 - Status per BRINGUP.md: milestone M1 (native arm64 PE runs, no Rosetta). 32-bit/x86 execution (WoW64 BTCpu, milestone M2) does not exist yet, so the x86 (i686/x86_64) arm64-runtime test legs cannot execute x86 code on it yet.
 - It also runs through the signed launcher `host/exec4k` (4 KiB page process); `wine --version` works without it.
@@ -52,7 +52,7 @@ A tree holding Wine's two ARM64X link archives at `lib/wine/aarch64-windows/libw
   | `libwinecrt0.a` | `9359f32e8a76f606b4c2721dd88f68fc6844f88fe6527aa836ee8def16af4a53` | No (install copy: `b56bac0d875c080cd3840caaf9cac7bf24f8aa19ef52b626ce51071542fe225d`) |
 
   Do not substitute the install tree for this one.
-- `sdk-arm64x/` is git-ignored in wine-arm64 (`.gitignore`). It is produced by wine-arm64, not by wine-build. The x86 Wine SDK carries neither archive.
+- `sdk-arm64x/` is git-ignored in the wine repo's `macos-arm64/` (`.gitignore`). It is produced by the arm64 build, not by wine-build. The x86 Wine SDK carries neither archive.
 - Read by the `EC=1` build (`windows-arm64x`, whose link takes `libntdll.a`; cargo build scripts read `WINE_SDK=$WINE_SDK_ARM64X`) and by the `EC=1 make check` clippy leg. The guard `ARM64X_REQUIRE_CARGO` checks that both files exist.
 
 ## 2. Which target reads which path
@@ -74,7 +74,7 @@ Mirrors the section "Which target reads which path" of mtld3d `docs/BUILDING.md`
   - Candidate `LLVM_MINGW=/Volumes/ExT2/GameHub/toolchains/llvm-mingw-20261006-ucrt-macos-universal`. Its aarch64 `dllcrt2.o` has an ARM64EC half, and release 20261006 is >= the required 20260826.
   - Candidate `ARM64X_LLD=/Volumes/ExT2/GameHub/toolchains/llvm-mingw-20261006-ucrt-macos-universal/bin/lld-link`. It needs an `lld-link` >= 23; this one reports "LLD 23.1.3", which meets that. Homebrew `lld` is not installed.
 - A full `EC=1` build was NOT run (shared, busy machine). Only the dry run `make -n EC=1 install-windows-arm64x` was done; it expands correctly to use `sdk-arm64x`.
-- Caveat: the `ARM64=1` legs (x86 DLLs under `WINE_ARM64`) will install but cannot run x86 code until wine-arm64 reaches M2.
+- Caveat: the `ARM64=1` legs (x86 DLLs under `WINE_ARM64`) will install but cannot run x86 code until the arm64 WoW64 CPU (M2) lands.
 
 ## 4. What each tree is not: the shipped GameHub runtime
 
