@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# HISTORICAL - references paths/branches that no longer exist
+# (/Volumes/ExT2/GameHub/work/mtld3d-merge, mtld3d-up). Kept as a record only; do not run.
 # Commit the two fixes, then diagnose the d3d9ex hang on upstream and on the tip,
 # then run the whole conformance suite on the tip. Usage: pe_conf.sh <logdir>
 set -u

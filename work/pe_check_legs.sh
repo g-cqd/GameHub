@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# HISTORICAL - references paths/branches that no longer exist
+# (/Volumes/ExT2/GameHub/work/mtld3d-merge). Kept as a record only; do not run.
 # Every leg of `make check` run on its own (so one red leg does not hide the next),
 # then `make check` as a whole for the record. Usage: pe_check_legs.sh <logdir>
 set -u

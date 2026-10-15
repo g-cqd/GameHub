@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# HISTORICAL - references paths/branches that no longer exist
+# (development branch, origin/development, /Volumes/ExT2/GameHub/work/mtld3d-merge). Kept as a record only; do not run.
 # Promote the verified tip to development (fast-forward only), push it normally,
 # then build the release bundle in the worktree's own target dir (scratch, no runtime touched).
 # Usage: promote.sh <logdir>

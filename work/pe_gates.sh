@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# HISTORICAL - references paths/branches that no longer exist
+# (/Volumes/ExT2/GameHub/work/mtld3d-merge). Kept as a record only; do not run.
 # Full mtld3d gates on the committed tip of the merge worktree, in the provisioned environment.
 # Usage: pe_gates.sh <logdir>
 set -u

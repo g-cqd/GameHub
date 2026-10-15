@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# HISTORICAL - references paths/branches that no longer exist
+# (origin/development, /Volumes/ExT2/GameHub/work/mtld3d-merge, bundle-out). Kept as a record only; do not run.
 # Amend the unpushed d3d8 stamp commit, gate it, bundle it, then fast-forward
 # development and push. Usage: ship2.sh <logdir>
 set -u

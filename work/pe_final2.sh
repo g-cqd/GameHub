@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# HISTORICAL - references paths/branches that no longer exist
+# (/Volumes/ExT2/GameHub/work/mtld3d-merge, mtld3d-up). Kept as a record only; do not run.
 # Commit the comment fix, then `make check`, `make test` and conformance on the final tip.
 # Usage: pe_final2.sh <logdir>
 set -u

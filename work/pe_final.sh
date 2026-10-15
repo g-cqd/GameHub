@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# HISTORICAL - references paths/branches that no longer exist
+# (/Volumes/ExT2/GameHub/work/mtld3d-merge, mtld3d-up). Kept as a record only; do not run.
 # Commit the use-after-free fix, then the full gate set on the final tip, plus an
 # upstream x86_64 d3d9ex control run. Usage: pe_final.sh <logdir>
 set -u

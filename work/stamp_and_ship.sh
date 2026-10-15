@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# HISTORICAL - references paths/branches that no longer exist
+# (/Volumes/ExT2/GameHub/work/mtld3d-merge, development branch). Kept as a record only; do not run.
 # Commit the d3d8 stamp fix on the promoted tip, gate it, bundle it, then
 # fast-forward development and push. Usage: stamp_and_ship.sh <logdir>
 set -u
