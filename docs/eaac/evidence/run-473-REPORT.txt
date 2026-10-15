@@ -1,0 +1,59 @@
+=== F1 24 CONTROLLED LAUNCH RUN - FINAL REPORT ===
+
+DEPLOYMENT VERIFICATION:
+- Runtime: /Volumes/ExT2/GameHub/Runtimes/hub-0-winemacfs-dxmtrtv-noWineVer
+- ntdll.so hash: 313e87df166d8fb6a9c5e8acc1eca6f3662ea20821dee0318d331c4f73ddac77 ✓
+- EA Desktop version used: 13.809.0.6322-1791939025
+- Helper log: /Volumes/ExT2/GameHub/Hub/Logs/ea-20261014-122655.log (1.8M, 20257 lines)
+
+TIMELINE:
+- Step 1 (Pre-check): 2026-10-14T10:26:36Z - Hash verified, no existing processes
+- Step 2 (Launch EA): 2026-10-14T10:26:55Z - Started PID 58483
+- Step 3 (Readiness): 2026-10-14T10:26:58Z - EADesktop.exe present; 10:29:09Z approx - EABackgroundService.exe running
+- Step 4 (Trigger): 2026-10-14T10:32:15Z (T0) - Triggered with origin2://game/launch/?offerIds=16425782
+- Step 5 (Monitor): 2026-10-14T10:32:19Z - Launch accepted; EAAntiCheat.GameServiceLauncher.exe processes created at 12:32:20 and 12:34:22
+
+TRIGGER DETAILS:
+- Method: EALauncher.exe with origin2:// protocol
+- Path: C:\Program Files\Electronic Arts\EA Desktop\13.809.0.6322-1791939025\EA Desktop\EALauncher.exe
+- Command: origin2://game/launch/?offerIds=16425782
+- Content ID: 16425782 (F1 24)
+- Offer ID: Origin.OFR.50.0005434
+
+PROCESS TIMELINE:
+PID    ProcessName                                         FirstSeen           LastSeen           Elapsed
+58483  EADesktop.exe                                       12:26:55            (still running)     ~09:41
+67014  EAAntiCheat.GameServiceLauncher.exe --reactivate   12:32:20            (still running)     ~04:18
+70273  EAAntiCheat.GameServiceLauncher.exe                12:34:22            (still running)     ~02:16
+
+CRITICAL FINDINGS:
+1. F1_24.exe: DID NOT APPEAR (monitoring window ended without F1 24 process starting)
+2. EAAntiCheat processes: RUNNING - GameServiceLauncher active for 4+ minutes
+3. License status: License file not found (expected - being reactivated)
+4. Cloud sync: Attempted but manifest request returned 404
+
+ERROR SUMMARY:
+- WMI/Security initialization failures (expected in Wine)
+- IGOProxy32.exe creation failed (disabled in environment)
+- License DLF file missing at C:\ProgramData\Electronic Arts\EA Services\License\16425782.dlf
+- Cloud sync manifest 404 error for game save sync
+
+WINE LOG FINDINGS:
+- Total lines: 20,362
+- Zw stubs patched: 2
+- EAAntiCheat services loaded successfully
+- CreateProcessInternalW called for both EAAntiCheat.GameServiceLauncher instances
+- No F1_24.exe CreateProcessInternalW calls found
+
+EA DESKTOP LOGS:
+- Launch request accepted at 10:32:19.430Z
+- Marked "Successful launch" at 10:32:19.455Z
+- Cloud sync initiated at 10:34:20.788Z
+- No launch errors or exceptions logged
+
+STATUS:
+Launch was INITIATED but F1_24.exe did not START. EAAntiCheat anticheat service is running
+and appears to be waiting or performing initialization. The game executable itself has not
+been spawned.
+
+EVIDENCE LOCATION: /Users/gc/eaac-archive/codex-20261014/run-473-20261014-102650/

@@ -1,0 +1,119 @@
+====================================================================
+WINDOW INSPECTION REPORT - EA AntiCheat macOS
+Run ID: 473-20261014-102650
+Captured: 2026-10-14 10:50:29 UTC
+====================================================================
+
+TARGET PIDS: 67014 and 70273 (Wine processes EAAntiCheat.GameServiceLauncher.exe)
+
+WINDOW TABLE (Filtered for target PIDs and wine/EA-related entries)
+====================================================================
+
+PID     WinNum  Layer    Onscreen  Owner  Title              Bounds (X,Y,W,H)
+------  ------  -------  --------  -----  -----------------  --------------------
+67014   4185    0        true      wine   Error              822,524,156x83
+67014   4184    0        false     wine   (empty)            0,669,500x500
+70273   4188    4188     true      wine   Error              822,524,156x83
+70273   4187    0        false     wine   (empty)            0,669,500x500
+58483   4170    0        false     wine   EA                 181,120,895x743
+58483   4166    0        false     wine   EA                 780,455,240x240
+58483   4165    0        false     wine   (empty)            0,669,500x500
+58623   4164    0        false     wine   (empty)            0,669,500x500
+
+====================================================================
+CAPTURED WINDOW DETAILS
+====================================================================
+
+WINDOW 4185 (PID 67014) - Error Dialog (156x83, VISIBLE)
+Status: On-screen, actively displayed at position (822,524)
+
+Title: Error
+
+Content:
+  [Error icon with red X circle]
+  
+  The program encountered E1110 00D at 0026FA30
+  during initialization.
+  
+  Conflicting software detected!
+  
+  [OK button]
+
+
+WINDOW 4188 (PID 70273) - Error Dialog (156x83, VISIBLE)
+Status: On-screen, actively displayed at position (822,524)
+
+Title: Error
+
+Content:
+  [Error icon with red X circle]
+  
+  The program encountered E1110 00D at 0026FA30
+  during initialization.
+  
+  Conflicting software detected!
+  
+  [OK button]
+
+
+WINDOW 4170 (PID 58483) - EA Application Window (895x743, NOT VISIBLE)
+Status: Off-screen, not displayed
+
+Title: EA
+
+Content:
+  - Dark navy/dark blue main window
+  - Title bar with "EA" text centered
+  - Hamburger menu icon (≡) on upper left
+  - Minimize, maximize, and close buttons on upper right
+  - Main content area is empty/dark (no visible UI elements)
+  - Appears to be a launcher or main application window
+
+
+WINDOW 4184 (PID 67014), 4187 (PID 70273), 4166 (PID 58483), 
+4165 (PID 58483), 4164 (PID 58623)
+Status: Off-screen/Not visible
+
+All other windows captured show blank/white or empty backgrounds - these are
+background windows not currently displayed.
+
+====================================================================
+FULL SCREEN CAPTURE
+====================================================================
+
+Status: ONE large window visible (kitty terminal) plus dock
+
+The full screen shows:
+  - Terminal window titled "◐ EAAC macOS game handoff" (kitty)
+  - Content displaying EAAC diagnostic information, environment tables,
+    debugging notes, and status messages
+  - Multiple reference panels discussing:
+    * Environment configuration (EA Desktop path, WebView, Wine settings)
+    * EAAC architecture and historical approaches
+    * Configuration and deployment steps
+    * Wine prefix configuration and timestamps
+    * Agent status: "Waiting for agents" → "Finished waiting"
+    * Token usage and agent interaction logs
+  - Dock at bottom with application icons (Firefox, Calculator, Discord, EA, etc.)
+
+NO EA AntiCheat/Wine error dialogs visible on the full screen at capture time.
+The error dialogs we captured (windows 4185/4188) exist but are not shown in 
+the full desktop view - they exist in the Wine process window hierarchy but
+may be covered or positioned off-visible areas.
+
+====================================================================
+KEY FINDINGS
+====================================================================
+
+1. TWO IDENTICAL ERROR DIALOGS detected in PID 67014 and PID 70273
+   - Error code: E1110 00D at 0026FA30
+   - Message: "Conflicting software detected!"
+   - These are initialization errors from the Wine-based GameServiceLauncher
+   
+2. EA Application window (PID 58483) is present but not visible/active
+   
+3. Multiple background Wine windows exist (not on-screen)
+   
+4. Main user activity is in terminal window for EAAC debugging/testing
+
+====================================================================

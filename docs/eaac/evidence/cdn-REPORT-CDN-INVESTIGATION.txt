@@ -1,0 +1,86 @@
+# eaanticheat.sys acquisition from EA CDN — investigation result
+
+Date: 2026-10-14, 14:15-14:35 CEST. Task: bring in `eaanticheat.sys` from EA's CDN
+(Pathway C of the 14:15 investigation report). All steps performed and verified this session.
+Evidence directory: /Users/gc/eaac-archive/eaanticheat-cdn-20261014/
+
+## RESULT: Pathway C is a dead end. EA does not statically host the driver.
+The driver cannot be downloaded from the CDN by URL; it is no longer bundled in the
+installer; it is only materialized inside a platform-valid runtime on real Windows.
+The only practical acquisition route is Pathway A: copy the genuine, signed
+`C:\Windows\System32\drivers\eaanticheat.sys` from a real Windows 10/11 machine with an
+EAAC title installed. The alternative is deep reverse engineering of the packed
+GameService/Installer runtime download flow (multi-day effort, out of scope).
+
+## What was done and measured
+
+1. Official CDN endpoint confirmed and downloaded:
+   https://cdn.eaanticheat.ac.ea.com/EAAntiCheat.Installer.exe
+   (the URL EA's help.ea.com anticheat page links to; also confirmed by public research).
+   Downloaded: 277,175,032 bytes, SHA-256 d0396b7fe0331cef94278ed015c93012cd9ab67eb02e3775abd6660e96f5b6eb
+   — the current official installer, NEWER than both on-disk copies (AC-dir v1.0.6832156-era
+   109,664,312 bytes; game-dir v0.0.5991790-era same size). PE32+ GUI, signed (DigiCert chains).
+
+2. Payload extraction (RCDATA 102, ZIP, 275,906,997 bytes) — six files, NO driver:
+   ProgramFiles/EAAntiCheat.GameService.dll    63,172,856  (Oct 8 build)
+   ProgramFiles/EAAntiCheat.GameService.exe   190,610,680  (Oct 8 build)
+   ProgramFiles/preloader_s.dll                    46,840
+   Title/EAAntiCheat.GameServiceLauncher.dll   52,015,864
+   Title/EAAntiCheat.GameServiceLauncher.exe   20,031,736
+   Title/preloader_l.dll                          46,840
+   Matches the public research (not-matthias.github.io, 2025-06): "they are not shipping the
+   driver with the installer anymore, so you need to dump it while running the game or
+   reverse engineer the download." No plaintext ".sys"/"drivers" strings in any payload
+   binary (all packed/obfuscated), so the driver is not embedded in extractable plain form.
+
+3. Installer run inside the prefix (the older AC-dir copy ran a full Install pass
+   automatically; the CDN copy shows an Update/Repair GUI):
+   - Registry re-written with IDENTICAL values (EAAntiCheat driver service:
+     ImagePath system32\drivers\eaanticheat.sys, Start=3, Type=2, FSFilter group;
+     EAAntiCheatService: eaanticheat.gameservice.exe, Start=3). Timestamps updated.
+   - Game-dir Title files re-copied byte-identical (launcher exe SHA-256 4265e4b2… — same
+     as recorded in run-473).
+   - ZERO WINHTTP/WININET activity in a full WINEDEBUG=trace+winhttp,+wininet,+http run —
+     the Install path performs no network fetch at all, yet reports "Install success".
+   - The installer's gameservice self-test crashed under Wine: execution jumped to the
+     mapped module base of eaanticheat.gameservice.dll at 0x100000000 and faulted on the
+     read-only MZ header (rip=0x100000000, pc-bytes "4d 5a…"). On real Windows this step
+     presumably validates/derives the driver package; under Wine it dies before any fetch.
+   - system32\drivers\eaanticheat.sys remains ABSENT after a reported-successful install.
+
+4. CDN probing: unknown paths 301-redirect to error.html; the only real object at the CDN
+   root is EAAntiCheat.Installer.exe. No version.json/manifest.json/driver paths exist.
+   (The CDN does keep older installer builds per public research, but only under
+   non-guessable internal paths, and those contain the same driver-less payload.)
+
+5. EA Desktop logs (install-time history) searched for the eaac custom-component download
+   URL (the game's __Installer/customcomponent/eaac/manifest describes a 95,422,336-byte
+   downloaded component): no component URL retained in logs. Note: logs contain signed
+   cloudsync AWS URLs with session tokens — sensitive, keep private, do not reproduce.
+
+## Interpretation
+
+The driver acquisition on real Windows happens inside a platform-valid runtime context
+(gameservice/installer self-test), gated on checks Wine cannot satisfy. This is consistent
+with real-Windows forum reports ("installer reports Install success but eaanticheat.sys is
+missing") when those platform checks fail. Forcing those checks to pass under Wine would be
+identity-masking work, which is out of scope per the project's no-evasion directive.
+
+## Environment changes made (recorded)
+
+- C:\Program Files\EA\AC\EAAntiCheat.Installer.exe replaced with the current CDN build
+  (277,175,032 bytes, SHA-256 d0396b7f…). Previous 109,664,312-byte copy archived as
+  AC-EAAntiCheat.Installer.exe.bak-109664312 in this directory. Restore with a copy if
+  launch-comparability with the pre-14:24 state is ever required.
+- Registry EAAntiCheat / EAAntiCheatService keys re-written by the genuine installer with
+  identical values (timestamps only).
+- No driver was placed (none obtained). All installer processes were shut down at the end.
+
+## Artifacts
+
+- EAAntiCheat.Installer.exe (CDN current) + SHA-256 above
+- RCDATA-102.zip and extracted payload (ProgramFiles/, Title/)
+- installer-trace.log (old-installer full Install run, WINEDEBUG winhttp trace — 0 requests)
+- installer-cdn-trace.log (CDN installer GUI session — 0 requests before close)
+- AC-dir-before-install.txt / AC-dir-after-install.txt (identical hashes)
+- Window captures + OCR confirming GUI states (Install log; Update/Repair)
