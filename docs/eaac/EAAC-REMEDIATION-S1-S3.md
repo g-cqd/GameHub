@@ -10,6 +10,8 @@
 > - An unguarded `rm -rf "$VERSIONED_RUNTIME"` can delete more than intended if the variable is empty or wrong.
 > - Around line ~504 it copies the built binaries from `src/wine-arm64/build`, a path that has been removed.
 
+**S1 superseded:** the S1 portion of this document has been replaced by the corrected plan at `docs/eaac/S1-prefix-isolation.md`. Use that document for S1; this file's S1 section is kept only for historical reference. S3 in this document remains DEFERRED and unaffected.
+
 
 # EAAC Security Remediation Plan: S1 & S3
 
