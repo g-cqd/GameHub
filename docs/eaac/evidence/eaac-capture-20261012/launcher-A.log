@@ -1,0 +1,5 @@
+compatdb: EAAntiCheat.GameServiceLauncher.exe [x86_64] company="Electronic Arts" product="EA Anticheat"
+compatdb:   rules = default
+compatdb:   dxgi = dxmt (from /Volumes/ExT2/GameHub/Runtimes/hub-0-winemacfs-dxmtrtv/lib/wine/dxgi/dxmt)
+compatdb:   d3d9 = mtld3d (from /Volumes/ExT2/GameHub/Runtimes/hub-0-winemacfs-dxmtrtv/lib/wine/d3d9/mtld3d)
+[rosettax87] x87 cache: block hash=0x74573adad0511748 translated again (ask=14 last_in=14 frontier=15 run=0), resetting cache (#1)

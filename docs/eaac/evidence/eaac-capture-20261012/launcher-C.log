@@ -1,0 +1,52 @@
+err:module:preloader_exec ROSETTA_X87_PATH: attaching rosettax87 --cooperative (/Volumes/ExT2/GameHub/Runtimes/hub-0-helpers-fpr/x87sidecar) for E:\EA Games\F1 24\EAAntiCheat.GameServiceLauncher.exe
+096c:trace:module:get_load_order got main exe default n,b for L"\\??\\E:\\EA Games\\F1 24\\EAAntiCheat.GameServiceLauncher.exe"
+096c:trace:module:get_load_order got main exe default n,b for L"\\??\\E:\\EA Games\\F1 24\\EAAntiCheat.GameServiceLauncher.exe"
+096c:trace:module:map_image_into_view mapping PE file L"\\??\\E:\\EA Games\\F1 24\\EAAntiCheat.GameServiceLauncher.exe" at 0x140000000-0x1410ab000
+096c:trace:module:map_image_into_view mapping L"\\??\\E:\\EA Games\\F1 24\\EAAntiCheat.GameServiceLauncher.exe" section .text at 0x140001000 off 400 size 7b6000 virt 7b6000 flags 60000020
+096c:trace:module:map_image_into_view mapping L"\\??\\E:\\EA Games\\F1 24\\EAAntiCheat.GameServiceLauncher.exe" section .rdata at 0x1407b7000 off 7b6400 size 2fdc00 virt 301000 flags 40000040
+096c:trace:module:map_image_into_view clearing 0x140ab4c00 - 0x140ab5000
+096c:trace:module:map_image_into_view mapping L"\\??\\E:\\EA Games\\F1 24\\EAAntiCheat.GameServiceLauncher.exe" section .data at 0x140ab8000 off ab4000 size 85c00 virt e6000 flags c0000040
+096c:trace:module:map_image_into_view clearing 0x140b3dc00 - 0x140b3e000
+096c:trace:module:map_image_into_view mapping L"\\??\\E:\\EA Games\\F1 24\\EAAntiCheat.GameServiceLauncher.exe" section .pdata at 0x140b9e000 off b39c00 size 45000 virt 45000 flags 40000040
+096c:trace:module:map_image_into_view mapping L"\\??\\E:\\EA Games\\F1 24\\EAAntiCheat.GameServiceLauncher.exe" section _RDATA at 0x140be3000 off b7ec00 size 1000 virt 1000 flags 40000040
+096c:trace:module:map_image_into_view mapping L"\\??\\E:\\EA Games\\F1 24\\EAAntiCheat.GameServiceLauncher.exe" section .rsrc at 0x140be4000 off b7fc00 size 40c00 virt 41000 flags 40000040
+096c:trace:module:map_image_into_view clearing 0x140c24c00 - 0x140c25000
+096c:trace:module:map_image_into_view mapping L"\\??\\E:\\EA Games\\F1 24\\EAAntiCheat.GameServiceLauncher.exe" section .reloc at 0x140c25000 off bc0800 size ec00 virt f000 flags 42000040
+096c:trace:module:map_image_into_view clearing 0x140c33c00 - 0x140c34000
+096c:trace:module:map_image_into_view mapping L"\\??\\E:\\EA Games\\F1 24\\EAAntiCheat.GameServiceLauncher.exe" section  at 0x140c34000 off bcf400 size 58000 virt 58000 flags c0000000
+096c:trace:module:map_image_into_view mapping L"\\??\\E:\\EA Games\\F1 24\\EAAntiCheat.GameServiceLauncher.exe" section  at 0x140c8c000 off c27400 size 368000 virt 368000 flags 60000020
+096c:trace:module:map_image_into_view mapping L"\\??\\E:\\EA Games\\F1 24\\EAAntiCheat.GameServiceLauncher.exe" section  at 0x140ff4000 off f8f400 size 39000 virt 39000 flags c0000000
+096c:trace:module:map_image_into_view mapping L"\\??\\E:\\EA Games\\F1 24\\EAAntiCheat.GameServiceLauncher.exe" section  at 0x14102d000 off fc8400 size 7e000 virt 7e000 flags 60000020
+096c:trace:module:map_image_into_view mapping PE file L"\\??\\C:\\windows\\system32\\ntdll.dll" at 0x6fffffbc0000-0x6ffffffe1000
+096c:trace:module:map_image_into_view mapping L"\\??\\C:\\windows\\system32\\ntdll.dll" section .text at 0x6fffffbc1000 off 1000 size 7a000 virt 79060 flags 60000020
+096c:trace:module:map_image_into_view mapping L"\\??\\C:\\windows\\system32\\ntdll.dll" section .data at 0x6fffffc3b000 off 7b000 size 1000 virt d30 flags c0000040
+096c:trace:module:map_image_into_view mapping L"\\??\\C:\\windows\\system32\\ntdll.dll" section .rdata at 0x6fffffc3c000 off 7c000 size 18000 virt 17d40 flags 40000040
+096c:trace:module:map_image_into_view mapping L"\\??\\C:\\windows\\system32\\ntdll.dll" section /4 at 0x6fffffc54000 off 94000 size 1000 virt 798 flags 40000040
+096c:trace:module:map_image_into_view mapping L"\\??\\C:\\windows\\system32\\ntdll.dll" section .pdata at 0x6fffffc55000 off 95000 size 9000 virt 8fd0 flags 40000040
+096c:trace:module:map_image_into_view mapping L"\\??\\C:\\windows\\system32\\ntdll.dll" section .xdata at 0x6fffffc5e000 off 9e000 size 6000 virt 537c flags 40000040
+096c:trace:module:map_image_into_view mapping L"\\??\\C:\\windows\\system32\\ntdll.dll" section .bss at 0x6fffffc64000 off 0 size 0 virt 38b0 flags c0000080
+096c:trace:module:map_image_into_view mapping L"\\??\\C:\\windows\\system32\\ntdll.dll" section .edata at 0x6fffffc68000 off a4000 size b000 virt aa88 flags 40000040
+096c:trace:module:map_image_into_view mapping L"\\??\\C:\\windows\\system32\\ntdll.dll" section .idata at 0x6fffffc73000 off af000 size 1000 virt 18 flags 40000040
+096c:trace:module:map_image_into_view mapping L"\\??\\C:\\windows\\system32\\ntdll.dll" section .rsrc at 0x6fffffc74000 off b0000 size 1000 virt 3b0 flags 40000040
+096c:trace:module:map_image_into_view mapping L"\\??\\C:\\windows\\system32\\ntdll.dll" section .reloc at 0x6fffffc75000 off b1000 size 1000 virt 214 flags 42000040
+096c:trace:module:map_image_into_view mapping L"\\??\\C:\\windows\\system32\\ntdll.dll" section /14 at 0x6fffffc76000 off b2000 size 6000 virt 5780 flags 42000040
+096c:trace:module:map_image_into_view mapping L"\\??\\C:\\windows\\system32\\ntdll.dll" section /29 at 0x6fffffc7c000 off b8000 size 166000 virt 165e0b flags 42000040
+096c:trace:module:map_image_into_view mapping L"\\??\\C:\\windows\\system32\\ntdll.dll" section /41 at 0x6fffffde2000 off 21e000 size 13000 virt 1299b flags 42000040
+096c:trace:module:map_image_into_view mapping L"\\??\\C:\\windows\\system32\\ntdll.dll" section /55 at 0x6fffffdf5000 off 231000 size 6f000 virt 6edb6 flags 42000040
+096c:trace:module:map_image_into_view mapping L"\\??\\C:\\windows\\system32\\ntdll.dll" section /67 at 0x6fffffe64000 off 2a0000 size 14000 virt 137e0 flags 42000040
+096c:trace:module:map_image_into_view mapping L"\\??\\C:\\windows\\system32\\ntdll.dll" section /80 at 0x6fffffe78000 off 2b4000 size 6000 virt 5a8c flags 42000040
+096c:trace:module:map_image_into_view mapping L"\\??\\C:\\windows\\system32\\ntdll.dll" section /91 at 0x6fffffe7e000 off 2ba000 size 130000 virt 12f0f6 flags 42000040
+096c:trace:module:map_image_into_view mapping L"\\??\\C:\\windows\\system32\\ntdll.dll" section /102 at 0x6ffffffae000 off 3ea000 size 31000 virt 30f80 flags 42000040
+096c:trace:module:map_image_into_view mapping L"\\??\\C:\\windows\\system32\\ntdll.dll" section /116 at 0x6ffffffdf000 off 41b000 size 1000 virt 1a8 flags 42000040
+096c:trace:module:map_image_into_view mapping L"\\??\\C:\\windows\\system32\\ntdll.dll" section /132 at 0x6ffffffe0000 off 41c000 size 1000 virt b8 flags 42000040
+096c:trace:module:map_image_into_view relocating L"\\??\\C:\\windows\\system32\\ntdll.dll" dynamic base 170000000 -> 6fffffbc0000 mapped at 0x6fffffbc0000
+096c:trace:module:load_apiset_dll loaded L"\\??\\C:\\windows\\system32\\apisetschema.dll" apiset at 0x11000
+compatdb: EAAntiCheat.GameServiceLauncher.exe [x86_64] company="Electronic Arts" product="EA Anticheat"
+compatdb:   rules = default
+compatdb:   dxgi = dxmt (from /Volumes/ExT2/GameHub/Runtimes/hub-0-winemacfs-dxmtrtv/lib/wine/dxgi/dxmt)
+compatdb:   d3d9 = mtld3d (from /Volumes/ExT2/GameHub/Runtimes/hub-0-winemacfs-dxmtrtv/lib/wine/d3d9/mtld3d)
+096c:trace:module:set_security_cookie initializing security cookie 0000000140B3ABD0
+096c:trace:module:build_module loaded L"\\??\\E:\\EA Games\\F1 24\\EAAntiCheat.GameServiceLauncher.exe" 0000000000030FF0 0000000140000000
+wine_dbg_output: debugstr buffer overflow (contents: '096c:trace:module:init_non_native_support ')
+096c:err:seh:call_seh_handlers invalid frame 00000001000FF138 (0000000000122000-0000000000320000)
+096c:err:seh:NtRaiseException Exception frame is not in stack limits => unable to dispatch exception.
