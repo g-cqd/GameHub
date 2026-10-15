@@ -1,0 +1,18 @@
+winemac: Keep the full-screen space black where the program draws nothing.
+
+With a full-screen DXGI swap chain DXMT sets a present rect, so win32u
+gives the driver monitor-sized rects and no letterbox mask, while the
+client view holding the Metal layer follows the window's client rect. A
+game whose window ends up a few pixels narrower than its monitor (seen with
+Battlefield 4 at the native mode) left a strip at the right edge where the
+content view's own layer showed through: the window surface, which a
+Direct3D program never paints, so white.
+
+Put an opaque black layer of our own under the client views while the
+window is in the full-screen space, covering the content view's visible
+bounds. The view's own layer is left alone: changing its background, or
+redisplaying it on every frame change, makes AppKit reveal the full-screen
+title bar.
+
+Also place the fitted content on whole device pixels, centred, and show
+content that already fits at exactly 1:1 instead of resampling it.

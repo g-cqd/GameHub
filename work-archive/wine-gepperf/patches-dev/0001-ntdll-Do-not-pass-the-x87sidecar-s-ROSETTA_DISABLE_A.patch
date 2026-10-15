@@ -1,0 +1,111 @@
+From dbbd488da82f514cdf92ad3178719f11707da6e1 Mon Sep 17 00:00:00 2001
+From: Gigi <42325924+g-cqd@users.noreply.github.com>
+Date: Sun, 11 Oct 2026 18:50:08 +0200
+Subject: [PATCH] ntdll: Do not pass the x87sidecar's ROSETTA_DISABLE_AOT on to
+ child processes.
+
+The x87sidecar starts each process it hooks with ROSETTA_DISABLE_AOT=1, so
+that Rosetta JIT-translates the whole process and the hook is reached.
+Rosetta reads the variable once, when the process starts, but the variable
+stayed in the environment, and every process the hooked one started
+inherited it, and so on down the tree. A 64-bit child never runs under the
+sidecar, yet it then lost Rosetta's ahead-of-time translation of its unix
+libraries and JIT-translated them at every start.
+
+This hits EA's elevation proxy (EAGEP, 64-bit), which EA's background
+service starts for elevated game launches and which must connect back
+within 3.5 s: in the EA sessions seen so far the first process of the
+session was hooked, and the background service and EAGEP inherited the
+variable from it. Started by a hooked 32-bit parent, EAGEP took 1414 ms
+median from CreateProcess to its IPC connect (p90 1527 ms, n=8), at 1.9
+times the CPU time of the same start with AOT (1800 against 952 ms). With
+this change it takes 932 ms (p90 955 ms, n=8, same harness, interleaved). A
+fresh runtime now also fills the AOT cache for the child's libraries (23
+entries for EAGEP), where it created none before.
+
+preloader_exec saves the value from before the sidecar in
+WINE_X87_SAVED_ROSETTA_DISABLE_AOT ("=value", or "-" if it was unset) just
+before it execs the sidecar. The started process puts it back right after
+the cooperative handshake, before init_environment imports the unix
+environment, and removes the saved copy. The hooked process keeps JIT,
+since Rosetta has already read the variable, and its x87 code runs as fast
+as before (160 ms against 2.3 s unhooked for a 32-bit x87 loop); a 32-bit
+child goes through the sidecar again, which sets the variable again for
+it. A value the user set before the sidecar is kept.
+---
+ dlls/ntdll/unix/loader.c | 44 ++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 44 insertions(+)
+
+diff --git a/dlls/ntdll/unix/loader.c b/dlls/ntdll/unix/loader.c
+index 0b24a021f50..a3d983c10d1 100644
+--- a/dlls/ntdll/unix/loader.c
++++ b/dlls/ntdll/unix/loader.c
+@@ -751,6 +751,47 @@ const char *get_x87_sidecar_path(void)
+ #endif
+ }
+ 
++/* The x87sidecar sets ROSETTA_DISABLE_AOT=1 for the process it starts, so that
++ * Rosetta JIT-translates all of it and the x87 hook is reached. Rosetta reads the
++ * variable once, when a process starts. Left in place, it is inherited by every
++ * process the hooked one starts: a 64-bit child, which never runs under the
++ * sidecar, then loses Rosetta's ahead-of-time translation of its unix libraries
++ * and JIT-translates them at every start, at about twice the CPU time. So
++ * preloader_exec saves the value from before the sidecar in this variable, as
++ * "=value", or "-" if it was unset, and the started process puts it back as soon
++ * as it runs (restore_rosetta_aot_env). */
++#define X87_SAVED_AOT_ENV "WINE_X87_SAVED_ROSETTA_DISABLE_AOT"
++
++static void save_rosetta_aot_env(void)
++{
++    const char *aot = getenv( "ROSETTA_DISABLE_AOT" );
++    char *saved = NULL;
++
++    if (!aot) setenv( X87_SAVED_AOT_ENV, "-", 1 );
++    else if (asprintf( &saved, "=%s", aot ) != -1)
++    {
++        setenv( X87_SAVED_AOT_ENV, saved, 1 );
++        free( saved );
++    }
++}
++
++/***********************************************************************
++ *           restore_rosetta_aot_env
++ *
++ * Put back the ROSETTA_DISABLE_AOT that this process had before the x87sidecar
++ * started it, so that the processes it starts do not inherit the sidecar's
++ * setting. Rosetta has read the variable by now, so this process keeps it.
++ */
++static void restore_rosetta_aot_env(void)
++{
++    const char *saved = getenv( X87_SAVED_AOT_ENV );
++
++    if (!saved) return;
++    if (saved[0] == '=') setenv( "ROSETTA_DISABLE_AOT", saved + 1, 1 );
++    else unsetenv( "ROSETTA_DISABLE_AOT" );
++    unsetenv( X87_SAVED_AOT_ENV );
++}
++
+ /* Whether to start this process under the x87sidecar: -1 undecided, 0 no,
+  * 1 yes. spawn_process sets it in the child, together with the sidecar to
+  * use, from what the parent decided; the first process of a launch decides
+@@ -959,7 +1000,9 @@ static void preloader_exec( char **argv, const char *image_path, WORD machine )
+             ERR( "%s: attaching rosettax87 --cooperative (%s) for %s\n",
+                  env_path && !strcmp( env_path, rosetta_path ) ? "ROSETTA_X87_PATH" : "x87sidecar",
+                  rosetta_path, target );
++            save_rosetta_aot_env();
+             execv( coop_argv[0], coop_argv );
++            unsetenv( X87_SAVED_AOT_ENV );
+         }
+     }
+ 
+@@ -3079,6 +3122,7 @@ DECLSPEC_EXPORT void __wine_main( int argc, char *argv[] )
+      * task port to the sidecar and wait for its x87 JIT hook before running. */
+     x87_cooperative_handshake();
+ #endif
++    restore_rosetta_aot_env();
+ 
+     init_paths();
+     if (!getenv( "WINELOADERNOEXEC" ) || argc <= 1) check_command_line( argc, argv );
+-- 
+2.56.0
+

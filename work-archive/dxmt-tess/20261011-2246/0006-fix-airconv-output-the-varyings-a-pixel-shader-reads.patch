@@ -1,0 +1,473 @@
+From 71994e66e7719bcdcbddcac6303f6a83b638208f Mon Sep 17 00:00:00 2001
+From: Gigi <42325924+g-cqd@users.noreply.github.com>
+Date: Sun, 11 Oct 2026 22:46:27 +0200
+Subject: [PATCH 6/6] fix(airconv): output the varyings a pixel shader reads
+ from a GS mesh pipeline
+
+D3D11 links stages by register and leaves a pixel shader input that the
+geometry shader does not write undefined. DXMT emitted only the GS's
+declared outputs as mesh vertex data, and on M1/M2 (G14X) Apple's compiler
+crashes on a mesh pipeline whose fragment function reads a varying missing
+from the mesh outputs (null Value in AGCLLVMUserMeshShaderSW::getBasePointer;
+"Failed to create mesh PSO: ... XPC_ERROR_CONNECTION_INTERRUPTED"). Crysis 3
+does this; the effect was lost (before: GPU fault and hang).
+
+The GS variant now depends on the pixel shader (ShaderVariantGeometry,
+new compilation argument SM50_SHADER_PSO_PIXEL_SHADER_INPUT, also converted
+for 32-bit callers). The pixel shader records its user inputs while it is
+parsed; the GS converter adds a mesh output for each one the GS does not
+output: the GS output register with the element's components when the GS
+declares that register, otherwise zero. Converters that do not know the
+argument ignore it.
+
+In a sweep over the 736 shaders Crysis 3 had in the DXMT cache, all 344
+compiler crashes were such pairs (0 of 1692 linked pairs crashed).
+tests/dx11/dx11_failed_pipeline gs mode: before, the pipeline fails and the
+draw is dropped; after, it compiles and renders exactly green (TEXCOORD1
+zero), i686 and x86_64. A ts mode (one patch at tess factor 64) is added
+as a smoke test of the tessellation path.
+---
+ src/airconv/air_signature.hpp             |   6 ++
+ src/airconv/airconv_public.h              |  14 +++
+ src/airconv/dxbc_converter.hpp            |  14 +++
+ src/airconv/dxbc_converter_basicblock.cpp |   9 ++
+ src/airconv/dxbc_converter_gs.cpp         |  32 +++++-
+ src/airconv/dxbc_signature.cpp            |   5 +
+ src/d3d11/d3d11_pipeline_gs.cpp           |   2 +-
+ src/d3d11/d3d11_shader.cpp                |   9 +-
+ src/d3d11/d3d11_shader.hpp                |   3 +
+ src/winemetal/unix/winemetal_unix.c       |  17 ++++
+ tests/dx11/dx11_failed_pipeline.cpp       | 118 +++++++++++++++++++++-
+ 11 files changed, 224 insertions(+), 5 deletions(-)
+
+diff --git a/src/airconv/air_signature.hpp b/src/airconv/air_signature.hpp
+index 45cd551..6be43e3 100644
+--- a/src/airconv/air_signature.hpp
++++ b/src/airconv/air_signature.hpp
+@@ -616,6 +616,12 @@ public:
+   uint32_t DefineOutput(const FunctionOutput &output);
+   uint32_t DefineMeshVertexOutput(const MeshVertexOutput &output);
+   uint32_t DefineMeshPrimitiveOutput(const MeshPrimitiveOutput &output);
++  bool HasMeshVertexData(const std::string &user) const {
++    for (auto &output : mesh_vertex_outputs)
++      if (auto data = std::get_if<OutputMeshData>(&output); data && data->user == user)
++        return true;
++    return false;
++  }
+   void UseEarlyFragmentTests() { early_fragment_tests = true; }
+   void UseMaxWorkgroupSize(uint32_t size) { max_work_group_size = size; }
+   void UseMaxMeshWorkgroupSize(uint32_t size) { max_mesh_work_group_size = size; }
+diff --git a/src/airconv/airconv_public.h b/src/airconv/airconv_public.h
+index 517ff0a..1f31772 100644
+--- a/src/airconv/airconv_public.h
++++ b/src/airconv/airconv_public.h
+@@ -192,6 +192,7 @@ enum SM50_SHADER_COMPILATION_ARGUMENT_TYPE {
+   SM50_SHADER_GS_PASS_THROUGH = 5,
+   SM50_SHADER_PSO_GEOMETRY_SHADER = 6,
+   SM50_SHADER_PSO_TESSELLATOR = 7,
++  SM50_SHADER_PSO_PIXEL_SHADER_INPUT = 8,
+   SM50_SHADER_ARGUMENT_TYPE_MAX = 0xffffffff,
+ };
+ 
+@@ -284,6 +285,19 @@ struct SM50_SHADER_PSO_GEOMETRY_SHADER_DATA {
+   bool strip_topology;
+ };
+ 
++/**
++The pixel shader of the pipeline, for a geometry shader compiled as a mesh function:
++the mesh function then also outputs every user varying the pixel shader reads, the
++value of the GS output register if the GS declares it, otherwise zero. D3D11 leaves
++such inputs undefined; Metal's compiler crashes on M1/M2 (G14X) if a fragment input is
++missing from the mesh outputs. Converters that do not know this type ignore it.
++*/
++struct SM50_SHADER_PSO_PIXEL_SHADER_INPUT_DATA {
++  void *next;
++  enum SM50_SHADER_COMPILATION_ARGUMENT_TYPE type;
++  sm50_shader_t pixel_shader;
++};
++
+ struct SM50_SHADER_PSO_TESSELLATOR_DATA {
+   void *next;
+   enum SM50_SHADER_COMPILATION_ARGUMENT_TYPE type;
+diff --git a/src/airconv/dxbc_converter.hpp b/src/airconv/dxbc_converter.hpp
+index 0f3f055..2dd936e 100644
+--- a/src/airconv/dxbc_converter.hpp
++++ b/src/airconv/dxbc_converter.hpp
+@@ -1,5 +1,6 @@
+ #pragma once
+ 
++#include <array>
+ #include <cstdint>
+ #include <map>
+ #include <optional>
+@@ -292,6 +293,8 @@ IREffect pop_mesh_output_viewport_array_index(uint32_t from_reg, uint32_t mask,
+ IREffect pop_mesh_output_position(uint32_t from_reg, uint32_t mask, pvalue vertex_id);
+ IREffect
+ pop_mesh_output_vertex_data(uint32_t from_reg, uint32_t mask, uint32_t idx, pvalue vertex_id, air::MSLScalerOrVectorType desired_type);
++IREffect
++pop_mesh_output_vertex_data_zero(uint32_t idx, pvalue vertex_id, air::MSLScalerOrVectorType desired_type);
+ 
+ llvm::Expected<llvm::BasicBlock *> convert_basicblocks(
+   BasicBlock *entry, context &ctx, llvm::BasicBlock *return_bb
+@@ -406,6 +409,13 @@ private:
+   RegisterComponentType component_type_;
+ };
+ 
++struct PixelShaderUserInput {
++  uint32_t reg;
++  uint32_t mask; /* components of the signature element */
++  std::string name;
++  RegisterComponentType type;
++};
++
+ class SM50ShaderInternal {
+ public:
+   dxmt::dxbc::ShaderInfo shader_info;
+@@ -435,6 +445,10 @@ public:
+   microsoft::D3D10_SB_PRIMITIVE gs_input_primitive = {};
+   std::vector<std::function<IREffect(MeshOutputContext &)>> mesh_output_handlers;
+   uint32_t num_mesh_vertex_data = 0;
++  /* pixel shader: the user (non system value) inputs it declares */
++  std::vector<PixelShaderUserInput> ps_user_inputs;
++  /* geometry shader: components declared by dcl_output, per output register */
++  std::array<uint8_t, 32> gs_output_reg_masks = {};
+   microsoft::D3D10_SB_PRIMITIVE_TOPOLOGY gs_output_topology = {};
+   uint32_t gs_max_vertex_output = 0;
+   uint32_t gs_instance_count = 1;
+diff --git a/src/airconv/dxbc_converter_basicblock.cpp b/src/airconv/dxbc_converter_basicblock.cpp
+index ca0aca2..593ac53 100644
+--- a/src/airconv/dxbc_converter_basicblock.cpp
++++ b/src/airconv/dxbc_converter_basicblock.cpp
+@@ -372,6 +372,15 @@ pop_mesh_output_vertex_data(
+   co_return {};
+ }
+ 
++IREffect
++pop_mesh_output_vertex_data_zero(uint32_t idx, pvalue vertex_id, air::MSLScalerOrVectorType desired_type) {
++  auto ctx = co_yield get_context();
++  ctx.air.CreateSetMeshVertexData(
++      vertex_id, idx, llvm::Constant::getNullValue(air::get_llvm_type(desired_type, ctx.llvm))
++  );
++  co_return {};
++}
++
+ IREffect pull_vertex_input(
+   air::FunctionSignatureBuilder &func_signature, uint32_t to_reg, uint32_t mask,
+   SM50_IA_INPUT_ELEMENT element_info, uint32_t slot_mask
+diff --git a/src/airconv/dxbc_converter_gs.cpp b/src/airconv/dxbc_converter_gs.cpp
+index ebcab5a..3efb185 100644
+--- a/src/airconv/dxbc_converter_gs.cpp
++++ b/src/airconv/dxbc_converter_gs.cpp
+@@ -131,7 +131,37 @@ convert_dxbc_geometry_shader(
+       p(sig_ctx);
+     }
+   }
+-  auto& gs_output_handlers = pShaderInternal->mesh_output_handlers;
++  auto gs_output_handlers = pShaderInternal->mesh_output_handlers; // copy: extended per pipeline below
++
++  SM50_SHADER_PSO_PIXEL_SHADER_INPUT_DATA *ps_input_data = nullptr;
++  if (args_get_data<SM50_SHADER_PSO_PIXEL_SHADER_INPUT, SM50_SHADER_PSO_PIXEL_SHADER_INPUT_DATA>(
++          pArgs, &ps_input_data
++      ) &&
++      ps_input_data->pixel_shader) {
++    // Output every user varying the pixel shader reads. D3D11 links by register and
++    // leaves a register the GS does not write undefined; Metal requires each fragment
++    // input among the mesh outputs (the G14X compiler crashes otherwise).
++    auto pixel_stage = (SM50ShaderInternal *)ps_input_data->pixel_shader;
++    uint32_t next_index = pShaderInternal->num_mesh_vertex_data;
++    for (auto &input : pixel_stage->ps_user_inputs) {
++      if (func_signature.HasMeshVertexData(input.name))
++        continue;
++      auto const index = next_index++;
++      auto const type = to_msl_type(input.type);
++      func_signature.DefineMeshVertexOutput(air::OutputMeshData{.user = input.name, .type = type, .index = index});
++      bool written = input.reg < max_output_register && input.reg < pShaderInternal->gs_output_reg_masks.size() &&
++                     (pShaderInternal->gs_output_reg_masks[input.reg] & input.mask);
++      if (written) {
++        gs_output_handlers.push_back([=, reg = input.reg, mask = input.mask](MeshOutputContext &output) -> IREffect {
++          return pop_mesh_output_vertex_data(reg, mask, index, output.vertex_id, type);
++        });
++      } else {
++        gs_output_handlers.push_back([=](MeshOutputContext &output) -> IREffect {
++          return pop_mesh_output_vertex_data_zero(index, output.vertex_id, type);
++        });
++      }
++    }
++  }
+ 
+   setup_binding_table(shader_info, resource_map, func_signature, module);
+ 
+diff --git a/src/airconv/dxbc_signature.cpp b/src/airconv/dxbc_signature.cpp
+index 6783006..311351c 100644
+--- a/src/airconv/dxbc_signature.cpp
++++ b/src/airconv/dxbc_signature.cpp
+@@ -420,6 +420,9 @@ void handle_signature_ps(
+     });
+     max_input_register = std::max(reg + 1, max_input_register);
+     if (sig.mask() == 0) break;
++    sm50_shader->ps_user_inputs.push_back(
++      {.reg = reg, .mask = sig.mask(), .name = sig.consistentAttributeName(), .type = sig.componentType()}
++    );
+     signature_handlers.push_back([=, type = sig.componentType(), name = sig.consistentAttributeName()]
+     (SignatureContext &ctx) {
+       bool pull_mode = bool(ctx.pull_mode_reg_mask & (1 << reg)) && interpolation != air::Interpolation::flat;
+@@ -1143,6 +1146,8 @@ handle_signature_gs(
+         return (sig.reg() == reg) && ((sig.mask() & mask) != 0);
+       });
+       max_output_register = std::max(reg + 1, max_output_register);
++      if (reg < sm50_shader->gs_output_reg_masks.size())
++        sm50_shader->gs_output_reg_masks[reg] |= mask;
+       if (sig.mask() == 0) break;
+       auto const mesh_vertex_data_index = num_mesh_vertex_data++;
+       auto const type = to_msl_type(sig.componentType());
+diff --git a/src/d3d11/d3d11_pipeline_gs.cpp b/src/d3d11/d3d11_pipeline_gs.cpp
+index 2567933..d3e1535 100644
+--- a/src/d3d11/d3d11_pipeline_gs.cpp
++++ b/src/d3d11/d3d11_pipeline_gs.cpp
+@@ -47,7 +47,7 @@ public:
+             pDesc->InputLayout, pDesc->GeometryShader,
+             pDesc->IndexBufferFormat, pDesc->GSStripTopology});
+     GeometryShader = pDesc->GeometryShader->get_shader(
+-      ShaderVariantGeometry{pDesc->VertexShader, pDesc->GSStripTopology});
++      ShaderVariantGeometry{pDesc->VertexShader, pDesc->PixelShader, pDesc->GSStripTopology});
+    
+     if (pDesc->PixelShader) {
+       PixelShader = pDesc->PixelShader->get_shader(ShaderVariantPixel{
+diff --git a/src/d3d11/d3d11_shader.cpp b/src/d3d11/d3d11_shader.cpp
+index 687b94a..c804436 100644
+--- a/src/d3d11/d3d11_shader.cpp
++++ b/src/d3d11/d3d11_shader.cpp
+@@ -416,12 +416,19 @@ CreateVariantShader(MTLD3D11Device *pDevice, ManagedShader shader,
+   h.update(getGlobalShaderFlag());
+   h.update(variant.vertex_shader_handle->sha1());
+   h.update(variant.strip_topology);
++  if (variant.pixel_shader_handle)
++    h.update(variant.pixel_shader_handle->sha1());
+   auto variant_digest = h.final();
+   std::string func_name = "gs_" + shader->sha1().string().substr(0, 8) + "_" + variant_digest.string();
+   auto proc = [=](const char *func_name, SM50_SHADER_COMMON_DATA *common) -> sm50_bitcode_t  {
++    SM50_SHADER_PSO_PIXEL_SHADER_INPUT_DATA pixel_input;
++    pixel_input.type = SM50_SHADER_PSO_PIXEL_SHADER_INPUT;
++    pixel_input.next = common;
++    pixel_input.pixel_shader = variant.pixel_shader_handle ? variant.pixel_shader_handle->handle() : sm50_shader_t{};
++
+     SM50_SHADER_PSO_GEOMETRY_SHADER_DATA geometry;
+     geometry.type = SM50_SHADER_PSO_GEOMETRY_SHADER;
+-    geometry.next = common;
++    geometry.next = variant.pixel_shader_handle ? (void *)&pixel_input : (void *)common;
+     geometry.strip_topology = variant.strip_topology;
+ 
+     sm50_bitcode_t compile_result = nullptr;
+diff --git a/src/d3d11/d3d11_shader.hpp b/src/d3d11/d3d11_shader.hpp
+index fd31bd9..d5d5d04 100644
+--- a/src/d3d11/d3d11_shader.hpp
++++ b/src/d3d11/d3d11_shader.hpp
+@@ -157,9 +157,12 @@ struct ShaderVariantGeometryVertex {
+ struct ShaderVariantGeometry {
+   using this_type = ShaderVariantGeometry;
+   ManagedShader vertex_shader_handle;
++  /* nullptr when rasterization is disabled */
++  ManagedShader pixel_shader_handle;
+   bool strip_topology;
+   bool operator==(const this_type &rhs) const {
+     return vertex_shader_handle == rhs.vertex_shader_handle &&
++           pixel_shader_handle == rhs.pixel_shader_handle &&
+            strip_topology == rhs.strip_topology;
+   }
+ };
+diff --git a/src/winemetal/unix/winemetal_unix.c b/src/winemetal/unix/winemetal_unix.c
+index 4744692..d55b5a5 100644
+--- a/src/winemetal/unix/winemetal_unix.c
++++ b/src/winemetal/unix/winemetal_unix.c
+@@ -1831,6 +1831,12 @@ struct SM50_SHADER_PSO_GEOMETRY_SHADER_DATA32 {
+   bool strip_topology;
+ };
+ 
++struct SM50_SHADER_PSO_PIXEL_SHADER_INPUT_DATA32 {
++  uint32_t next;
++  enum SM50_SHADER_COMPILATION_ARGUMENT_TYPE type;
++  uint64_t pixel_shader; /* sm50_shader_t, 64-bit on both sides, offset 8 */
++};
++
+ struct SM50_SHADER_PSO_TESSELLATOR_DATA32 {
+   uint32_t next;
+   enum SM50_SHADER_COMPILATION_ARGUMENT_TYPE type;
+@@ -1933,6 +1939,17 @@ sm50_compilation_argument32_convert(
+       data->max_potential_tess_factor = src->max_potential_tess_factor;
+       break;
+     }
++    case SM50_SHADER_PSO_PIXEL_SHADER_INPUT: {
++      struct SM50_SHADER_PSO_PIXEL_SHADER_INPUT_DATA32 *src = (void *)args32;
++      struct SM50_SHADER_PSO_PIXEL_SHADER_INPUT_DATA *data =
++          malloc(sizeof(struct SM50_SHADER_PSO_PIXEL_SHADER_INPUT_DATA));
++      last_arg->next = data;
++      last_arg = (void *)data;
++      last_arg->next = NULL;
++      data->type = src->type;
++      data->pixel_shader = (sm50_shader_t)src->pixel_shader;
++      break;
++    }
+     case SM50_SHADER_ARGUMENT_TYPE_MAX:
+       break;
+     }
+diff --git a/tests/dx11/dx11_failed_pipeline.cpp b/tests/dx11/dx11_failed_pipeline.cpp
+index f26fd4f..7c0a7cc 100644
+--- a/tests/dx11/dx11_failed_pipeline.cpp
++++ b/tests/dx11/dx11_failed_pipeline.cpp
+@@ -25,7 +25,10 @@
+ //
+ // Mode "control" runs both paths with a pixel shader that links (B renders green).
+ //
+-// usage: dx11_failed_pipeline [vs|gs|all|control] [idle_ms (default 15000)]
++// Mode "ts" (also part of "all") draws one tessellated patch at factor 64 (smoke test of
++// the tessellation path).
++//
++// usage: dx11_failed_pipeline [vs|gs|ts|all|control] [idle_ms (default 15000)]
+ // Exit 0: pass. 1: the failed draw was executed with a stale pipeline, A did not
+ // draw, or the queue stopped executing work. 2: setup error (device, shader
+ // compilation). 3: the process faulted. A hang (killed by the runner's timeout)
+@@ -81,6 +84,31 @@ float4 ps_red(VSOut i) : SV_Target { return float4(1, 0, 0, 1); }
+ struct PSInBad { float4 pos : SV_Position; float4 c0 : TEXCOORD0; float4 c1 : TEXCOORD1; };
+ float4 ps_unlinked(PSInBad i) : SV_Target { return float4(0, i.c0.y, 0, 1) + i.c1 * 0.5; }
+ 
++// Tessellation smoke test: a fullscreen triangle patch tessellated at factor 64
++// (DXMT clamps it to 8 on M1/M2), each control point colored by TEXCOORD0.
++struct HSIn { float4 pos : SV_Position; float4 c0 : TEXCOORD0; };
++VSOut vs_patch(uint id : SV_VertexID) { return vs_tri(id); }
++struct PatchConst { float edge[3] : SV_TessFactor; float inside : SV_InsideTessFactor; };
++PatchConst hs_const(InputPatch<VSOut, 3> p) {
++  PatchConst c;
++  c.edge[0] = 64; c.edge[1] = 64; c.edge[2] = 64; c.inside = 64;
++  return c;
++}
++[domain("tri")]
++[partitioning("integer")]
++[outputtopology("triangle_cw")]
++[outputcontrolpoints(3)]
++[patchconstantfunc("hs_const")]
++[maxtessfactor(64.0)]
++VSOut hs_main(InputPatch<VSOut, 3> p, uint i : SV_OutputControlPointID) { return p[i]; }
++[domain("tri")]
++VSOut ds_main(PatchConst c, float3 uvw : SV_DomainLocation, const OutputPatch<VSOut, 3> p) {
++  VSOut o;
++  o.pos = p[0].pos * uvw.x + p[1].pos * uvw.y + p[2].pos * uvw.z;
++  o.c0 = p[0].c0;
++  return o;
++}
++
+ // Control: reads only what the previous stage writes.
+ float4 ps_green(VSOut i) : SV_Target { return float4(0, i.c0.y, 0, 1); }
+ )";
+@@ -225,8 +253,13 @@ static int run_mode(ID3D11Device *dev, ID3D11DeviceContext *ctx, bool use_gs, bo
+     result = 1;
+   } else if (right.r == 0 && right.g == 0 && right.b == 0) {
+     std::printf("[%s] ok: the draw with the failed pipeline was skipped\n", mode);
++  } else if (right.r == 0 && right.g == 255 && right.b == 0) {
++    // TEXCOORD0.y = 1 from the previous stage; TEXCOORD1, which it does not write,
++    // read as zero (DXMT fills varyings the geometry shader does not write with zero).
++    std::printf("[%s] ok: the unlinkable draw rendered with its own pipeline (green)\n", mode);
+   } else {
+-    std::printf("[%s] ok: the unlinkable draw rendered with its own pipeline (it compiled on this GPU)\n", mode);
++    std::printf("[%s] FAIL: the unlinkable draw rendered an unexpected color\n", mode);
++    result = 1;
+   }
+ 
+   staging->Release();
+@@ -240,6 +273,82 @@ static int run_mode(ID3D11Device *dev, ID3D11DeviceContext *ctx, bool use_gs, bo
+   return result;
+ }
+ 
++// Draws one tessellated patch (green, from TEXCOORD0) over the whole target.
++static int run_tessellation(ID3D11Device *dev, ID3D11DeviceContext *ctx) {
++  const UINT W = 32, H = 32;
++  ID3DBlob *vs_blob = compile("vs_patch", "vs_5_0");
++  ID3DBlob *hs_blob = compile("hs_main", "hs_5_0");
++  ID3DBlob *ds_blob = compile("ds_main", "ds_5_0");
++  ID3DBlob *ps_blob = compile("ps_green", "ps_5_0");
++  if (!vs_blob || !hs_blob || !ds_blob || !ps_blob)
++    return 2;
++  ID3D11VertexShader *vs = nullptr;
++  ID3D11HullShader *hs = nullptr;
++  ID3D11DomainShader *ds = nullptr;
++  ID3D11PixelShader *ps = nullptr;
++  if (FAILED(dev->CreateVertexShader(vs_blob->GetBufferPointer(), vs_blob->GetBufferSize(), nullptr, &vs)) ||
++      FAILED(dev->CreateHullShader(hs_blob->GetBufferPointer(), hs_blob->GetBufferSize(), nullptr, &hs)) ||
++      FAILED(dev->CreateDomainShader(ds_blob->GetBufferPointer(), ds_blob->GetBufferSize(), nullptr, &ds)) ||
++      FAILED(dev->CreatePixelShader(ps_blob->GetBufferPointer(), ps_blob->GetBufferSize(), nullptr, &ps)))
++    return 2;
++  D3D11_TEXTURE2D_DESC td = {};
++  td.Width = W;
++  td.Height = H;
++  td.MipLevels = 1;
++  td.ArraySize = 1;
++  td.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
++  td.SampleDesc.Count = 1;
++  td.Usage = D3D11_USAGE_DEFAULT;
++  td.BindFlags = D3D11_BIND_RENDER_TARGET;
++  ID3D11Texture2D *rt = nullptr, *staging = nullptr;
++  ID3D11RenderTargetView *rtv = nullptr;
++  if (FAILED(dev->CreateTexture2D(&td, nullptr, &rt)) || FAILED(dev->CreateRenderTargetView(rt, nullptr, &rtv)))
++    return 2;
++  td.Usage = D3D11_USAGE_STAGING;
++  td.BindFlags = 0;
++  td.CPUAccessFlags = D3D11_CPU_ACCESS_READ;
++  if (FAILED(dev->CreateTexture2D(&td, nullptr, &staging)))
++    return 2;
++  const float black[4] = {0, 0, 0, 1};
++  ctx->ClearRenderTargetView(rtv, black);
++  ctx->OMSetRenderTargets(1, &rtv, nullptr);
++  ctx->IASetInputLayout(nullptr);
++  ctx->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_3_CONTROL_POINT_PATCHLIST);
++  D3D11_VIEWPORT vp = {0, 0, (float)W, (float)H, 0, 1};
++  ctx->RSSetViewports(1, &vp);
++  ctx->VSSetShader(vs, nullptr, 0);
++  ctx->HSSetShader(hs, nullptr, 0);
++  ctx->DSSetShader(ds, nullptr, 0);
++  ctx->GSSetShader(nullptr, nullptr, 0);
++  ctx->PSSetShader(ps, nullptr, 0);
++  std::printf("[ts] draw one patch tessellated at factor 64, read back\n");
++  ctx->Draw(3, 0);
++  ctx->HSSetShader(nullptr, nullptr, 0);
++  ctx->DSSetShader(nullptr, nullptr, 0);
++  ctx->CopyResource(staging, rt);
++  D3D11_MAPPED_SUBRESOURCE map;
++  if (FAILED(ctx->Map(staging, 0, D3D11_MAP_READ, 0, &map)))
++    return 1;
++  unsigned green = 0;
++  for (UINT y = 0; y < H; y++)
++    for (UINT x = 0; x < W; x++) {
++      Rgba p = *(Rgba *)((char *)map.pData + y * map.RowPitch + x * 4);
++      green += p.r == 0 && p.g == 255 && p.b == 0;
++    }
++  ctx->Unmap(staging, 0);
++  std::printf("[ts] %u of %u pixels green\n", green, W * H);
++  int result = green == W * H ? 0 : 1;
++  std::printf(result ? "[ts] FAIL: the tessellated patch did not cover the target\n" : "[ts] ok: tessellated patch rendered\n");
++  staging->Release();
++  rtv->Release();
++  rt->Release();
++  ps->Release();
++  ds->Release();
++  hs->Release();
++  vs->Release();
++  return result;
++}
++
+ int main(int argc, char **argv) {
+   SetUnhandledExceptionFilter(on_fault);
+   setvbuf(stdout, nullptr, _IONBF, 0);
+@@ -267,6 +376,11 @@ int main(int argc, char **argv) {
+     if (r > result)
+       result = r;
+   }
++  if (!std::strcmp(which, "ts") || !std::strcmp(which, "all")) {
++    int r = run_tessellation(dev, ctx);
++    if (r > result)
++      result = r;
++  }
+   if (result < 2 && !check_alive(dev, ctx, "after draws"))
+     result = 1;
+   // Pipelines are compiled on threadpool workers, which exit when idle. A worker that
+-- 
+2.56.0
+

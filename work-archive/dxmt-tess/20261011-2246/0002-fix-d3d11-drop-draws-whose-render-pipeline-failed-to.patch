@@ -1,0 +1,669 @@
+From cb535b372e41a7dc8f6b39606d9da22c2d8a09f9 Mon Sep 17 00:00:00 2001
+From: Gigi <42325924+g-cqd@users.noreply.github.com>
+Date: Sun, 11 Oct 2026 22:07:24 +0200
+Subject: [PATCH 2/6] fix(d3d11): drop draws whose render pipeline failed to
+ compile
+
+When a pipeline failed to compile, the set-pipeline lambda returned without
+setting anything, but the draw after it was still encoded, so it ran with
+whatever pipeline the encoder had bound before and with bindings laid out
+for other shaders. Crysis 3 hits this on M1/M2: a pixel shader reads a
+varying its geometry shader does not write, Apple's compiler service
+crashes on the VS+GS mesh pipeline ("Failed to create mesh PSO: ...
+XPC_ERROR_CONNECTION_INTERRUPTED"), the GS draw runs with a stale mesh
+pipeline, the GPU page-faults, and every later command buffer is ignored.
+
+The set-pipeline lambdas of the ordinary, geometry and tessellation paths
+now record a failed pipeline in RenderEncoderData::pipeline_failed, and all
+14 draw paths go through EmitDrawOP, which drops the draw while it is set.
+A warning is logged once. The mesh pipeline errors now name the shaders
+(VS=xxxxxxxx GS=... PS=..., the SHA-1 prefixes used in the shader cache
+function names) so the failing combination can be found.
+
+tests/dx11/dx11_failed_pipeline draws a valid pipeline (red, left half) and
+an unlinkable one (right half) in one render pass, for VS->PS and
+VS->GS->PS. Before: the right half is red on i686 and x86_64 (the failed
+draw ran with the previous pipeline). After: it stays black. Also fixes
+the meson.build entry of dx11_staging_rename (unquoted names).
+---
+ src/d3d11/d3d11_context_impl.cpp    |  65 +++++--
+ src/d3d11/d3d11_pipeline_gs.cpp     |  24 ++-
+ src/d3d11/d3d11_pipeline_ts.cpp     |  24 ++-
+ src/dxmt/dxmt_context.hpp           |   7 +
+ tests/dx11/dx11_failed_pipeline.cpp | 282 ++++++++++++++++++++++++++++
+ tests/dx11/meson.build              |   6 +-
+ 6 files changed, 386 insertions(+), 22 deletions(-)
+ create mode 100644 tests/dx11/dx11_failed_pipeline.cpp
+
+diff --git a/src/d3d11/d3d11_context_impl.cpp b/src/d3d11/d3d11_context_impl.cpp
+index d53be63..fdd91eb 100644
+--- a/src/d3d11/d3d11_context_impl.cpp
++++ b/src/d3d11/d3d11_context_impl.cpp
+@@ -1253,7 +1253,7 @@ public:
+     if (status == DrawCallStatus::Tessellation) {
+       return TessellationDraw(ControlPointCount, VertexCount, 1, StartVertexLocation, 0);
+     }
+-    EmitOP([Primitive, StartVertexLocation, VertexCount](ArgumentEncodingContext& enc) {
++    EmitDrawOP([Primitive, StartVertexLocation, VertexCount](ArgumentEncodingContext& enc) {
+       enc.bumpVisibilityResultOffset();
+       enc.resolveRenderPassBarrier();
+       auto &cmd = enc.encodeRenderCommand<wmtcmd_render_draw>();
+@@ -1291,7 +1291,7 @@ public:
+     auto IndexBufferOffset =
+         state_.InputAssembler.IndexBufferOffset +
+         StartIndexLocation * (state_.InputAssembler.IndexBufferFormat == DXGI_FORMAT_R32_UINT ? 4 : 2);
+-    EmitOP([IndexType, IndexBufferOffset, Primitive, IndexCount, BaseVertexLocation](ArgumentEncodingContext &enc) {
++    EmitDrawOP([IndexType, IndexBufferOffset, Primitive, IndexCount, BaseVertexLocation](ArgumentEncodingContext &enc) {
+       enc.bumpVisibilityResultOffset();
+       auto [index_buffer, index_sub_offset] = enc.currentIndexBuffer();
+       enc.resolveRenderPassBarrier();
+@@ -1329,7 +1329,7 @@ public:
+           ControlPointCount, VertexCountPerInstance, InstanceCount, StartVertexLocation, StartInstanceLocation
+       );
+     }
+-    EmitOP([Primitive, StartVertexLocation, VertexCountPerInstance, InstanceCount,
++    EmitDrawOP([Primitive, StartVertexLocation, VertexCountPerInstance, InstanceCount,
+           StartInstanceLocation](ArgumentEncodingContext &enc) {
+       enc.bumpVisibilityResultOffset();
+       enc.resolveRenderPassBarrier();
+@@ -1376,7 +1376,7 @@ public:
+     auto IndexBufferOffset =
+         state_.InputAssembler.IndexBufferOffset +
+         StartIndexLocation * (state_.InputAssembler.IndexBufferFormat == DXGI_FORMAT_R32_UINT ? 4 : 2);
+-    EmitOP([IndexType, IndexBufferOffset, Primitive, InstanceCount, BaseVertexLocation, StartInstanceLocation,
++    EmitDrawOP([IndexType, IndexBufferOffset, Primitive, InstanceCount, BaseVertexLocation, StartInstanceLocation,
+           IndexCountPerInstance](ArgumentEncodingContext &enc) {
+       enc.bumpVisibilityResultOffset();
+       auto [index_buffer, index_sub_offset] = enc.currentIndexBuffer();
+@@ -1401,7 +1401,7 @@ public:
+   ) {
+     auto draw_arguments_offset = PreAllocateArgumentBuffer(sizeof(DXMT_DRAW_ARGUMENTS), 32);
+     auto max_object_threadgroups = max_object_threadgroups_;
+-    EmitOP([=](ArgumentEncodingContext &enc) {
++    EmitDrawOP([=](ArgumentEncodingContext &enc) {
+       DXMT_DRAW_ARGUMENTS *draw_argument = enc.getMappedArgumentBuffer<DXMT_DRAW_ARGUMENTS>(draw_arguments_offset);
+       draw_argument->StartVertex = StartVertexLocation;
+       draw_argument->VertexCount = VertexCountPerInstance;
+@@ -1441,7 +1441,7 @@ public:
+     auto IndexBufferOffset = state_.InputAssembler.IndexBufferOffset;
+     auto draw_arguments_offset = PreAllocateArgumentBuffer(sizeof(DXMT_DRAW_INDEXED_ARGUMENTS), 32);
+     auto max_object_threadgroups = max_object_threadgroups_;
+-    EmitOP([=](ArgumentEncodingContext &enc) {
++    EmitDrawOP([=](ArgumentEncodingContext &enc) {
+       DXMT_DRAW_INDEXED_ARGUMENTS *draw_argument = enc.getMappedArgumentBuffer<DXMT_DRAW_INDEXED_ARGUMENTS>(draw_arguments_offset);
+       draw_argument->BaseVertex = BaseVertexLocation;
+       draw_argument->IndexCount = IndexCountPerInstance;
+@@ -1484,7 +1484,7 @@ public:
+   ) {
+     auto draw_arguments_offset = PreAllocateArgumentBuffer(sizeof(DXMT_DRAW_ARGUMENTS), 32);
+     auto max_object_threadgroups = max_object_threadgroups_;
+-    EmitOP([=, topo = state_.InputAssembler.Topology](ArgumentEncodingContext &enc) {
++    EmitDrawOP([=, topo = state_.InputAssembler.Topology](ArgumentEncodingContext &enc) {
+       DXMT_DRAW_ARGUMENTS *draw_argument = enc.getMappedArgumentBuffer<DXMT_DRAW_ARGUMENTS>(draw_arguments_offset);
+       draw_argument->StartVertex = StartVertexLocation;
+       draw_argument->VertexCount = VertexCountPerInstance;
+@@ -1518,7 +1518,7 @@ public:
+     auto IndexBufferOffset = state_.InputAssembler.IndexBufferOffset;
+     auto draw_arguments_offset = PreAllocateArgumentBuffer(sizeof(DXMT_DRAW_INDEXED_ARGUMENTS), 32);
+     auto max_object_threadgroups = max_object_threadgroups_;
+-    EmitOP([=, topo = state_.InputAssembler.Topology](ArgumentEncodingContext &enc) {
++    EmitDrawOP([=, topo = state_.InputAssembler.Topology](ArgumentEncodingContext &enc) {
+       DXMT_DRAW_INDEXED_ARGUMENTS *draw_argument = enc.getMappedArgumentBuffer<DXMT_DRAW_INDEXED_ARGUMENTS>(draw_arguments_offset);
+       draw_argument->BaseVertex = BaseVertexLocation;
+       draw_argument->IndexCount = IndexCountPerInstance;
+@@ -1570,7 +1570,7 @@ public:
+         state_.InputAssembler.IndexBufferFormat == DXGI_FORMAT_R32_UINT ? WMTIndexTypeUInt32 : WMTIndexTypeUInt16;
+     auto IndexBufferOffset = state_.InputAssembler.IndexBufferOffset;
+     if (auto bindable = GetResourceCommon(pBufferForArgs)) {
+-      EmitOP([IndexType, IndexBufferOffset, Primitive, ArgBuffer = bindable->buffer(),
++      EmitDrawOP([IndexType, IndexBufferOffset, Primitive, ArgBuffer = bindable->buffer(),
+               AlignedByteOffsetForArgs](ArgumentEncodingContext &enc) {
+         auto [buffer, buffer_offset] = enc.access<PipelineStage::Vertex>(
+             ArgBuffer, AlignedByteOffsetForArgs, sizeof(DXMT_DRAW_INDEXED_ARGUMENTS), ResourceAccess::Read
+@@ -1609,7 +1609,7 @@ public:
+       return TessellationDrawIndirect(ControlPointCount, pBufferForArgs, AlignedByteOffsetForArgs);
+     }
+     if (auto bindable = GetResourceCommon(pBufferForArgs)) {
+-      EmitOP([Primitive, ArgBuffer = bindable->buffer(), AlignedByteOffsetForArgs](ArgumentEncodingContext &enc) {
++      EmitDrawOP([Primitive, ArgBuffer = bindable->buffer(), AlignedByteOffsetForArgs](ArgumentEncodingContext &enc) {
+         auto [buffer, buffer_offset] = enc.access<PipelineStage::Vertex>(
+             ArgBuffer, AlignedByteOffsetForArgs, sizeof(DXMT_DRAW_ARGUMENTS), ResourceAccess::Read
+         );
+@@ -1630,7 +1630,7 @@ public:
+   ) {
+     auto max_object_threadgroups = max_object_threadgroups_;
+     if (auto bindable = GetResourceCommon(pBufferForArgs)) {
+-      EmitOP([=, topo = state_.InputAssembler.Topology, ArgBuffer = bindable->buffer()](ArgumentEncodingContext &enc) {
++      EmitDrawOP([=, topo = state_.InputAssembler.Topology, ArgBuffer = bindable->buffer()](ArgumentEncodingContext &enc) {
+         auto [buffer, buffer_offset] = enc.access<PipelineStage::Vertex>(
+             ArgBuffer, AlignedByteOffsetForArgs, sizeof(DXMT_DRAW_ARGUMENTS), ResourceAccess::Read
+         );
+@@ -1664,7 +1664,7 @@ public:
+     auto max_object_threadgroups = max_object_threadgroups_;
+ 
+     if (auto bindable = GetResourceCommon(pBufferForArgs)) {
+-      EmitOP([=, topo = state_.InputAssembler.Topology, ArgBuffer = bindable->buffer()](ArgumentEncodingContext &enc) {
++      EmitDrawOP([=, topo = state_.InputAssembler.Topology, ArgBuffer = bindable->buffer()](ArgumentEncodingContext &enc) {
+         auto [buffer, buffer_offset] = enc.access<PipelineStage::Vertex>(
+             ArgBuffer, AlignedByteOffsetForArgs, sizeof(DXMT_DRAW_INDEXED_ARGUMENTS), ResourceAccess::Read
+         );
+@@ -1699,7 +1699,7 @@ public:
+   ) {
+     auto max_object_threadgroups = max_object_threadgroups_;
+     if (auto bindable = GetResourceCommon(pBufferForArgs)) {
+-      EmitOP([=, ArgBuffer = bindable->buffer()](ArgumentEncodingContext &enc) {
++      EmitDrawOP([=, ArgBuffer = bindable->buffer()](ArgumentEncodingContext &enc) {
+         auto [buffer, buffer_offset] = enc.access<PipelineStage::Vertex>(
+             ArgBuffer, AlignedByteOffsetForArgs, sizeof(DXMT_DRAW_ARGUMENTS), ResourceAccess::Read
+         );
+@@ -1736,7 +1736,7 @@ public:
+     auto max_object_threadgroups = max_object_threadgroups_;
+ 
+     if (auto bindable = GetResourceCommon(pBufferForArgs)) {
+-      EmitOP([=, ArgBuffer = bindable->buffer()](ArgumentEncodingContext &enc) {
++      EmitDrawOP([=, ArgBuffer = bindable->buffer()](ArgumentEncodingContext &enc) {
+         auto [buffer, buffer_offset] = enc.access<PipelineStage::Vertex>(
+             ArgBuffer, AlignedByteOffsetForArgs, sizeof(DXMT_DRAW_INDEXED_ARGUMENTS), ResourceAccess::Read
+         );
+@@ -3212,6 +3212,37 @@ public:
+   template <CommandWithContext<ArgumentEncodingContext> cmd> void EmitST(cmd &&fn);
+   template <CommandWithContext<ArgumentEncodingContext> cmd> void EmitOP(cmd &&fn);
+ 
++  /**
++  Emits a draw that is dropped when the render pipeline set for it failed to compile
++  (see RenderEncoderData::pipeline_failed). Pipelines compile asynchronously, so this
++  is only known while encoding.
++  */
++  template <CommandWithContext<ArgumentEncodingContext> cmd>
++  void
++  EmitDrawOP(cmd &&fn) {
++    EmitOP([fn = std::forward<cmd>(fn)](ArgumentEncodingContext &enc) mutable {
++      if (enc.currentRenderEncoder()->pipeline_failed)
++        return;
++      fn(enc);
++    });
++  }
++
++  /**
++  Records whether the pipeline about to be set exists. Returns false if it failed to
++  compile; the caller then sets nothing and the following draws are dropped.
++  */
++  static bool
++  TrackRenderPipelineState(ArgumentEncodingContext &enc, const WMT::RenderPipelineState &pso) {
++    auto render_encoder = enc.currentRenderEncoder();
++    render_encoder->pipeline_failed = pso == nullptr;
++    if (unlikely(render_encoder->pipeline_failed)) {
++      static std::atomic_bool warned = false;
++      if (!warned.exchange(true))
++        WARN("Skipping draws whose render pipeline failed to compile (see the error above)");
++    }
++    return !render_encoder->pipeline_failed;
++  }
++
+   template <typename T> moveonly_list<T> AllocateCommandData(size_t n = 1);
+ 
+   std::tuple<WMT::Buffer, uint64_t> AllocateStagingBuffer(size_t size, size_t alignment);
+@@ -4671,7 +4702,7 @@ public:
+       pso->GetPipeline(&GraphicsPipeline); // may block
+       enc.tess_num_output_control_point_element = GraphicsPipeline.NumControlPointOutputElement;
+       enc.tess_threads_per_patch = GraphicsPipeline.ThreadsPerPatch;
+-      if (!GraphicsPipeline.PipelineState)
++      if (!TrackRenderPipelineState(enc, GraphicsPipeline.PipelineState))
+         return;
+       auto &cmd = enc.encodeRenderCommand<wmtcmd_render_setpso>();
+       cmd.type = WMTRenderCommandSetPSO;
+@@ -4717,7 +4748,7 @@ public:
+       render_encoder->use_geometry = 1;
+       MTL_COMPILED_GRAPHICS_PIPELINE GraphicsPipeline{};
+       pso->GetPipeline(&GraphicsPipeline); // may block
+-      if (!GraphicsPipeline.PipelineState)
++      if (!TrackRenderPipelineState(enc, GraphicsPipeline.PipelineState))
+         return;
+       auto &cmd = enc.encodeRenderCommand<wmtcmd_render_setpso>();
+       cmd.type = WMTRenderCommandSetPSO;
+@@ -4773,7 +4804,7 @@ public:
+     EmitST([pso = std::move(pipeline)](ArgumentEncodingContext& enc) {
+       MTL_COMPILED_GRAPHICS_PIPELINE GraphicsPipeline{};
+       pso->GetPipeline(&GraphicsPipeline); // may block
+-      if (!GraphicsPipeline.PipelineState)
++      if (!TrackRenderPipelineState(enc, GraphicsPipeline.PipelineState))
+         return;
+       auto &cmd = enc.encodeRenderCommand<wmtcmd_render_setpso>();
+       cmd.type = WMTRenderCommandSetPSO;
+diff --git a/src/d3d11/d3d11_pipeline_gs.cpp b/src/d3d11/d3d11_pipeline_gs.cpp
+index a81dc9f..3868ce1 100644
+--- a/src/d3d11/d3d11_pipeline_gs.cpp
++++ b/src/d3d11/d3d11_pipeline_gs.cpp
+@@ -6,6 +6,22 @@
+ 
+ namespace dxmt {
+ 
++static std::string
++ShaderNames(std::initializer_list<std::pair<const char *, ManagedShader>> shaders) {
++  // The first 8 hex digits of the SHA-1 of a shader are the ones in its function
++  // names (vsgs_xxxxxxxx_*, gs_xxxxxxxx_*, ps_xxxxxxxx_*) in the DXMT shader cache.
++  std::string names;
++  for (auto &[stage, shader] : shaders) {
++    if (!shader)
++      continue;
++    names += names.empty() ? "" : " ";
++    names += stage;
++    names += "=";
++    names += shader->sha1().string().substr(0, 8);
++  }
++  return names;
++}
++
+ class MTLCompiledGeometryPipelineImpl
+     : public MTLCompiledGeometryPipeline {
+ public:
+@@ -15,7 +31,10 @@ public:
+         depth_stencil_format(pDesc->DepthStencilFormat), device_(pDevice),
+         pBlendState(pDesc->BlendState),
+         RasterizationEnabled(pDesc->RasterizationEnabled),
+-        SampleCount(pDesc->SampleCount) {
++        SampleCount(pDesc->SampleCount),
++        shader_names_(ShaderNames(
++            {{"VS", pDesc->VertexShader}, {"GS", pDesc->GeometryShader}, {"PS", pDesc->PixelShader}}
++        )) {
+     uint32_t unorm_output_reg_mask = 0;
+     for (unsigned i = 0; i < num_rtvs; i++) {
+       rtv_formats[i] = pDesc->ColorAttachmentFormats[i];
+@@ -114,7 +133,7 @@ public:
+     state_mesh_ = device_->GetMTLDevice().newRenderPipelineState(info, err);
+ 
+     if (state_mesh_ == nullptr) {
+-      ERR("Failed to create mesh PSO: ", err.description().getUTF8String());
++      ERR("Failed to create mesh PSO (", shader_names_, "): ", err.description().getUTF8String());
+       return this;
+     }
+     return this;
+@@ -138,6 +157,7 @@ private:
+   WMT::Reference<WMT::RenderPipelineState> state_mesh_;
+   bool RasterizationEnabled;
+   UINT SampleCount;
++  std::string shader_names_;
+ 
+   CompiledShader *VertexShader;
+   CompiledShader *PixelShader;
+diff --git a/src/d3d11/d3d11_pipeline_ts.cpp b/src/d3d11/d3d11_pipeline_ts.cpp
+index cd087fb..5332f2f 100644
+--- a/src/d3d11/d3d11_pipeline_ts.cpp
++++ b/src/d3d11/d3d11_pipeline_ts.cpp
+@@ -8,6 +8,22 @@
+ 
+ namespace dxmt {
+ 
++static std::string
++ShaderNames(std::initializer_list<std::pair<const char *, ManagedShader>> shaders) {
++  // The first 8 hex digits of the SHA-1 of a shader are the ones in its function
++  // names (vsgs_xxxxxxxx_*, gs_xxxxxxxx_*, ps_xxxxxxxx_*) in the DXMT shader cache.
++  std::string names;
++  for (auto &[stage, shader] : shaders) {
++    if (!shader)
++      continue;
++    names += names.empty() ? "" : " ";
++    names += stage;
++    names += "=";
++    names += shader->sha1().string().substr(0, 8);
++  }
++  return names;
++}
++
+ static dxmt::mutex ts_global_mutex;
+ 
+ class MTLCompiledTessellationPipelineImpl: public MTLCompiledTessellationMeshPipeline {
+@@ -18,7 +34,10 @@ public:
+         depth_stencil_format(pDesc->DepthStencilFormat), device_(pDevice),
+         pBlendState(pDesc->BlendState),
+         RasterizationEnabled(pDesc->RasterizationEnabled),
+-        SampleCount(pDesc->SampleCount) {
++        SampleCount(pDesc->SampleCount),
++        shader_names_(ShaderNames(
++            {{"VS", pDesc->VertexShader}, {"HS", pDesc->HullShader}, {"DS", pDesc->DomainShader}, {"PS", pDesc->PixelShader}}
++        )) {
+     uint32_t unorm_output_reg_mask = 0;
+     for (unsigned i = 0; i < num_rtvs; i++) {
+       rtv_formats[i] = pDesc->ColorAttachmentFormats[i];
+@@ -149,7 +168,7 @@ public:
+           device_->GetMTLDevice().newRenderPipelineState(info, err);
+     }
+     if (state_rasterization_ == nullptr) {
+-      ERR("Failed to create tessellation raster PSO: ",
++      ERR("Failed to create tessellation raster PSO (", shader_names_, "): ",
+           err.description().getUTF8String());
+     }
+ 
+@@ -174,6 +193,7 @@ private:
+   WMT::Reference<WMT::RenderPipelineState> state_rasterization_;
+   bool RasterizationEnabled;
+   UINT SampleCount;
++  std::string shader_names_;
+ 
+   MTL_SHADER_REFLECTION hull_reflection;
+ 
+diff --git a/src/dxmt/dxmt_context.hpp b/src/dxmt/dxmt_context.hpp
+index 6356fae..0a2d631 100644
+--- a/src/dxmt/dxmt_context.hpp
++++ b/src/dxmt/dxmt_context.hpp
+@@ -180,6 +180,13 @@ struct RenderEncoderData : EncoderData {
+   bool use_visibility_result = 0;
+   bool use_tessellation = 0;
+   bool use_geometry = 0;
++  /**
++  The pipeline of the last set-pipeline command of this encoder failed to compile, so
++  the encoder still has the previous pipeline bound. Draws are dropped until a pipeline
++  is set successfully: running them with the previous pipeline reads bindings laid out
++  for other shaders (Crysis 3 page-faulted the GPU this way).
++  */
++  bool pipeline_failed = 0;
+   TileBarrierPSOKey tile_barrier_pso_key = {};
+   WMT::RenderPipelineState last_pso = {};
+ };
+diff --git a/tests/dx11/dx11_failed_pipeline.cpp b/tests/dx11/dx11_failed_pipeline.cpp
+new file mode 100644
+index 0000000..f26fd4f
+--- /dev/null
++++ b/tests/dx11/dx11_failed_pipeline.cpp
+@@ -0,0 +1,282 @@
++// Regression test: a draw whose pipeline state failed to compile must not be
++// executed with the pipeline that happens to be bound from an earlier draw.
++//
++// Crysis 3 binds a geometry shader with a pixel shader that reads a varying the
++// geometry shader never writes. DXMT turns VS+GS into a Metal mesh pipeline; on
++// M1/M2 GPUs Apple's shader compiler crashes on that pipeline
++// ("Failed to create mesh PSO: ... XPC_ERROR_CONNECTION_INTERRUPTED"). DXMT then
++// skipped only the set-pipeline command and still encoded the mesh draw, which
++// ran with the previously bound pipeline and its unrelated bindings; the GPU
++// page-faulted and every later command buffer was ignored (the game hung).
++//
++// Each mode draws twice into one render pass:
++//   A: left half of the target, a valid pipeline whose pixel shader returns red;
++//   B: right half, same input stages, but a pixel shader that reads TEXCOORD1,
++//      which the previous stage does not write, so B's pipeline fails to compile.
++// If B is encoded with A's pipeline, the right half turns red. With the fix B is
++// skipped and the right half keeps the clear color (black).
++//
++// Modes: vs - ordinary VS->PS pipeline (Metal rejects the link with an error, on
++//             every GPU);
++//        gs - VS->GS->PS mesh pipeline (the compiler crash; on Apple9+ GPUs the
++//             pipeline may compile, which the test reports as SKIP-free PASS).
++// After the draws the test checks that the GPU queue still executes work, idles so
++// the threadpool workers that compiled the pipelines exit, and checks again.
++//
++// Mode "control" runs both paths with a pixel shader that links (B renders green).
++//
++// usage: dx11_failed_pipeline [vs|gs|all|control] [idle_ms (default 15000)]
++// Exit 0: pass. 1: the failed draw was executed with a stale pipeline, A did not
++// draw, or the queue stopped executing work. 2: setup error (device, shader
++// compilation). 3: the process faulted. A hang (killed by the runner's timeout)
++// is a failure too.
++#include <d3d11.h>
++#include <d3dcompiler.h>
++#include <windows.h>
++#include <cstdio>
++#include <cstdlib>
++#include <cstring>
++
++static LONG WINAPI on_fault(EXCEPTION_POINTERS *info) {
++  std::printf("FAULT code=0x%08lx at %p\n", (unsigned long)info->ExceptionRecord->ExceptionCode,
++              info->ExceptionRecord->ExceptionAddress);
++  std::fflush(stdout);
++  ExitProcess(3);
++  return EXCEPTION_EXECUTE_HANDLER;
++}
++
++static const char kShaders[] = R"(
++struct VSOut { float4 pos : SV_Position; float4 c0 : TEXCOORD0; };
++
++// Fullscreen triangle for the VS-only mode.
++VSOut vs_tri(uint id : SV_VertexID) {
++  VSOut o;
++  float2 uv = float2((id << 1) & 2, id & 2);
++  o.pos = float4(uv * float2(2, -2) + float2(-1, 1), 0, 1);
++  o.c0 = float4(0, 1, 0, 1);
++  return o;
++}
++
++// One point; the geometry shader expands it into a fullscreen quad.
++VSOut vs_point(uint id : SV_VertexID) {
++  VSOut o;
++  o.pos = float4(0, 0, 0, 1);
++  o.c0 = float4(0, 1, 0, 1);
++  return o;
++}
++
++[maxvertexcount(4)]
++void gs_quad(point VSOut i[1], inout TriangleStream<VSOut> s) {
++  VSOut o;
++  o.c0 = i[0].c0;
++  o.pos = float4(-1, -1, 0, 1); s.Append(o);
++  o.pos = float4(-1,  1, 0, 1); s.Append(o);
++  o.pos = float4( 1, -1, 0, 1); s.Append(o);
++  o.pos = float4( 1,  1, 0, 1); s.Append(o);
++}
++
++float4 ps_red(VSOut i) : SV_Target { return float4(1, 0, 0, 1); }
++
++// Reads TEXCOORD1, which neither vs_tri nor gs_quad writes.
++struct PSInBad { float4 pos : SV_Position; float4 c0 : TEXCOORD0; float4 c1 : TEXCOORD1; };
++float4 ps_unlinked(PSInBad i) : SV_Target { return float4(0, i.c0.y, 0, 1) + i.c1 * 0.5; }
++
++// Control: reads only what the previous stage writes.
++float4 ps_green(VSOut i) : SV_Target { return float4(0, i.c0.y, 0, 1); }
++)";
++
++static ID3DBlob *compile(const char *entry, const char *target) {
++  ID3DBlob *code = nullptr, *errors = nullptr;
++  HRESULT hr = D3DCompile(kShaders, sizeof(kShaders) - 1, "dx11_failed_pipeline.hlsl", nullptr, nullptr, entry, target,
++                          0, 0, &code, &errors);
++  if (FAILED(hr)) {
++    std::printf("D3DCompile(%s, %s) failed 0x%08lx: %s\n", entry, target, (unsigned long)hr,
++                errors ? (const char *)errors->GetBufferPointer() : "");
++    return nullptr;
++  }
++  return code;
++}
++
++struct Rgba {
++  unsigned char r, g, b, a;
++};
++
++// Clears a fresh target to blue and reads it back. After a GPU fault Metal ignores
++// every later command buffer of the queue, so the readback is not blue.
++static bool check_alive(ID3D11Device *dev, ID3D11DeviceContext *ctx, const char *tag) {
++  D3D11_TEXTURE2D_DESC td = {};
++  td.Width = 4;
++  td.Height = 4;
++  td.MipLevels = 1;
++  td.ArraySize = 1;
++  td.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
++  td.SampleDesc.Count = 1;
++  td.Usage = D3D11_USAGE_DEFAULT;
++  td.BindFlags = D3D11_BIND_RENDER_TARGET;
++  ID3D11Texture2D *rt = nullptr, *staging = nullptr;
++  ID3D11RenderTargetView *rtv = nullptr;
++  if (FAILED(dev->CreateTexture2D(&td, nullptr, &rt)) || FAILED(dev->CreateRenderTargetView(rt, nullptr, &rtv)))
++    return false;
++  td.Usage = D3D11_USAGE_STAGING;
++  td.BindFlags = 0;
++  td.CPUAccessFlags = D3D11_CPU_ACCESS_READ;
++  if (FAILED(dev->CreateTexture2D(&td, nullptr, &staging)))
++    return false;
++  const float blue[4] = {0, 0, 1, 1};
++  ctx->ClearRenderTargetView(rtv, blue);
++  ctx->CopyResource(staging, rt);
++  D3D11_MAPPED_SUBRESOURCE map;
++  bool ok = false;
++  if (SUCCEEDED(ctx->Map(staging, 0, D3D11_MAP_READ, 0, &map))) {
++    Rgba p = *(Rgba *)map.pData;
++    ok = p.r == 0 && p.g == 0 && p.b == 255;
++    std::printf("[%s] GPU liveness readback = %u,%u,%u,%u (%s)\n", tag, p.r, p.g, p.b, p.a,
++                ok ? "ok" : "the queue no longer executes work");
++    ctx->Unmap(staging, 0);
++  }
++  staging->Release();
++  rtv->Release();
++  rt->Release();
++  return ok;
++}
++
++static int run_mode(ID3D11Device *dev, ID3D11DeviceContext *ctx, bool use_gs, bool control) {
++  const UINT W = 64, H = 32;
++  const char *mode = use_gs ? (control ? "gs-control" : "gs") : (control ? "vs-control" : "vs");
++
++  ID3DBlob *vs_blob = compile(use_gs ? "vs_point" : "vs_tri", "vs_5_0");
++  ID3DBlob *gs_blob = use_gs ? compile("gs_quad", "gs_5_0") : nullptr;
++  ID3DBlob *ps_a_blob = compile("ps_red", "ps_5_0");
++  ID3DBlob *ps_b_blob = compile(control ? "ps_green" : "ps_unlinked", "ps_5_0");
++  if (!vs_blob || (use_gs && !gs_blob) || !ps_a_blob || !ps_b_blob)
++    return 2;
++
++  ID3D11VertexShader *vs = nullptr;
++  ID3D11GeometryShader *gs = nullptr;
++  ID3D11PixelShader *ps_a = nullptr, *ps_b = nullptr;
++  if (FAILED(dev->CreateVertexShader(vs_blob->GetBufferPointer(), vs_blob->GetBufferSize(), nullptr, &vs)) ||
++      (use_gs && FAILED(dev->CreateGeometryShader(gs_blob->GetBufferPointer(), gs_blob->GetBufferSize(), nullptr, &gs))) ||
++      FAILED(dev->CreatePixelShader(ps_a_blob->GetBufferPointer(), ps_a_blob->GetBufferSize(), nullptr, &ps_a)) ||
++      FAILED(dev->CreatePixelShader(ps_b_blob->GetBufferPointer(), ps_b_blob->GetBufferSize(), nullptr, &ps_b))) {
++    std::printf("[%s] shader creation failed\n", mode);
++    return 2;
++  }
++
++  D3D11_TEXTURE2D_DESC td = {};
++  td.Width = W;
++  td.Height = H;
++  td.MipLevels = 1;
++  td.ArraySize = 1;
++  td.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
++  td.SampleDesc.Count = 1;
++  td.Usage = D3D11_USAGE_DEFAULT;
++  td.BindFlags = D3D11_BIND_RENDER_TARGET;
++  ID3D11Texture2D *rt = nullptr, *staging = nullptr;
++  ID3D11RenderTargetView *rtv = nullptr;
++  if (FAILED(dev->CreateTexture2D(&td, nullptr, &rt)) || FAILED(dev->CreateRenderTargetView(rt, nullptr, &rtv)))
++    return 2;
++  td.Usage = D3D11_USAGE_STAGING;
++  td.BindFlags = 0;
++  td.CPUAccessFlags = D3D11_CPU_ACCESS_READ;
++  if (FAILED(dev->CreateTexture2D(&td, nullptr, &staging)))
++    return 2;
++
++  const float black[4] = {0, 0, 0, 1};
++  ctx->ClearRenderTargetView(rtv, black);
++  ctx->OMSetRenderTargets(1, &rtv, nullptr);
++  ctx->IASetInputLayout(nullptr);
++  ctx->IASetPrimitiveTopology(use_gs ? D3D11_PRIMITIVE_TOPOLOGY_POINTLIST : D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
++  ctx->VSSetShader(vs, nullptr, 0);
++  ctx->GSSetShader(gs, nullptr, 0);
++  UINT vertex_count = use_gs ? 1 : 3;
++
++  std::printf("[%s] draw A (valid pipeline), draw B (unlinkable pipeline), read back\n", mode);
++  // A: valid pipeline, left half, red.
++  D3D11_VIEWPORT vp = {0, 0, W / 2.0f, (float)H, 0, 1};
++  ctx->RSSetViewports(1, &vp);
++  ctx->PSSetShader(ps_a, nullptr, 0);
++  ctx->Draw(vertex_count, 0);
++
++  // B: pipeline that cannot be linked, right half.
++  vp.TopLeftX = W / 2.0f;
++  ctx->RSSetViewports(1, &vp);
++  ctx->PSSetShader(ps_b, nullptr, 0);
++  ctx->Draw(vertex_count, 0);
++
++  ctx->CopyResource(staging, rt);
++  D3D11_MAPPED_SUBRESOURCE map;
++  if (FAILED(ctx->Map(staging, 0, D3D11_MAP_READ, 0, &map))) {
++    std::printf("[%s] Map failed\n", mode);
++    return 1;
++  }
++  Rgba left = *(Rgba *)((char *)map.pData + (H / 2) * map.RowPitch + (W / 4) * 4);
++  Rgba right = *(Rgba *)((char *)map.pData + (H / 2) * map.RowPitch + (3 * W / 4) * 4);
++  ctx->Unmap(staging, 0);
++
++  std::printf("[%s] left (valid draw) = %u,%u,%u,%u  right (unlinkable draw) = %u,%u,%u,%u\n", mode, left.r, left.g,
++              left.b, left.a, right.r, right.g, right.b, right.a);
++  int result = 0;
++  if (!(left.r == 255 && left.g == 0 && left.b == 0)) {
++    std::printf("[%s] FAIL: the valid draw did not render red\n", mode);
++    result = 1;
++  }
++  if (right.r == 255 && right.g == 0 && right.b == 0) {
++    std::printf("[%s] FAIL: the draw with the failed pipeline ran with the previous (red) pipeline\n", mode);
++    result = 1;
++  } else if (right.r == 0 && right.g == 0 && right.b == 0) {
++    std::printf("[%s] ok: the draw with the failed pipeline was skipped\n", mode);
++  } else {
++    std::printf("[%s] ok: the unlinkable draw rendered with its own pipeline (it compiled on this GPU)\n", mode);
++  }
++
++  staging->Release();
++  rtv->Release();
++  rt->Release();
++  ps_b->Release();
++  ps_a->Release();
++  if (gs)
++    gs->Release();
++  vs->Release();
++  return result;
++}
++
++int main(int argc, char **argv) {
++  SetUnhandledExceptionFilter(on_fault);
++  setvbuf(stdout, nullptr, _IONBF, 0);
++  const char *which = argc > 1 ? argv[1] : "all";
++  int idle_ms = argc > 2 ? std::atoi(argv[2]) : 15000;
++
++  ID3D11Device *dev = nullptr;
++  ID3D11DeviceContext *ctx = nullptr;
++  D3D_FEATURE_LEVEL level = D3D_FEATURE_LEVEL_11_0;
++  if (FAILED(D3D11CreateDevice(nullptr, D3D_DRIVER_TYPE_HARDWARE, nullptr, 0, &level, 1, D3D11_SDK_VERSION, &dev,
++                               nullptr, &ctx))) {
++    std::printf("D3D11CreateDevice failed\n");
++    return 2;
++  }
++
++  int result = 0;
++  bool control = !std::strcmp(which, "control");
++  if (!std::strcmp(which, "vs") || !std::strcmp(which, "all") || control) {
++    int r = run_mode(dev, ctx, false, control);
++    if (r > result)
++      result = r;
++  }
++  if (!std::strcmp(which, "gs") || !std::strcmp(which, "all") || control) {
++    int r = run_mode(dev, ctx, true, control);
++    if (r > result)
++      result = r;
++  }
++  if (result < 2 && !check_alive(dev, ctx, "after draws"))
++    result = 1;
++  // Pipelines are compiled on threadpool workers, which exit when idle. A worker that
++  // received an over-released Metal error object crashes while it exits.
++  std::printf("idling %d ms so idle compile threads exit\n", idle_ms);
++  Sleep(idle_ms);
++  if (result < 2 && !check_alive(dev, ctx, "after idle"))
++    result = 1;
++  ctx->Release();
++  dev->Release();
++  std::printf("RESULT %s\n", result == 0 ? "PASS" : result == 1 ? "FAIL" : "ERROR");
++  return result;
++}
+diff --git a/tests/dx11/meson.build b/tests/dx11/meson.build
+index 2390168..cbc8bbb 100644
+--- a/tests/dx11/meson.build
++++ b/tests/dx11/meson.build
+@@ -34,6 +34,10 @@ executable('dx11_buffer_rtv', ['dx11_buffer_rtv.cpp'],
+   dependencies: [ lib_d3d11 ]
+ )
+ 
+-executable(dx11_staging_rename, [dx11_staging_rename.cpp],
++executable('dx11_staging_rename', ['dx11_staging_rename.cpp'],
+   dependencies: [ lib_d3d11 ]
+ )
++
++executable('dx11_failed_pipeline', ['dx11_failed_pipeline.cpp'],
++  dependencies: [ lib_d3d11, lib_d3dcompiler ]
++)
+-- 
+2.56.0
+

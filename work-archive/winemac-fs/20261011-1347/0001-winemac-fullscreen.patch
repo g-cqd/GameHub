@@ -1,0 +1,1026 @@
+From ecc4a8ef878f3ae6ffcc0b649cde062ed3d17033 Mon Sep 17 00:00:00 2001
+From: Gigi <42325924+g-cqd@users.noreply.github.com>
+Date: Sun, 11 Oct 2026 13:46:53 +0200
+Subject: [PATCH] winemac: Emulate display modes and use native full screen for
+ covering windows.
+
+An exclusive full-screen DXGI swap chain makes DXMT call
+ChangeDisplaySettingsEx(CDS_FULLSCREEN). On a Retina desktop at 120 Hz it
+asks for the desktop size at 60 Hz, which winemac resolves to the 1:1
+low-resolution mode of that size: it captured every display and switched
+the hardware mode, turning Retina mode off for every window, all on the
+main thread while the game's thread waited. Battlefield 4 hung right after
+that switch and Battlefield 3 ended up neither full screen nor focused.
+
+With the new FullscreenMode setting (HKCU\Software\Wine\Mac Driver,
+prefix-wide; native by default, borderless, or legacy for the old
+behaviour):
+
+- The driver reports only the current mode, so win32u emulates the others:
+  it lists the native mode with the standard sizes below it, keeps the mode
+  a program sets as the current one for EnumDisplaySettings, GetMonitorInfo
+  and DXGI, and scales windows and input to the physical mode.
+  ChangeDisplaySettings never touches the hardware or captures displays.
+
+- In native mode, an unowned top-level window without a title bar that
+  covers its monitor and draws with Metal, OpenGL or D3DMetal enters a
+  native macOS full-screen space, asynchronously, and the application is
+  activated with the window key. GDI-only windows stay borderless windows.
+  In the space the Win32 frame is kept and AppKit's frame (below the camera
+  housing) is not reported back; the content view's bounds fit the content
+  into it, keeping the aspect ratio, and mouse events, GetCursorPos,
+  SetCursorPos and ClipCursor are mapped through the same scaling. Leaving
+  the space by hand stops re-entry until Win32 changes its mind.
+
+- The letterbox mask of an emulated mode is now in content view
+  coordinates and Cocoa units (it was in Win32 screen pixels), and is drawn
+  in the scaled coordinates while in the space. In Retina mode the Metal
+  layer filters linearly, so a smaller emulated mode is resampled smoothly.
+---
+ dlls/winemac.drv/cocoa_app.h    |   1 +
+ dlls/winemac.drv/cocoa_app.m    |  50 +++-
+ dlls/winemac.drv/cocoa_window.h |  19 ++
+ dlls/winemac.drv/cocoa_window.m | 420 +++++++++++++++++++++++++++++---
+ dlls/winemac.drv/display.c      |  31 ++-
+ dlls/winemac.drv/macdrv.h       |   1 +
+ dlls/winemac.drv/macdrv_cocoa.h |  14 ++
+ dlls/winemac.drv/macdrv_main.c  |  19 ++
+ dlls/winemac.drv/window.c       |  47 +++-
+ 9 files changed, 558 insertions(+), 44 deletions(-)
+
+diff --git a/dlls/winemac.drv/cocoa_app.h b/dlls/winemac.drv/cocoa_app.h
+index 562138a0865..fb64afc9947 100644
+--- a/dlls/winemac.drv/cocoa_app.h
++++ b/dlls/winemac.drv/cocoa_app.h
+@@ -139,6 +139,7 @@ - (void) flipRect:(NSRect*)rect;
+     - (NSPoint) flippedMouseLocation:(NSPoint)point;
+ 
+     - (WineWindow*) frontWineWindow;
++    - (WineWindow*) scaledFullScreenWindow;
+     - (void) adjustWindowLevels;
+     - (void) prepareToMiniaturize;
+     - (void) updateFullscreenWindows;
+diff --git a/dlls/winemac.drv/cocoa_app.m b/dlls/winemac.drv/cocoa_app.m
+index f67b432e178..7a59dd2f412 100644
+--- a/dlls/winemac.drv/cocoa_app.m
++++ b/dlls/winemac.drv/cocoa_app.m
+@@ -674,6 +674,20 @@ - (void) flipRect:(NSRect*)rect
+         rect->origin.y = NSMaxY([[NSScreen screens][0] frame]) - NSMaxY(*rect);
+     }
+ 
++    /* The window, if any, whose content is scaled in a native full-screen
++       space on the active space: cursor positions Win32 sets or reads are in
++       its coordinates. */
++    - (WineWindow*) scaledFullScreenWindow
++    {
++        for (NSWindow* window in [NSApp windows])
++        {
++            if ([window isKindOfClass:[WineWindow class]] && [(WineWindow*)window isScaledInFullScreen] &&
++                [window isVisible] && [window isOnActiveSpace])
++                return (WineWindow*)window;
++        }
++        return nil;
++    }
++
+     - (WineWindow*) frontWineWindow
+     {
+         NSNumber* windowNumber;
+@@ -1630,6 +1644,7 @@ - (void) handleMouseMove:(NSEvent*)anEvent
+             {
+                 if (self.clippingCursor)
+                     [clipCursorHandler clipCursorLocation:&point];
++                point = [targetWindow winePointFromScreenPoint:point];
+                 point = cgpoint_win_from_mac(point);
+ 
+                 event = macdrv_create_event(MOUSE_MOVED_ABSOLUTE, targetWindow);
+@@ -1641,7 +1656,7 @@ - (void) handleMouseMove:(NSEvent*)anEvent
+             }
+             else
+             {
+-                double scale = retina_on ? 2 : 1;
++                double scale = (retina_on ? 2 : 1) * [targetWindow wineUnitsPerScreenUnit];
+ 
+                 /* Add event delta to accumulated delta error */
+                 /* deltaY is already flipped */
+@@ -1775,6 +1790,7 @@ - (void) handleMouseButton:(NSEvent*)theEvent
+             {
+                 macdrv_event* event;
+ 
++                pt = [window winePointFromScreenPoint:pt];
+                 pt = cgpoint_win_from_mac(pt);
+ 
+                 event = macdrv_create_event(MOUSE_BUTTON, window);
+@@ -1858,6 +1874,7 @@ - (void) handleScrollWheel:(NSEvent*)theEvent
+                 double x, y;
+                 BOOL continuous = FALSE;
+ 
++                pt = [window winePointFromScreenPoint:pt];
+                 pt = cgpoint_win_from_mac(pt);
+ 
+                 event = macdrv_create_event(MOUSE_SCROLL, window);
+@@ -2952,9 +2969,16 @@ void macdrv_set_cursor(CFStringRef name, CFArrayRef frames)
+ int macdrv_get_cursor_position(CGPoint *pos)
+ {
+     OnMainThread(^{
++        WineApplicationController* controller = [WineApplicationController sharedController];
++        WineWindow* window = [controller scaledFullScreenWindow];
+         NSPoint location = [NSEvent mouseLocation];
+-        location = [[WineApplicationController sharedController] flippedMouseLocation:location];
+-        *pos = cgpoint_win_from_mac(NSPointToCGPoint(location));
++        CGPoint point;
++
++        location = [controller flippedMouseLocation:location];
++        point = NSPointToCGPoint(location);
++        if (window)
++            point = [window winePointFromScreenPoint:point];
++        *pos = cgpoint_win_from_mac(point);
+     });
+ 
+     return TRUE;
+@@ -2971,7 +2995,13 @@ int macdrv_set_cursor_position(CGPoint pos)
+     __block int ret;
+ 
+     OnMainThread(^{
+-        ret = [[WineApplicationController sharedController] setCursorPosition:cgpoint_mac_from_win(pos)];
++        WineApplicationController* controller = [WineApplicationController sharedController];
++        WineWindow* window = [controller scaledFullScreenWindow];
++        CGPoint point = cgpoint_mac_from_win(pos);
++
++        if (window)
++            point = [window screenPointFromWinePoint:point];
++        ret = [controller setCursorPosition:point];
+     });
+ 
+     return ret;
+@@ -2994,8 +3024,20 @@ int macdrv_clip_cursor(CGRect r)
+         CGRect rect = r;
+ 
+         if (!CGRectIsInfinite(rect))
++        {
++            WineWindow* window = [controller scaledFullScreenWindow];
++
+             rect = cgrect_mac_from_win(rect);
+ 
++            /* Clip to where the content shows on screen. */
++            if (window)
++            {
++                CGPoint min = [window screenPointFromWinePoint:rect.origin];
++                CGPoint max = [window screenPointFromWinePoint:CGPointMake(CGRectGetMaxX(rect), CGRectGetMaxY(rect))];
++                rect = CGRectMake(min.x, min.y, max.x - min.x, max.y - min.y);
++            }
++        }
++
+         if (!CGRectIsInfinite(rect))
+         {
+             NSRect nsrect = NSRectFromCGRect(rect);
+diff --git a/dlls/winemac.drv/cocoa_window.h b/dlls/winemac.drv/cocoa_window.h
+index ae0acd9a9c6..37c48d3e866 100644
+--- a/dlls/winemac.drv/cocoa_window.h
++++ b/dlls/winemac.drv/cocoa_window.h
+@@ -84,6 +84,17 @@ @interface WineWindow : NSPanel <NSWindowDelegate>
+     BOOL fakingClose;
+ 
+     CAShapeLayer* contentViewMaskLayer;
++
++    /* Native full-screen space for a window covering its monitor
++       (FullscreenMode=native).  While the window is in that space, its Cocoa
++       frame is the one AppKit chose, which on a display with a camera housing
++       is shorter than the screen; Windows keeps the frame it set, held in
++       fullScreenWineFrame, and the content is scaled to fit. */
++    BOOL wantsNativeFullScreen;       /* Win32 asked for the space */
++    BOOL inAutoFullScreen;            /* we entered the space for Win32 */
++    BOOL suppressAutoFullScreen;      /* the user left it; don't re-enter */
++    NSRect fullScreenWineFrame;       /* frame Win32 set, Cocoa coordinates */
++    NSRect fullScreenSourceRect;      /* mask rect in content coordinates, or empty */
+ }
+ 
+ @property (retain, readonly, nonatomic) WineEventQueue* queue;
+@@ -116,4 +127,12 @@ - (void) updateForCursorClipping;
+ 
+     - (void) setRetinaMode:(BOOL)mode;
+ 
++    /* Mapping of global points (Quartz coordinates: top-left origin, in
++       points) between where the content shows on screen and where Win32
++       placed it, while the window is scaled in a native full-screen space. */
++    - (BOOL) isScaledInFullScreen;
++    - (CGPoint) winePointFromScreenPoint:(CGPoint)point;
++    - (CGPoint) screenPointFromWinePoint:(CGPoint)point;
++    - (CGFloat) wineUnitsPerScreenUnit;
++
+ @end
+diff --git a/dlls/winemac.drv/cocoa_window.m b/dlls/winemac.drv/cocoa_window.m
+index 00489b2a9d2..aa9f7984b4a 100644
+--- a/dlls/winemac.drv/cocoa_window.m
++++ b/dlls/winemac.drv/cocoa_window.m
+@@ -389,6 +389,7 @@ - (void) wine_getBackingSize:(int*)outBackingSize;
+     - (void) wine_setBackingSize:(const int*)newBackingSize;
+ 
+     - (WineMetalView*) newMetalViewWithDevice:(id<MTLDevice>)device;
++    - (BOOL) hasAcceleratedContent;
+ 
+ @end
+ 
+@@ -619,7 +620,10 @@ - (void) addGLContext:(WineOpenGLContext*)context
+ 
+         _everHadGLContext = YES;
+         if (!hadContext)
++        {
+             [self invalidateHasGLDescendant];
++            [(WineWindow*)[self window] acceleratedContentDidAppear];
++        }
+         [(WineWindow*)[self window] updateForGLSubviews];
+     }
+ 
+@@ -705,10 +709,26 @@ - (WineMetalView*) newMetalViewWithDevice:(id<MTLDevice>)device
+         _metalView = view;
+ 
+         [(WineWindow*)self.window windowDidDrawContent];
++        [(WineWindow*)self.window acceleratedContentDidAppear];
+ 
+         return _metalView;
+     }
+ 
++    /* Whether Metal, OpenGL or D3DMetal draws into this view or a descendant:
++       only such windows go to a native full-screen space.  A GDI-only window
++       covering its screen stays a borderless window. */
++    - (BOOL) hasAcceleratedContent
++    {
++        if (_metalView || _everHadGLContext || d3dmetal_client_surface)
++            return YES;
++        for (NSView* view in [self subviews])
++        {
++            if ([view isKindOfClass:[WineContentView class]] && [(WineContentView*)view hasAcceleratedContent])
++                return YES;
++        }
++        return NO;
++    }
++
+     - (void) setLayerRetinaProperties:(BOOL)mode
+     {
+         [self layer].contentsScale = mode ? 2.0 : 1.0;
+@@ -961,6 +981,16 @@ - (NSInteger) windowLevel
+ @end
+ 
+ 
++/* In Retina mode a Win32 unit is a pixel, so a drawable that doesn't match
++   the layer comes from an emulated display mode and is resampled to the
++   physical one: filter it.  Otherwise keep the crisp doubling of non-Retina
++   mode. */
++static NSString* metal_layer_filter(BOOL mode)
++{
++    return (mode && fullscreen_mode != FULLSCREEN_MODE_LEGACY) ? kCAFilterLinear : kCAFilterNearest;
++}
++
++
+ @implementation WineMetalView
+ 
+     - (id) initWithFrame:(NSRect)frame device:(id<MTLDevice>)device
+@@ -984,6 +1014,8 @@ - (void) dealloc
+     - (void) setRetinaMode:(BOOL)mode
+     {
+         self.layer.contentsScale = mode ? 2.0 : 1.0;
++        self.layer.magnificationFilter = metal_layer_filter(mode);
++        self.layer.minificationFilter = metal_layer_filter(mode);
+         [super setRetinaMode:mode];
+     }
+ 
+@@ -992,7 +1024,8 @@ - (CALayer*) makeBackingLayer
+         CAMetalLayer *layer = [WineMetalLayer layer];   /* CW HACK 22435 */
+         layer.device = _device;
+         layer.framebufferOnly = YES;
+-        layer.magnificationFilter = kCAFilterNearest;
++        layer.magnificationFilter = metal_layer_filter(retina_on);
++        layer.minificationFilter = metal_layer_filter(retina_on);
+         layer.backgroundColor = CGColorGetConstantColor(kCGColorBlack);
+         layer.contentsScale = retina_on ? 2.0 : 1.0;
+         return layer;
+@@ -1161,16 +1194,25 @@ - (void) adjustFeaturesForState
+     - (void) adjustFullScreenBehavior:(NSWindowCollectionBehavior)behavior
+     {
+         NSUInteger style = [self styleMask];
+-
+-        if (behavior & NSWindowCollectionBehaviorParticipatesInCycle &&
+-            style & NSWindowStyleMaskResizable && !(style & NSWindowStyleMaskUtilityWindow) && !maximized &&
+-            !(self.parentWindow || self.latentParentWindow))
++        BOOL hasParent = self.parentWindow || self.latentParentWindow;
++
++        /* A window covering its monitor for Win32 is eligible even when it is
++           borderless or maximized: that is how a game asks for full screen. */
++        if ((behavior & NSWindowCollectionBehaviorParticipatesInCycle &&
++             style & NSWindowStyleMaskResizable && !(style & NSWindowStyleMaskUtilityWindow) && !maximized &&
++             !hasParent) ||
++            (wantsNativeFullScreen && !hasParent))
+         {
+             behavior |= NSWindowCollectionBehaviorFullScreenPrimary;
+             behavior &= ~NSWindowCollectionBehaviorFullScreenAuxiliary;
+         }
+         else
+         {
++            /* Leaving the space happens first; the behavior follows once
++               AppKit is done with it. */
++            if (inAutoFullScreen || enteringFullScreen || exitingFullScreen)
++                return;
++
+             behavior &= ~NSWindowCollectionBehaviorFullScreenPrimary;
+             behavior |= NSWindowCollectionBehaviorFullScreenAuxiliary;
+             if (style & NSWindowStyleMaskFullScreen)
+@@ -1184,6 +1226,179 @@ - (void) adjustFullScreenBehavior:(NSWindowCollectionBehavior)behavior
+         }
+     }
+ 
++    /* Called on the main thread, after Win32 changed whether the window
++       covers its monitor without a title bar. */
++    - (void) setWantsNativeFullScreen:(BOOL)want
++    {
++        if (want != wantsNativeFullScreen)
++        {
++            wantsNativeFullScreen = want;
++            suppressAutoFullScreen = FALSE;
++            [self adjustFullScreenBehavior:[self collectionBehavior]];
++        }
++        [self updateNativeFullScreen];
++    }
++
++    /* Enter or leave the native full-screen space to match what Win32 wants.
++       Re-evaluated whenever a transition ends or the window is ordered in. */
++    - (void) updateNativeFullScreen
++    {
++        static BOOL updating;   /* main thread only */
++        BOOL inFullScreen = ([self styleMask] & NSWindowStyleMaskFullScreen) != 0;
++
++        /* AppKit may order the window in while it starts a transition, which
++           comes back here. */
++        if (updating || enteringFullScreen || exitingFullScreen)
++            return;
++        updating = TRUE;
++        [self updateNativeFullScreenNow:inFullScreen];
++        updating = FALSE;
++    }
++
++    - (void) updateNativeFullScreenNow:(BOOL)inFullScreen
++    {
++        if (wantsNativeFullScreen && !suppressAutoFullScreen && !inFullScreen)
++        {
++            if (![self isVisible] || [self isMiniaturized] || self.closing)
++                return;
++            if (!([self collectionBehavior] & NSWindowCollectionBehaviorFullScreenPrimary))
++                return;
++            if (![self.contentView hasAcceleratedContent])
++                return;  /* re-evaluated when such content appears */
++
++            /* The program owns the screen now: activate it and give the
++               window the keyboard, as Windows does for an exclusive
++               full-screen window.  (Not -makeKeyAndOrderFront:, which orders
++               the window in again.) */
++            if (!self.noForeground && !self.disabled)
++                [self makeFocused:YES];
++            [super toggleFullScreen:nil];
++        }
++        else if (!wantsNativeFullScreen && inFullScreen && inAutoFullScreen)
++            [super toggleFullScreen:nil];
++        else if (!wantsNativeFullScreen && !inFullScreen)
++            [self adjustFullScreenBehavior:[self collectionBehavior]];
++    }
++
++    - (void) acceleratedContentDidAppear
++    {
++        /* Not from inside the request that attached the content. */
++        if (wantsNativeFullScreen && !inAutoFullScreen)
++            [self performSelector:@selector(updateNativeFullScreen) withObject:nil afterDelay:0];
++    }
++
++    - (BOOL) willEnterNativeFullScreen
++    {
++        return wantsNativeFullScreen && !suppressAutoFullScreen && [self.contentView hasAcceleratedContent];
++    }
++
++    - (BOOL) isScaledInFullScreen
++    {
++        return inAutoFullScreen;
++    }
++
++    /* The rect of the screen showing the content and the rect of the frame
++       Win32 set, both in Quartz coordinates, and the content view bounds
++       relating them. */
++    - (void) getFullScreenScreenRect:(NSRect*)screenRect wineRect:(NSRect*)wineRect bounds:(NSRect*)bounds
++    {
++        WineApplicationController* controller = [WineApplicationController sharedController];
++
++        *screenRect = [self contentRectForFrameRect:[self frame]];
++        [controller flipRect:screenRect];
++        *wineRect = [self contentRectForFrameRect:fullScreenWineFrame];
++        [controller flipRect:wineRect];
++        *bounds = [[self contentView] bounds];
++    }
++
++    - (CGFloat) wineUnitsPerScreenUnit
++    {
++        NSRect screenRect, wineRect, bounds;
++
++        if (!inAutoFullScreen) return 1;
++        [self getFullScreenScreenRect:&screenRect wineRect:&wineRect bounds:&bounds];
++        if (NSWidth(screenRect) <= 0) return 1;
++        return NSWidth(bounds) / NSWidth(screenRect);
++    }
++
++    - (CGPoint) winePointFromScreenPoint:(CGPoint)point
++    {
++        NSRect screenRect, wineRect, bounds, source;
++        CGFloat scale;
++
++        if (!inAutoFullScreen) return point;
++
++        [self getFullScreenScreenRect:&screenRect wineRect:&wineRect bounds:&bounds];
++        if (NSWidth(screenRect) <= 0 || NSHeight(screenRect) <= 0) return point;
++        scale = NSWidth(bounds) / NSWidth(screenRect);
++
++        point.x = NSMinX(bounds) + (point.x - NSMinX(screenRect)) * scale;
++        point.y = NSMinY(bounds) + (point.y - NSMinY(screenRect)) * scale;
++
++        /* Outside the part of the screen showing Win32 content (the camera
++           housing strip, letterbox bars), stay at its nearest edge. */
++        source = NSIsEmptyRect(fullScreenSourceRect) ?
++                 NSMakeRect(0, 0, NSWidth(wineRect), NSHeight(wineRect)) : fullScreenSourceRect;
++        point.x = fmax(NSMinX(source), fmin(point.x, NSMaxX(source) - 0.5));
++        point.y = fmax(NSMinY(source), fmin(point.y, NSMaxY(source) - 0.5));
++
++        point.x += NSMinX(wineRect);
++        point.y += NSMinY(wineRect);
++        return point;
++    }
++
++    - (CGPoint) screenPointFromWinePoint:(CGPoint)point
++    {
++        NSRect screenRect, wineRect, bounds;
++        CGFloat scale;
++
++        if (!inAutoFullScreen) return point;
++
++        [self getFullScreenScreenRect:&screenRect wineRect:&wineRect bounds:&bounds];
++        if (NSWidth(bounds) <= 0 || NSHeight(bounds) <= 0) return point;
++        scale = NSWidth(screenRect) / NSWidth(bounds);
++
++        point.x = NSMinX(screenRect) + (point.x - NSMinX(wineRect) - NSMinX(bounds)) * scale;
++        point.y = NSMinY(screenRect) + (point.y - NSMinY(wineRect) - NSMinY(bounds)) * scale;
++        return point;
++    }
++
++    /* Fit the content Win32 shows (the mask rect, or the whole frame it set)
++       into the content area AppKit gave the full-screen window, keeping its
++       aspect ratio, through the bounds of the content view. */
++    - (void) updateFullScreenContentTransform
++    {
++        NSView* contentView = [self contentView];
++        NSSize frameSize = [contentView frame].size;
++        NSRect bounds = NSMakeRect(0, 0, frameSize.width, frameSize.height);
++
++        if (inAutoFullScreen && frameSize.width > 0 && frameSize.height > 0)
++        {
++            NSSize wineSize = [self contentRectForFrameRect:fullScreenWineFrame].size;
++            NSRect source = NSIsEmptyRect(fullScreenSourceRect) ?
++                            NSMakeRect(0, 0, wineSize.width, wineSize.height) : fullScreenSourceRect;
++
++            if (source.size.width > 0 && source.size.height > 0)
++            {
++                CGFloat scale = fmin(frameSize.width / source.size.width, frameSize.height / source.size.height);
++                bounds.size.width = frameSize.width / scale;
++                bounds.size.height = frameSize.height / scale;
++                bounds.origin.x = source.origin.x - (bounds.size.width - source.size.width) / 2;
++                bounds.origin.y = source.origin.y - (bounds.size.height - source.size.height) / 2;
++            }
++        }
++
++        if (!NSEqualRects(bounds, [contentView bounds]))
++        {
++            /* AppKit scales the content layer, sublayers included; the
++               window surface is cropped to the new bounds on the next
++               -updateLayer. */
++            [contentView setBounds:bounds];
++            [contentView setNeedsDisplay:YES];
++            [self updateMaskLayer];
++        }
++    }
++
+     - (void) setWindowFeatures:(const struct macdrv_window_features*)wf
+     {
+         static const NSUInteger usedStyles = NSWindowStyleMaskTitled | NSWindowStyleMaskClosable | NSWindowStyleMaskMiniaturizable |
+@@ -1845,6 +2060,9 @@ - (void) orderBelow:(WineWindow*)prev orAbove:(WineWindow*)next activate:(BOOL)a
+ 
+             if (![self isExcludedFromWindowsMenu])
+                 [NSApp addWindowsItem:self title:[self title] filename:NO];
++
++            if (wantsNativeFullScreen)
++                [self updateNativeFullScreen];
+         }
+     }
+ 
+@@ -1912,6 +2130,11 @@ - (BOOL) coversMenuBarScreen
+         NSScreen* screen = [[NSScreen screens] firstObject];
+         NSRect contentRect = [self contentRectForFrameRect:self.wine_fractionalFrame];
+ 
++        /* A window on its way into a full-screen space doesn't need the Dock
++           and menu bar hidden over the desktop. */
++        if ([self willEnterNativeFullScreen])
++            return NO;
++
+         return screen && fullscreen && screen_covered_by_rect(contentRect, @[screen]);
+     }
+ 
+@@ -1970,6 +2193,18 @@ - (void) setFrameFromWine:(NSRect)contentRect
+         [queue discardEventsMatchingMask:event_mask_for_type(WINDOW_FRAME_CHANGED)
+                                forWindow:self];
+ 
++        /* In the full-screen space AppKit owns the frame.  Remember the one
++           Win32 wants for when the window leaves the space. */
++        if (inAutoFullScreen)
++        {
++            if (!NSIsEmptyRect(contentRect))
++            {
++                fullScreenWineFrame = [self frameRectForContentRect:contentRect];
++                [self updateFullScreenContentTransform];
++            }
++            return;
++        }
++
+         if (!NSIsEmptyRect(contentRect))
+         {
+             NSRect frame, oldFrame;
+@@ -2037,6 +2272,8 @@ - (void) setFrameFromWine:(NSRect)contentRect
+     - (NSRect) wine_fractionalFrame
+     {
+         NSRect frame = self.frame;
++        if (inAutoFullScreen)
++            return fullScreenWineFrame;
+         if (NSEqualRects(frame, roundedWineFrame))
+             frame = wineFrame;
+         return frame;
+@@ -2865,48 +3102,69 @@ - (void) setRetinaMode:(BOOL)mode
+ 
+     - (void) setMask:(CGRect)rect
+     {
+-        /* Draw black bars to cover every part of the window except for 'rect'.
+-         * Intended for use on a window covering the full screen.
+-         */
++        fullScreenSourceRect = NSRectFromCGRect(rect);
++        if (inAutoFullScreen)
++            [self updateFullScreenContentTransform];
++        [self updateMaskLayer];
++    }
++
++    /* Draw black bars over every part of the content view's visible bounds
++       outside the rect Win32 shows content in: the mask rect of a window
++       covering its screen in an emulated display mode and, while scaled in a
++       full-screen space, whatever lies outside the frame Win32 set. */
++    - (void) updateMaskLayer
++    {
++        NSView* contentView = [self contentView];
++        NSRect bounds = [contentView bounds], source = fullScreenSourceRect;
++        CGMutablePathRef path;
++        CAShapeLayer* shapeLayer;
++        NSRect bars[4];
++        int i;
++
+         if (self.contentViewMaskLayer)
+         {
+             [self.contentViewMaskLayer removeFromSuperlayer];
+             self.contentViewMaskLayer = nil;
+         }
+ 
+-        if (CGRectIsEmpty(rect))
+-            return;
++        if (NSIsEmptyRect(source))
++        {
++            NSSize wineSize;
+ 
+-        CAShapeLayer *shapeLayer = [CAShapeLayer layer];
+-        shapeLayer.bounds = self.contentView.layer.bounds;
+-        shapeLayer.position = self.contentView.layer.position;
+-        shapeLayer.geometryFlipped = self.contentView.layer.geometryFlipped;
+-        shapeLayer.anchorPoint = self.contentView.layer.anchorPoint;
+-        shapeLayer.fillColor = CGColorGetConstantColor(kCGColorBlack);
++            if (!inAutoFullScreen)
++                return;
++            wineSize = [self contentRectForFrameRect:fullScreenWineFrame].size;
++            source = NSMakeRect(0, 0, wineSize.width, wineSize.height);
++        }
++
++        bars[0] = NSMakeRect(NSMinX(bounds), NSMinY(bounds), NSMinX(source) - NSMinX(bounds), NSHeight(bounds));
++        bars[1] = NSMakeRect(NSMaxX(source), NSMinY(bounds), NSMaxX(bounds) - NSMaxX(source), NSHeight(bounds));
++        bars[2] = NSMakeRect(NSMinX(source), NSMinY(bounds), NSWidth(source), NSMinY(source) - NSMinY(bounds));
++        bars[3] = NSMakeRect(NSMinX(source), NSMaxY(source), NSWidth(source), NSMaxY(bounds) - NSMaxY(source));
+ 
+-        CGMutablePathRef path = CGPathCreateMutable();
+-        /* left/right */
+-        if (rect.origin.x > 0.0)
+-            CGPathAddRect(path, NULL, CGRectMake(0, 0, rect.origin.x, shapeLayer.bounds.size.height));
+-        if (rect.origin.x + rect.size.width < shapeLayer.bounds.size.width)
+-            CGPathAddRect(path, NULL, CGRectMake(rect.origin.x + rect.size.width,
+-                                                 0,
+-                                                 shapeLayer.bounds.size.width - (rect.origin.x + rect.size.width),
+-                                                 shapeLayer.bounds.size.height));
+-
+-        /* top/bottom */
+-        if (rect.origin.y > 0.0)
+-            CGPathAddRect(path, NULL, CGRectMake(0, 0, shapeLayer.bounds.size.width, rect.origin.y));
+-        if (rect.origin.y + rect.size.height < shapeLayer.bounds.size.height)
+-            CGPathAddRect(path, NULL, CGRectMake(0,
+-                                                 rect.origin.y + rect.size.height,
+-                                                 shapeLayer.bounds.size.width,
+-                                                 shapeLayer.bounds.size.height - (rect.origin.y + rect.size.height)));
++        path = CGPathCreateMutable();
++        for (i = 0; i < 4; i++)
++        {
++            if (NSWidth(bars[i]) > 0 && NSHeight(bars[i]) > 0)
++                CGPathAddRect(path, NULL, NSRectToCGRect(bars[i]));
++        }
++        if (CGPathIsEmpty(path))
++        {
++            CGPathRelease(path);
++            return;
++        }
+ 
++        /* The content layer's bounds are the view's bounds, so a sublayer
++           with the same frame and bounds draws in content view coordinates. */
++        shapeLayer = [CAShapeLayer layer];
++        shapeLayer.frame = contentView.layer.bounds;
++        shapeLayer.bounds = contentView.layer.bounds;
++        shapeLayer.fillColor = CGColorGetConstantColor(kCGColorBlack);
++        shapeLayer.zPosition = 1000;   /* above the client views */
+         shapeLayer.path = path;
+         CGPathRelease(path);
+ 
+-        [self.contentView.layer addSublayer:shapeLayer];
++        [contentView.layer addSublayer:shapeLayer];
+         self.contentViewMaskLayer = shapeLayer;
+     }
+ 
+@@ -3025,6 +3283,11 @@ - (NSSize) window:(NSWindow*)window willUseFullScreenContentSize:(NSSize)propose
+         macdrv_query* query;
+         NSSize size;
+ 
++        /* The Win32 frame stays as it is; the content is scaled to whatever
++           AppKit offers. */
++        if (wantsNativeFullScreen)
++            return proposedSize;
++
+         query = macdrv_create_query();
+         query->type = QUERY_MIN_MAX_INFO;
+         query->window = (macdrv_window)[self retain];
+@@ -3104,13 +3367,36 @@ - (void) windowDidEnterFullScreen:(NSNotification*)notification
+     {
+         enteringFullScreen = FALSE;
+         enteredFullScreenTime = [[NSProcessInfo processInfo] systemUptime];
++        if (inAutoFullScreen)
++        {
++            [self updateFullScreenContentTransform];
++            if (!self.noForeground && !self.disabled && !pendingOrderOut)
++                [self makeFocused:YES];
++        }
+         if (pendingOrderOut)
+             [self doOrderOut];
++        else if (inAutoFullScreen)
++            [self updateNativeFullScreen];
+     }
+ 
+     - (void) windowDidExitFullScreen:(NSNotification*)notification
+     {
+         exitingFullScreen = FALSE;
++        if (inAutoFullScreen)
++        {
++            /* Back to the frame Win32 has set meanwhile; it never saw the
++               full-screen one. */
++            inAutoFullScreen = FALSE;
++            [self updateFullScreenContentTransform];
++            [self setFrameAndWineFrame:fullScreenWineFrame];
++            [self windowDidResize:nil skipSizeMove:TRUE];
++            if (pendingOrderOut)
++                [self doOrderOut];
++            else
++                [self updateNativeFullScreen];
++            [[WineApplicationController sharedController] adjustWindowLevels];
++            return;
++        }
+         [self setFrameAndWineFrame:nonFullscreenFrame];
+         [self windowDidResize:nil];
+         if (pendingOrderOut)
+@@ -3121,6 +3407,14 @@ - (void) windowDidFailToEnterFullScreen:(NSWindow*)window
+     {
+         enteringFullScreen = FALSE;
+         enteredFullScreenTime = 0;
++        if (inAutoFullScreen)
++        {
++            /* Don't try again until Win32 changes its mind. */
++            inAutoFullScreen = FALSE;
++            suppressAutoFullScreen = TRUE;
++            [self updateFullScreenContentTransform];
++            [self setFrameAndWineFrame:fullScreenWineFrame];
++        }
+         if (pendingOrderOut)
+             [self doOrderOut];
+     }
+@@ -3178,6 +3472,15 @@ - (void)windowDidResize:(NSNotification *)notification skipSizeMove:(BOOL)skipSi
+ 
+         if (ignore_windowResize || exitingFullScreen) return;
+ 
++        /* AppKit's full-screen frame is not reported to Win32, which keeps
++           the frame it set; the content is scaled instead. */
++        if (inAutoFullScreen)
++        {
++            [self updateFullScreenContentTransform];
++            [[[self contentView] inputContext] invalidateCharacterCoordinates];
++            return;
++        }
++
+         if ([self preventResizing])
+         {
+             NSRect contentRect = [self contentRectForFrameRect:frame];
+@@ -3248,13 +3551,26 @@ - (void) windowWillClose:(NSNotification*)notification
+ 
+     - (void) windowWillEnterFullScreen:(NSNotification*)notification
+     {
+-        enteringFullScreen = TRUE;
+         nonFullscreenFrame = self.wine_fractionalFrame;
++        if (wantsNativeFullScreen && !inAutoFullScreen)
++        {
++            fullScreenWineFrame = nonFullscreenFrame;
++            inAutoFullScreen = TRUE;
++        }
++        enteringFullScreen = TRUE;
+     }
+ 
+     - (void) windowWillExitFullScreen:(NSNotification*)notification
+     {
+         exitingFullScreen = TRUE;
++        if (inAutoFullScreen)
++        {
++            /* The user left the space while Win32 still covers the screen:
++               stay out until Win32 changes its mind. */
++            if (wantsNativeFullScreen)
++                suppressAutoFullScreen = TRUE;
++            return;
++        }
+         [self postWindowFrameChanged:nonFullscreenFrame fullscreen:FALSE resizing:FALSE skipSizeMove:FALSE];
+     }
+ 
+@@ -3796,12 +4112,34 @@ void macdrv_set_window_mask(macdrv_window w, CGRect rect)
+ {
+     WineWindow* window = (WineWindow*)w;
+ 
++    /* From Win32 units, relative to the content view, to Cocoa units. */
++    rect = cgrect_mac_from_win(rect);
++
+     OnMainThread(^{
+         [window setMask:rect];
+     });
+ }
+ }
+ 
++/***********************************************************************
++ *              macdrv_set_window_native_fullscreen
++ *
++ * Asks for the window to enter (or leave) a native full-screen space.  The
++ * transition is asynchronous: this never waits for the main thread.
++ */
++void macdrv_set_window_native_fullscreen(macdrv_window w, int enable)
++{
++@autoreleasepool
++{
++    WineWindow* window = (WineWindow*)w;
++    BOOL want = enable != 0;
++
++    OnMainThreadAsync(^{
++        [window setWantsNativeFullScreen:want];
++    });
++}
++}
++
+ /***********************************************************************
+  *              macdrv_give_cocoa_window_focus
+  *
+@@ -4120,7 +4458,17 @@ void macdrv_set_view_d3dmetal_client_surface(macdrv_view v, void *client_surface
+     WineContentView* view = (WineContentView*)v;
+ 
+     if ([view isKindOfClass:[WineContentView class]])
++    {
+         view->d3dmetal_client_surface = client_surface;
++        if (client_surface)
++        {
++            OnMainThreadAsync(^{
++                WineWindow* window = (WineWindow*)[view window];
++                if ([window isKindOfClass:[WineWindow class]])
++                    [window acceleratedContentDidAppear];
++            });
++        }
++    }
+ }
+ 
+ /***********************************************************************
+diff --git a/dlls/winemac.drv/display.c b/dlls/winemac.drv/display.c
+index 2663eb8dfbe..17f424e2397 100644
+--- a/dlls/winemac.drv/display.c
++++ b/dlls/winemac.drv/display.c
+@@ -793,6 +793,21 @@ LONG macdrv_ChangeDisplaySettings(LPDEVMODEW displays, LPCWSTR primary_name, HWN
+ 
+     TRACE("%p %s %p 0x%08x %p\n", displays, debugstr_w(primary_name), hwnd, flags, lpvoid);
+ 
++    /* With emulated modes the only host mode reported is the current one, and
++       win32u keeps the mode a program asks for as a virtual mode, scaling its
++       windows and input to the physical one.  Never switch the hardware mode or
++       capture the displays: on a Retina display a "same size" request at
++       another refresh rate selects a low-resolution 1:1 mode, which flips the
++       Retina mode of every window. */
++    if (fullscreen_mode != FULLSCREEN_MODE_LEGACY)
++    {
++        for (mode = displays; mode->dmSize; mode = NEXT_DEVMODEW(mode))
++            TRACE("emulating %s: %ux%u %u bpp @%u Hz\n", debugstr_w(mode->dmDeviceName),
++                  (UINT)mode->dmPelsWidth, (UINT)mode->dmPelsHeight, (UINT)mode->dmBitsPerPel,
++                  (UINT)mode->dmDisplayFrequency);
++        return DISP_CHANGE_SUCCESSFUL;
++    }
++
+     init_original_display_mode();
+ 
+     /* TODO: support displays other than the main one */
+@@ -1142,9 +1157,19 @@ UINT macdrv_UpdateDisplayDevices(const struct gdi_device_manager *device_manager
+                     display_get_current_mode(monitor, &current_mode);
+             }
+ 
+-            if (!(modes = display_get_modes(adapter->id, &mode_count))) break;
+-            device_manager->add_modes( &current_mode, mode_count, modes, param );
+-            free(modes);
++            if (fullscreen_mode != FULLSCREEN_MODE_LEGACY)
++            {
++                /* A single host mode makes win32u emulate every other mode:
++                   it lists the native mode with the standard sizes below it
++                   and reports whichever the program sets as the current one. */
++                device_manager->add_modes( &current_mode, 1, &current_mode, param );
++            }
++            else
++            {
++                if (!(modes = display_get_modes(adapter->id, &mode_count))) break;
++                device_manager->add_modes( &current_mode, mode_count, modes, param );
++                free(modes);
++            }
+             macdrv_free_monitors(monitors, monitor_count);
+         }
+ 
+diff --git a/dlls/winemac.drv/macdrv.h b/dlls/winemac.drv/macdrv.h
+index 5735ff78aa1..400cd5ea484 100644
+--- a/dlls/winemac.drv/macdrv.h
++++ b/dlls/winemac.drv/macdrv.h
+@@ -194,6 +194,7 @@ extern BOOL macdrv_SystemParametersInfo(UINT action, UINT int_param, void *ptr_p
+     unsigned int        per_pixel_alpha : 1;    /* is window using per-pixel alpha? */
+     unsigned int        minimized : 1;          /* is window minimized? */
+     unsigned int        fullscreen : 1;         /* is the window visible rect fullscreen? (unrelated to native AppKit/Cocoa fullscreen) */
++    unsigned int        native_fullscreen : 1;  /* was the Cocoa window asked to enter a native full-screen space? */
+ 
+     /* CW HACK 22435 */
+     CFMutableArrayRef   d3dmetal_client_surfaces;
+diff --git a/dlls/winemac.drv/macdrv_cocoa.h b/dlls/winemac.drv/macdrv_cocoa.h
+index 477efe9fa6a..4e9b70795f5 100644
+--- a/dlls/winemac.drv/macdrv_cocoa.h
++++ b/dlls/winemac.drv/macdrv_cocoa.h
+@@ -109,6 +109,18 @@
+     GL_SURFACE_BEHIND,
+ };
+ 
++/* How a full-screen Windows program is presented (FullscreenMode). */
++enum {
++    /* Display mode changes are emulated, and a borderless window covering
++       its screen enters a native macOS full-screen space. */
++    FULLSCREEN_MODE_NATIVE,
++    /* Display mode changes are emulated; a covering window stays a borderless
++       window over the desktop, with the Dock and menu bar hidden. */
++    FULLSCREEN_MODE_BORDERLESS,
++    /* Display mode changes switch the hardware mode and capture the displays. */
++    FULLSCREEN_MODE_LEGACY,
++};
++
+ enum {
+     MACDRV_HOTKEY_SUCCESS,
+     MACDRV_HOTKEY_ALREADY_REGISTERED,
+@@ -131,6 +143,7 @@
+ extern bool macdrv_err_on;
+ extern int topmost_float_inactive;
+ extern bool capture_displays_for_fullscreen;
++extern int fullscreen_mode;
+ /* CrossOver Hack 10912: Mac Edit menu */
+ extern int mac_edit_menu;
+ extern bool left_option_is_alt;
+@@ -545,6 +558,7 @@ extern void macdrv_order_cocoa_window(macdrv_window w, macdrv_window prev,
+ extern void macdrv_set_window_alpha(macdrv_window w, CGFloat alpha);
+ extern void macdrv_window_use_per_pixel_alpha(macdrv_window w, bool use_per_pixel_alpha);
+ extern void macdrv_set_window_mask(macdrv_window w, CGRect rect);
++extern void macdrv_set_window_native_fullscreen(macdrv_window w, int enable);
+ extern void macdrv_give_cocoa_window_focus(macdrv_window w, bool activate);
+ extern void macdrv_set_window_min_max_sizes(macdrv_window w, CGSize min_size, CGSize max_size);
+ extern macdrv_view macdrv_create_view(CGRect rect);
+diff --git a/dlls/winemac.drv/macdrv_main.c b/dlls/winemac.drv/macdrv_main.c
+index 56e7a77c4da..ac78158b5cf 100644
+--- a/dlls/winemac.drv/macdrv_main.c
++++ b/dlls/winemac.drv/macdrv_main.c
+@@ -44,6 +44,7 @@ C_ASSERT(NUM_EVENT_TYPES <= sizeof(macdrv_event_mask) * 8);
+ 
+ int topmost_float_inactive = TOPMOST_FLOAT_INACTIVE_NONFULLSCREEN;
+ bool capture_displays_for_fullscreen = false;
++int fullscreen_mode = FULLSCREEN_MODE_NATIVE;
+ BOOL allow_vsync = TRUE;
+ BOOL allow_set_gamma = TRUE;
+ /* CrossOver Hack 10912: Mac Edit menu */
+@@ -396,6 +397,24 @@ static void setup_options(void)
+ 
+     retina_on = retina_enabled;
+ 
++    /* Not per application either: the display modes every process of the
++       prefix sees come from this setting. */
++    if (!get_config_key(hkey, NULL, "FullscreenMode", buffer, sizeof(buffer)))
++    {
++        static const WCHAR legacyW[] = {'l','e','g','a','c','y',0};
++        static const WCHAR borderlessW[] = {'b','o','r','d','e','r','l','e','s','s',0};
++        if (!wcsicmp(buffer, legacyW))
++            fullscreen_mode = FULLSCREEN_MODE_LEGACY;
++        else if (!wcsicmp(buffer, borderlessW))
++            fullscreen_mode = FULLSCREEN_MODE_BORDERLESS;
++        else
++            fullscreen_mode = FULLSCREEN_MODE_NATIVE;
++    }
++
++    /* Emulated display modes never capture the displays. */
++    if (fullscreen_mode != FULLSCREEN_MODE_LEGACY)
++        capture_displays_for_fullscreen = false;
++
+     if (appkey) NtClose(appkey);
+     if (hkey) NtClose(hkey);
+ }
+diff --git a/dlls/winemac.drv/window.c b/dlls/winemac.drv/window.c
+index 2bf26deeaa7..2291111ceaa 100644
+--- a/dlls/winemac.drv/window.c
++++ b/dlls/winemac.drv/window.c
+@@ -1679,6 +1679,31 @@ BOOL macdrv_GetWindowStyleMasks(HWND hwnd, UINT style, UINT ex_style, UINT *styl
+ }
+ 
+ 
++/***********************************************************************
++ *              wants_native_fullscreen
++ *
++ * Whether a window should be presented in a native macOS full-screen space:
++ * an unowned, unminimized top-level window without a title bar that covers
++ * its monitor, as a game does in exclusive full-screen mode.  Visibility is
++ * left to the Cocoa side, which enters the space once the window is ordered
++ * in, so that hiding and showing the window doesn't flip the request.
++ */
++static BOOL wants_native_fullscreen(struct macdrv_win_data *data, BOOL fullscreen, DWORD style)
++{
++    DWORD ex_style;
++
++    if (fullscreen_mode != FULLSCREEN_MODE_NATIVE || !fullscreen) return FALSE;
++    if (style & (WS_MINIMIZE | WS_CHILD)) return FALSE;
++    if (data->hwnd == NtUserGetDesktopWindow()) return FALSE;
++    if (NtUserGetWindowRelative(data->hwnd, GW_OWNER)) return FALSE;
++
++    ex_style = NtUserGetWindowLongW(data->hwnd, GWL_EXSTYLE);
++    if (ex_style & (WS_EX_TOOLWINDOW | WS_EX_NOACTIVATE | WS_EX_LAYERED)) return FALSE;
++
++    return !get_cocoa_window_features(data, style, ex_style).title_bar;
++}
++
++
+ /***********************************************************************
+  *              WindowPosChanged   (MACDRV.@)
+  */
+@@ -1736,11 +1761,31 @@ void macdrv_WindowPosChanged(HWND hwnd, HWND insert_after, HWND owner_hint, UINT
+ 
+     if (fullscreen || fullscreen != data->fullscreen)
+     {
+-        CGRect rect = (fullscreen && !EqualRect(&data->rects.window, &data->rects.visible)) ? cgrect_from_rect(data->rects.window) : CGRectZero;
++        CGRect rect = CGRectZero;
++
++        /* The mask is in the coordinates of the Cocoa content view, which
++           starts at the visible rect. */
++        if (fullscreen && !EqualRect(&data->rects.window, &data->rects.visible))
++        {
++            RECT window = data->rects.window;
++            OffsetRect(&window, -data->rects.visible.left, -data->rects.visible.top);
++            rect = cgrect_from_rect(window);
++        }
+         macdrv_set_window_mask(data->cocoa_window, rect);
+         data->fullscreen = fullscreen;
+     }
+ 
++    if (data->cocoa_window)
++    {
++        BOOL native_fullscreen = wants_native_fullscreen(data, fullscreen, new_style);
++        if (native_fullscreen != data->native_fullscreen)
++        {
++            TRACE("win %p/%p native fullscreen %d\n", hwnd, data->cocoa_window, native_fullscreen);
++            data->native_fullscreen = native_fullscreen;
++            macdrv_set_window_native_fullscreen(data->cocoa_window, native_fullscreen);
++        }
++    }
++
+ done:
+     release_win_data(data);
+ }
+-- 
+2.56.0
+

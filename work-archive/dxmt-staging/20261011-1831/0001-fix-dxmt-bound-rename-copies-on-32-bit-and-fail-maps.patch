@@ -1,0 +1,1053 @@
+From 1c9e911adcc4a4fb10bedba23b04a3aa87c356cb Mon Sep 17 00:00:00 2001
+From: Gigi <42325924+g-cqd@users.noreply.github.com>
+Date: Sun, 11 Oct 2026 18:44:57 +0200
+Subject: [PATCH] fix(dxmt): bound rename copies on 32-bit and fail maps
+ without CPU memory
+
+A write map of a staging resource that the GPU still reads renames it to a
+fresh copy, and a retired copy is only reused once the GPU has finished with
+it. Nothing in that path flushes, so a burst of map/write/unmap/copy cycles
+without a present grows the pool by one copy per map. On i386 each copy is a
+CpuPlaced _aligned_malloc; Crysis 3 maps a 4 MB staging buffer hundreds of
+times while loading a level (651 copies, 3.6 GB committed), _aligned_malloc
+fails, winemetal silently allocates a Metal buffer at a 64-bit address,
+get_accessible_or_null() turns it into NULL, and Map memcpys 4 MB to address 0.
+
+Add RenameBudget: in 32-bit processes a resource may hold at most 64 MB of
+renamed copies, and all renamers together 512 MB. Past that, a staging write
+map flushes and waits for the GPU to retire the oldest copy (or to finish
+with the current one) instead of allocating; WRITE_DISCARD maps of dynamic
+buffers and dynamic linear textures on the immediate context do the same.
+64-bit processes are not bounded.
+
+A CpuPlaced buffer or linear texture that cannot get CPU-accessible memory
+now logs an error once, and mappedMemory() returns nullptr instead of an
+offset from NULL. Staging and dynamic maps on both contexts return
+E_OUTOFMEMORY instead of handing out or writing through a null pointer,
+staging creation fails with E_OUTOFMEMORY, and a staging rename that gets
+no memory waits for the GPU instead.
+
+tests/dx11/dx11_staging_rename repeats the Crysis 3 pattern (20 bursts of
+300 maps of a 4 MB staging buffer) and checks the 4 MB region count and the
+copied data. i386 before: 352 regions (1.4 GB); 2 x 1000 maps fault writing
+to 0x0. After: 19 regions (124 MB), data correct, no fault.
+---
+ src/d3d11/d3d11_context_def.cpp      |  10 ++
+ src/d3d11/d3d11_context_imm.cpp      |  99 +++++++++++--
+ src/d3d11/d3d11_resource_staging.cpp |  10 +-
+ src/d3d11/d3d11_texture_linear.cpp   |   4 +-
+ src/dxmt/dxmt_allocation.cpp         |   6 +
+ src/dxmt/dxmt_allocation.hpp         |  52 +++++++
+ src/dxmt/dxmt_buffer.cpp             |   6 +
+ src/dxmt/dxmt_buffer.hpp             |  14 ++
+ src/dxmt/dxmt_dynamic.cpp            |  58 +++++++-
+ src/dxmt/dxmt_dynamic.hpp            |  28 ++++
+ src/dxmt/dxmt_staging.cpp            |  59 +++++---
+ src/dxmt/dxmt_staging.hpp            |  16 +++
+ src/dxmt/dxmt_texture.cpp            |  12 +-
+ src/dxmt/dxmt_texture.hpp            |   8 ++
+ src/util/log/log.hpp                 |   6 +
+ tests/dx11/dx11_staging_rename.cpp   | 205 +++++++++++++++++++++++++++
+ tests/dx11/meson.build               |   4 +
+ 17 files changed, 562 insertions(+), 35 deletions(-)
+ create mode 100644 tests/dx11/dx11_staging_rename.cpp
+
+diff --git a/src/d3d11/d3d11_context_def.cpp b/src/d3d11/d3d11_context_def.cpp
+index 821a842..f647d9e 100644
+--- a/src/d3d11/d3d11_context_def.cpp
++++ b/src/d3d11/d3d11_context_def.cpp
+@@ -173,6 +173,8 @@ public:
+         }
+ 
+         pMappedResource->pData = MapDynamicBuffer(dynamic);
++        if (unlikely(!pMappedResource->pData))
++          return E_OUTOFMEMORY;
+         pMappedResource->RowPitch = buffer_length;
+         pMappedResource->DepthPitch = buffer_length;
+         break;
+@@ -185,6 +187,8 @@ public:
+         }
+         auto &allocation_state = ret->second;
+         pMappedResource->pData = allocation_state.allocation->mappedMemory(allocation_state.suballocation);
++        if (unlikely(!pMappedResource->pData))
++          return E_OUTOFMEMORY;
+         pMappedResource->RowPitch = buffer_length;
+         pMappedResource->DepthPitch = buffer_length;
+         break;
+@@ -223,6 +227,8 @@ public:
+         });
+ 
+         pMappedResource->pData = new_allocation->mappedMemory;
++        if (unlikely(!pMappedResource->pData))
++          return E_OUTOFMEMORY;
+         pMappedResource->RowPitch = row_pitch;
+         pMappedResource->DepthPitch = depth_pitch;
+         break;
+@@ -234,6 +240,8 @@ public:
+           return E_INVALIDARG;
+         }
+         pMappedResource->pData = ret->second.first->mappedMemory;
++        if (unlikely(!pMappedResource->pData))
++          return E_OUTOFMEMORY;
+         pMappedResource->RowPitch = row_pitch;
+         pMappedResource->DepthPitch = depth_pitch;
+         break;
+@@ -255,6 +263,8 @@ public:
+             stage.SRVs.set_dirty();
+         }
+         pMappedResource->pData = MapDynamicBuffer(dynamic);
++        if (unlikely(!pMappedResource->pData))
++          return E_OUTOFMEMORY;
+         pMappedResource->RowPitch = row_pitch;
+         pMappedResource->DepthPitch = depth_pitch;
+         break;
+diff --git a/src/d3d11/d3d11_context_imm.cpp b/src/d3d11/d3d11_context_imm.cpp
+index b361f17..28a9d1a 100644
+--- a/src/d3d11/d3d11_context_imm.cpp
++++ b/src/d3d11/d3d11_context_imm.cpp
+@@ -115,14 +115,68 @@ public:
+     return refCount;
+   }
+ 
++  /**
++  Wait until the GPU reaches `seq_id`. The current chunk is committed first even if
++  only renames (which do not mark it dirty) were recorded since the last flush.
++   */
++  void
++  WaitForRetiredAllocation(uint64_t seq_id, uint64_t &current_seq_id, uint64_t &coherent_seq_id) {
++    promote_flush = true;
++    Flush();
++    auto &statistics = cmd_queue.CurrentFrameStatistics();
++    auto t0 = clock::now();
++    cmd_queue.WaitCPUFence(seq_id);
++    auto t1 = clock::now();
++    statistics.sync_count++;
++    statistics.sync_interval += (t1 - t0);
++    current_seq_id = cmd_queue.CurrentSeqId();
++    coherent_seq_id = cmd_queue.CoherentSeqId();
++  }
++
++  static bool
++  HasCpuMemory(const Rc<BufferAllocation> &allocation) {
++    return allocation->mappedMemory(0) != nullptr;
++  }
++
++  static bool
++  HasCpuMemory(const Rc<TextureAllocation> &allocation) {
++    return allocation->mappedMemory != nullptr;
++  }
++
++  /**
++  The allocation a WRITE_DISCARD map renames to. Waits for the GPU to retire the
++  oldest allocation instead of growing past the rename budget, or when a new one
++  gets no CPU-accessible memory. The result has no CPU memory only if nothing can
++  be reused either.
++   */
++  template <typename Dynamic>
++  auto
++  AllocateDiscardName(Rc<Dynamic> &dynamic, uint64_t &current_seq_id, uint64_t &coherent_seq_id) {
++    uint64_t wait_seq_id = 0;
++    if (dynamic->mustWaitToAllocate(coherent_seq_id, &wait_seq_id))
++      WaitForRetiredAllocation(wait_seq_id, current_seq_id, coherent_seq_id);
++    auto allocation = dynamic->allocate(coherent_seq_id);
++    if (unlikely(!HasCpuMemory(allocation)) && (wait_seq_id = dynamic->oldestRetiredSeqId())) {
++      WaitForRetiredAllocation(wait_seq_id, current_seq_id, coherent_seq_id);
++      allocation = dynamic->allocate(coherent_seq_id);
++    }
++    return allocation;
++  }
++
++  /**
++  nullptr if the buffer has no CPU-accessible memory (32-bit address space exhausted)
++   */
+   void *
+-  MapDynamicBuffer(Rc<DynamicBuffer> &dynamic, uint64_t current_seq_id, uint64_t coherent_seq_id) {
++  MapDynamicBuffer(Rc<DynamicBuffer> &dynamic, uint64_t &current_seq_id, uint64_t &coherent_seq_id) {
+     if (auto next_sub = dynamic->nextSuballocation()) {
+       EmitST([allocation = dynamic->immediateName(), next_sub](ArgumentEncodingContext &enc) mutable {
+         allocation->useSuballocation(next_sub);
+       });
+     } else {
+-      dynamic->updateImmediateName(current_seq_id, dynamic->allocate(coherent_seq_id), 0, false);
++      auto allocation = AllocateDiscardName(dynamic, current_seq_id, coherent_seq_id);
++      if (unlikely(!HasCpuMemory(allocation)))
++        return nullptr;
++      dynamic->updateImmediateName(current_seq_id, std::move(allocation), 0, false);
+       EmitST([allocation = dynamic->immediateName(),
+               buffer = Rc(dynamic->buffer)](ArgumentEncodingContext &enc) mutable {
+         allocation->useSuballocation(0);
+@@ -167,12 +221,16 @@ public:
+         }
+ 
+         pMappedResource->pData = MapDynamicBuffer(dynamic, current_seq_id, coherent_seq_id);
++        if (unlikely(!pMappedResource->pData))
++          return E_OUTOFMEMORY;
+         pMappedResource->RowPitch = buffer_length;
+         pMappedResource->DepthPitch = buffer_length;
+         break;
+       }
+       case D3D11_MAP_WRITE_NO_OVERWRITE: {
+         pMappedResource->pData = dynamic->immediateMappedMemory();
++        if (unlikely(!pMappedResource->pData))
++          return E_OUTOFMEMORY;
+         pMappedResource->RowPitch = buffer_length;
+         pMappedResource->DepthPitch = buffer_length;
+         break;
+@@ -193,6 +251,8 @@ public:
+         }
+ 
+         pMappedResource->pData = MapDynamicBuffer(dynamic, current_seq_id, coherent_seq_id);
++        if (unlikely(!pMappedResource->pData))
++          return E_OUTOFMEMORY;
+         pMappedResource->RowPitch = row_pitch;
+         pMappedResource->DepthPitch = depth_pitch;
+         break;
+@@ -211,7 +271,10 @@ public:
+           stage.SRVs.set_dirty();
+         }
+ 
+-        dynamic->updateImmediateName(current_seq_id, dynamic->allocate(coherent_seq_id), false);
++        auto allocation = AllocateDiscardName(dynamic, current_seq_id, coherent_seq_id);
++        if (unlikely(!HasCpuMemory(allocation)))
++          return E_OUTOFMEMORY;
++        dynamic->updateImmediateName(current_seq_id, std::move(allocation), false);
+         EmitST([allocation = dynamic->immediateName(),
+               texture = Rc(dynamic->texture)](ArgumentEncodingContext &enc) mutable {
+           auto _ = texture->rename(forward_rc(allocation));
+@@ -224,6 +287,8 @@ public:
+       }
+       case D3D11_MAP_WRITE_NO_OVERWRITE: {
+         pMappedResource->pData = dynamic->mappedMemory();
++        if (unlikely(!pMappedResource->pData))
++          return E_OUTOFMEMORY;
+         pMappedResource->RowPitch = row_pitch;
+         pMappedResource->DepthPitch = depth_pitch;
+         break;
+@@ -238,6 +303,9 @@ public:
+       if (ignore_map_flag_no_wait_)
+         MapFlags &= ~D3D11_MAP_FLAG_DO_NOT_WAIT;
+ 
++      if (unlikely(!staging->mappedImmediateMemory()))
++        return E_OUTOFMEMORY;
++
+       while (true) {
+         auto result = staging->tryMap(coherent_seq_id, MapType & D3D11_MAP_READ, MapType & D3D11_MAP_WRITE);
+         if (result == StagingMapResult::Mapped)
+@@ -245,13 +313,24 @@ public:
+         if (result == StagingMapResult::Renamable) {
+           // when write to a buffer that is gpu-readonly
+           auto next_name = staging->allocate(coherent_seq_id);
+-          // can't guarantee a full overwrite
+-          std::memcpy(staging->mappedMemory(next_name), staging->mappedImmediateMemory(), staging->length);
+-          staging->updateImmediateName(current_seq_id, next_name);
+-          EmitST([staging, next_name](ArgumentEncodingContext &enc) mutable { 
+-            auto _ = staging->buffer()->rename(staging->allocation(next_name));
+-          });
+-          result = StagingMapResult::Mappable;
++          if (next_name != StagingResource::kNoAllocation) {
++            // can't guarantee a full overwrite
++            std::memcpy(staging->mappedMemory(next_name), staging->mappedImmediateMemory(), staging->length);
++            staging->updateImmediateName(current_seq_id, next_name);
++            EmitST([staging, next_name](ArgumentEncodingContext &enc) mutable {
++              auto _ = staging->buffer()->rename(staging->allocation(next_name));
++            });
++            result = StagingMapResult::Mappable;
++          } else {
++            // Rename budget spent (or no memory for a copy): wait for the GPU to
++            // retire the oldest copy, or to finish with the current one. The copy
++            // may be retired by commands in the current chunk, which renames alone
++            // do not mark dirty, so commit it even if Flush() would skip it.
++            auto wait_seq_id = std::max(staging->renameWaitSeqId(), coherent_seq_id + 1);
++            result = StagingMapResult(wait_seq_id - coherent_seq_id);
++            promote_flush = true;
++            Flush();
++          }
+         }
+         if (result == StagingMapResult::Mappable) {
+           TRACE("staging map ready");
+diff --git a/src/d3d11/d3d11_resource_staging.cpp b/src/d3d11/d3d11_resource_staging.cpp
+index 5ba6cb3..b07f827 100644
+--- a/src/d3d11/d3d11_resource_staging.cpp
++++ b/src/d3d11/d3d11_resource_staging.cpp
+@@ -45,11 +45,13 @@ CreateStagingBuffer(MTLD3D11Device *pDevice, const D3D11_BUFFER_DESC *pDesc,
+                     ID3D11Buffer **ppBuffer) {
+   auto metal = pDevice->GetMTLDevice();
+   auto byte_width = pDesc->ByteWidth;
+-  auto buffer = new StagingResource(metal, byte_width, byte_width, byte_width);
++  Rc<StagingResource> buffer = new StagingResource(metal, byte_width, byte_width, byte_width);
++  if (unlikely(!buffer->mappedImmediateMemory()))
++    return E_OUTOFMEMORY;
+   if (pInitialData) {
+     memcpy(buffer->mappedImmediateMemory(), pInitialData->pSysMem, byte_width);
+   }
+-  *ppBuffer = reinterpret_cast<ID3D11Buffer *>(ref(new StagingBuffer(pDesc, pDevice, buffer)));
++  *ppBuffer = reinterpret_cast<ID3D11Buffer *>(ref(new StagingBuffer(pDesc, pDevice, std::move(buffer))));
+   return S_OK;
+ }
+ 
+@@ -117,7 +119,9 @@ HRESULT CreateStagingTextureInternal(MTLD3D11Device *pDevice,
+       return E_FAIL;
+     }
+     D3D11_ASSERT(subresources.size() == sub.SubresourceId);
+-    auto buffer = new StagingResource(metal, buf_len, bpr, bpi);
++    Rc<StagingResource> buffer = new StagingResource(metal, buf_len, bpr, bpi);
++    if (unlikely(!buffer->mappedImmediateMemory()))
++      return E_OUTOFMEMORY;
+     if (pInitialData) {
+       auto mapped = buffer->mappedImmediateMemory();
+       auto bpi_read = is_3d_tex ? pInitialData[sub.SubresourceId].SysMemSlicePitch : 0;
+diff --git a/src/d3d11/d3d11_texture_linear.cpp b/src/d3d11/d3d11_texture_linear.cpp
+index e250d6e..3b52d49 100644
+--- a/src/d3d11/d3d11_texture_linear.cpp
++++ b/src/d3d11/d3d11_texture_linear.cpp
+@@ -59,7 +59,9 @@ TDynamicLinearTexture(
+     auto _ = this->texture_->rename(Rc(allocation));
+     D3D11_ASSERT(_.ptr() == nullptr);
+ 
+-    if (pInitialData) {
++    if (pInitialData && unlikely(!allocation->mappedMemory)) {
++      ERR("DynamicLinearTexture: no CPU-accessible memory, initial data dropped");
++    } else if (pInitialData) {
+       if (pInitialData->SysMemPitch != bytes_per_row_) {
+         for (unsigned row = 0; row < this->texture_->height(); row++) {
+           memcpy(
+diff --git a/src/dxmt/dxmt_allocation.cpp b/src/dxmt/dxmt_allocation.cpp
+index 9f2219d..e3386a0 100644
+--- a/src/dxmt/dxmt_allocation.cpp
++++ b/src/dxmt/dxmt_allocation.cpp
+@@ -17,6 +17,12 @@ Allocation::decRef() {
+     delete this;
+ };
+ 
++RenameBudget &
++RenameBudget::instance() {
++  static RenameBudget budget;
++  return budget;
++}
++
+ AllocationRefTracking::AllocationRefTracking() {
+   chunk_placed.next_chunk = nullptr;
+   chunk_placed.size = 0;
+diff --git a/src/dxmt/dxmt_allocation.hpp b/src/dxmt/dxmt_allocation.hpp
+index 1b8a4f7..ded71f2 100644
+--- a/src/dxmt/dxmt_allocation.hpp
++++ b/src/dxmt/dxmt_allocation.hpp
+@@ -47,4 +47,56 @@ private:
+   RefAddChunk<> *chunk_last = nullptr;
+ };
+ 
++/**
++ * Bounds the CPU-visible copies a resource makes by renaming: a WRITE_DISCARD map
++ * of a dynamic resource, or a write map of a staging resource the GPU still reads.
++ * A retired copy is only reused once the GPU has finished with it, and nothing in
++ * the rename path flushes, so a burst of maps without a flush grows the pool by one
++ * copy per map.
++ *
++ * In a 32-bit process every copy is placed in the 4 GB address space, so a 4 MB
++ * staging buffer mapped a few hundred times during a load exhausts it. There the
++ * renamer must wait for the GPU to retire its oldest copy once it holds
++ * kPerResource bytes of copies, or once all renamers together hold kTotal bytes.
++ * 64-bit processes are not bounded.
++ */
++class RenameBudget {
++public:
++#ifdef __i386__
++  static constexpr uint64_t kPerResource = 64ull << 20;
++  static constexpr uint64_t kTotal = 512ull << 20;
++#else
++  static constexpr uint64_t kPerResource = ~0ull;
++  static constexpr uint64_t kTotal = ~0ull;
++#endif
++
++  /**
++   * Whether a resource that already holds `held` bytes of copies may make another
++   * copy of `length` bytes instead of waiting. The first copy is always allowed.
++   */
++  bool
++  allows(uint64_t held, uint64_t length) const {
++    if (held == 0)
++      return true;
++    if (held + length > kPerResource)
++      return false;
++    return total_.load(std::memory_order_relaxed) + length <= kTotal;
++  }
++
++  void
++  acquire(uint64_t length) {
++    total_.fetch_add(length, std::memory_order_relaxed);
++  }
++
++  void
++  release(uint64_t length) {
++    total_.fetch_sub(length, std::memory_order_relaxed);
++  }
++
++  static RenameBudget &instance();
++
++private:
++  std::atomic<uint64_t> total_ = {0};
++};
++
+ } // namespace dxmt
+diff --git a/src/dxmt/dxmt_buffer.cpp b/src/dxmt/dxmt_buffer.cpp
+index 2d9704c..89aef47 100644
+--- a/src/dxmt/dxmt_buffer.cpp
++++ b/src/dxmt/dxmt_buffer.cpp
+@@ -1,11 +1,13 @@
+ #include "dxmt_buffer.hpp"
+ #include "dxmt_format.hpp"
++#include "log/log.hpp"
+ #include "thread.hpp"
+ #include "util_likely.hpp"
+ #include "util_math.hpp"
+ #include "wsi_platform.hpp"
+ #include <cassert>
+ #include <mutex>
++#include <utility>
+ 
+ namespace dxmt {
+ 
+@@ -25,6 +27,10 @@ BufferAllocation::BufferAllocation(WMT::Device device, const WMTBufferInfo &info
+   fenceTrackers.resize(suballocation_count_);
+   if (flags_.test(BufferAllocationFlag::CpuPlaced)) {
+     placed_buffer = wsi::aligned_malloc(info_.length, DXMT_PAGE_SIZE);
++    if (unlikely(!placed_buffer)) {
++      // Metal will allocate the memory itself, at an address a 32-bit process cannot reach
++      ERR_ONCE("BufferAllocation: out of address space for a CPU-visible buffer of ", info_.length, " bytes");
++    }
+     info_.memory.set(placed_buffer);
+   }
+   obj_ = device.newBuffer(info_);
+diff --git a/src/dxmt/dxmt_buffer.hpp b/src/dxmt/dxmt_buffer.hpp
+index 2ee36c0..85273b1 100644
+--- a/src/dxmt/dxmt_buffer.hpp
++++ b/src/dxmt/dxmt_buffer.hpp
+@@ -59,11 +59,25 @@ public:
+     return flags_;
+   }
+ 
++  /**
++   * nullptr when the CPU cannot access the allocation: GPU-private storage, or a
++   * 32-bit process that ran out of address space for a CpuPlaced allocation.
++   */
+   void *
+   mappedMemory(uint32_t sub) const noexcept {
++    if (unlikely(!mappedMemory_))
++      return nullptr;
+     return reinterpret_cast<void *>(reinterpret_cast<std::uintptr_t>(mappedMemory_) + sub * suballocation_size_);
+   }
+ 
++  /**
++   * bytes of memory this allocation occupies (at least one page when suballocated)
++   */
++  uint64_t
++  allocatedLength() const noexcept {
++    return info_.length;
++  }
++
+   uint64_t
+   gpuAddress() const noexcept {
+     return gpuAddress_;
+diff --git a/src/dxmt/dxmt_dynamic.cpp b/src/dxmt/dxmt_dynamic.cpp
+index ce7941e..2e88321 100644
+--- a/src/dxmt/dxmt_dynamic.cpp
++++ b/src/dxmt/dxmt_dynamic.cpp
+@@ -7,6 +7,10 @@ DynamicBuffer::DynamicBuffer(Buffer *buffer, Flags<BufferAllocationFlag> flags)
+     flags_(flags),
+     name_(buffer->current()) {}
+ 
++DynamicBuffer::~DynamicBuffer() {
++  RenameBudget::instance().release(renamed_bytes_);
++}
++
+ void
+ DynamicBuffer::incRef() {
+   refcount_.fetch_add(1u, std::memory_order_acquire);
+@@ -34,11 +38,34 @@ DynamicBuffer::allocate(uint64_t coherent_seq_id) {
+     fifo.pop();
+     break;
+   }
+-  if (!ret.ptr())
++  if (!ret.ptr()) {
+     ret = buffer->allocate(flags_);
++    // one without CPU memory is dropped by the caller and does not count
++    if (ret->mappedMemory(0)) {
++      renamed_bytes_ += ret->allocatedLength();
++      RenameBudget::instance().acquire(ret->allocatedLength());
++    }
++  }
+   return ret;
+ }
+ 
++bool
++DynamicBuffer::mustWaitToAllocate(uint64_t coherent_seq_id, uint64_t *wait_seq_id) {
++  std::lock_guard<dxmt::mutex> lock(mutex_);
++  if (fifo.empty() || fifo.front().will_free_at <= coherent_seq_id)
++    return false;
++  if (RenameBudget::instance().allows(renamed_bytes_, name_->allocatedLength()))
++    return false;
++  *wait_seq_id = fifo.front().will_free_at;
++  return true;
++}
++
++uint64_t
++DynamicBuffer::oldestRetiredSeqId() {
++  std::lock_guard<dxmt::mutex> lock(mutex_);
++  return fifo.empty() ? 0 : fifo.front().will_free_at;
++}
++
+ void
+ DynamicBuffer::updateImmediateName(uint64_t current_seq_id, Rc<BufferAllocation> &&allocation, uint32_t suballocation, bool owned_by_command_list) {
+   std::lock_guard<dxmt::mutex> lock(mutex_);
+@@ -75,6 +102,10 @@ DynamicLinearTexture::DynamicLinearTexture(Texture *texture, Flags<TextureAlloca
+     flags_(flags),
+     name_(texture->current()) {}
+ 
++DynamicLinearTexture::~DynamicLinearTexture() {
++  RenameBudget::instance().release(renamed_bytes_);
++}
++
+ void
+ DynamicLinearTexture::incRef() {
+   refcount_.fetch_add(1u, std::memory_order_acquire);
+@@ -102,11 +133,34 @@ DynamicLinearTexture::allocate(uint64_t coherent_seq_id) {
+     fifo.pop();
+     break;
+   }
+-  if (!ret.ptr())
++  if (!ret.ptr()) {
+     ret = texture->allocate(flags_);
++    // one without CPU memory is dropped by the caller and does not count
++    if (ret->mappedMemory) {
++      renamed_bytes_ += texture->bytesPerImage();
++      RenameBudget::instance().acquire(texture->bytesPerImage());
++    }
++  }
+   return ret;
+ }
+ 
++bool
++DynamicLinearTexture::mustWaitToAllocate(uint64_t coherent_seq_id, uint64_t *wait_seq_id) {
++  std::lock_guard<dxmt::mutex> lock(mutex_);
++  if (fifo.empty() || fifo.front().will_free_at <= coherent_seq_id)
++    return false;
++  if (RenameBudget::instance().allows(renamed_bytes_, texture->bytesPerImage()))
++    return false;
++  *wait_seq_id = fifo.front().will_free_at;
++  return true;
++}
++
++uint64_t
++DynamicLinearTexture::oldestRetiredSeqId() {
++  std::lock_guard<dxmt::mutex> lock(mutex_);
++  return fifo.empty() ? 0 : fifo.front().will_free_at;
++}
++
+ void
+ DynamicLinearTexture::updateImmediateName(uint64_t current_seq_id, Rc<TextureAllocation> &&allocation, bool owned_by_command_list) {
+   std::lock_guard<dxmt::mutex> lock(mutex_);
+diff --git a/src/dxmt/dxmt_dynamic.hpp b/src/dxmt/dxmt_dynamic.hpp
+index 9ee3b1d..1179450 100644
+--- a/src/dxmt/dxmt_dynamic.hpp
++++ b/src/dxmt/dxmt_dynamic.hpp
+@@ -11,6 +11,17 @@ public:
+   void decRef();
+ 
+   Rc<BufferAllocation> allocate(uint64_t coherent_seq_id);
++  /**
++   * Whether a WRITE_DISCARD map on the immediate context must wait for the GPU before
++   * allocate(): the oldest retired allocation is still in use and the rename budget
++   * allows no new one. Sets *wait_seq_id to the sequence id that frees it.
++   */
++  bool mustWaitToAllocate(uint64_t coherent_seq_id, uint64_t *wait_seq_id);
++
++  /**
++   * The sequence id that frees the oldest retired allocation, or 0 if none is retired.
++   */
++  uint64_t oldestRetiredSeqId();
+   void updateImmediateName(uint64_t current_seq_id, Rc<BufferAllocation> &&allocation, uint32_t suballocation, bool owned_by_command_list);
+   void recycle(uint64_t current_seq_id, Rc<BufferAllocation> &&allocation);
+   uint32_t nextSuballocation();
+@@ -31,6 +42,7 @@ public:
+   }
+ 
+   DynamicBuffer(Buffer *buffer, Flags<BufferAllocationFlag> flags);
++  ~DynamicBuffer();
+ 
+   struct QueueEntry {
+     Rc<BufferAllocation> allocation;
+@@ -50,6 +62,8 @@ private:
+   Rc<BufferAllocation> name_;
+   uint32_t name_suballocation_ = 0;
+   bool owned_by_command_list_ = false;
++  // bytes allocated by allocate(), held in RenameBudget
++  uint64_t renamed_bytes_ = 0;
+ };
+ 
+ class DynamicLinearTexture {
+@@ -58,6 +72,17 @@ public:
+   void decRef();
+ 
+   Rc<TextureAllocation> allocate(uint64_t coherent_seq_id);
++  /**
++   * Whether a WRITE_DISCARD map on the immediate context must wait for the GPU before
++   * allocate(): the oldest retired allocation is still in use and the rename budget
++   * allows no new one. Sets *wait_seq_id to the sequence id that frees it.
++   */
++  bool mustWaitToAllocate(uint64_t coherent_seq_id, uint64_t *wait_seq_id);
++
++  /**
++   * The sequence id that frees the oldest retired allocation, or 0 if none is retired.
++   */
++  uint64_t oldestRetiredSeqId();
+   void updateImmediateName(uint64_t current_seq_id, Rc<TextureAllocation> &&allocation, bool owned_by_command_list);
+   void recycle(uint64_t current_seq_id, Rc<TextureAllocation> &&allocation);
+ 
+@@ -72,6 +97,7 @@ public:
+   }
+ 
+   DynamicLinearTexture(Texture *buffer, Flags<TextureAllocationFlag> flags);
++  ~DynamicLinearTexture();
+ 
+   struct QueueEntry {
+     Rc<TextureAllocation> allocation;
+@@ -89,6 +115,8 @@ private:
+   dxmt::mutex mutex_;
+   Rc<TextureAllocation> name_;
+   bool owned_by_command_list_ = false;
++  // bytes allocated by allocate(), held in RenameBudget
++  uint64_t renamed_bytes_ = 0;
+ };
+ 
+ } // namespace dxmt
+diff --git a/src/dxmt/dxmt_staging.cpp b/src/dxmt/dxmt_staging.cpp
+index 80a3d62..6ac5f26 100644
+--- a/src/dxmt/dxmt_staging.cpp
++++ b/src/dxmt/dxmt_staging.cpp
+@@ -1,5 +1,8 @@
+ #include "dxmt_staging.hpp"
++#include "log/log.hpp"
++#include "util_likely.hpp"
+ #include <cassert>
++#include <utility>
+ 
+ namespace dxmt {
+ 
+@@ -11,10 +14,20 @@ StagingResource::StagingResource(
+     length(length),
+     device_(device) {
+   buffer_ = new Buffer(length, device);
+-  immediate_name_ = allocate(0);
++  Flags<BufferAllocationFlag> flags;
++#ifdef __i386__
++  flags.set(BufferAllocationFlag::CpuPlaced);
++#endif
++  // mappedImmediateMemory() is nullptr if this has no CPU-accessible memory
++  buffer_pool.push_back(buffer_->allocate(flags));
++  immediate_name_ = 0;
+   buffer_->rename(allocation(0));
+ }
+ 
++StagingResource::~StagingResource() {
++  RenameBudget::instance().release(renamed_bytes_);
++}
++
+ void
+ StagingResource::incRef() {
+   refcount_.fetch_add(1u, std::memory_order_acquire);
+@@ -62,28 +75,38 @@ StagingResource::unmap() {
+ uint64_t
+ StagingResource::allocate(uint64_t coherent_seq_id) {
+   std::lock_guard<dxmt::mutex> lock(mutex_);
+-  uint64_t ret = ~0ull;
+-  for (;;) {
+-    if (fifo.empty()) {
+-      break;
+-    }
+-    auto entry = fifo.front();
+-    if (entry.will_free_at > coherent_seq_id) {
+-      break;
+-    }
+-    ret = entry.id;
++  if (!fifo.empty() && fifo.front().will_free_at <= coherent_seq_id) {
++    auto id = fifo.front().id;
+     fifo.pop();
+-    break;
++    return id;
++  }
++  auto &budget = RenameBudget::instance();
++  if (!budget.allows(renamed_bytes_, length)) {
++    WARN_ONCE("StagingResource: rename budget reached (", renamed_bytes_ >> 20, " MB of copies of a ", length,
++              "-byte resource), waiting for the GPU instead");
++    return kNoAllocation;
+   }
+-  if (ret == ~0ull) {
+-    Flags<BufferAllocationFlag> flags;
++  Flags<BufferAllocationFlag> flags;
+ #ifdef __i386__
+-    flags.set(BufferAllocationFlag::CpuPlaced);
++  flags.set(BufferAllocationFlag::CpuPlaced);
+ #endif
+-    buffer_pool.push_back(buffer_->allocate(flags));
+-    ret = buffer_pool.size() - 1;
++  auto new_allocation = buffer_->allocate(flags);
++  if (unlikely(!new_allocation->mappedMemory(0))) {
++    ERR_ONCE("StagingResource: no CPU-accessible memory for a ", length, "-byte copy, waiting for the GPU instead");
++    return kNoAllocation;
+   }
+-  return ret;
++  buffer_pool.push_back(std::move(new_allocation));
++  renamed_bytes_ += length;
++  budget.acquire(length);
++  return buffer_pool.size() - 1;
++}
++
++uint64_t
++StagingResource::renameWaitSeqId() {
++  std::lock_guard<dxmt::mutex> lock(mutex_);
++  if (!fifo.empty())
++    return fifo.front().will_free_at;
++  return gpu_occupied_until_finished_seq_id;
+ }
+ 
+ void
+diff --git a/src/dxmt/dxmt_staging.hpp b/src/dxmt/dxmt_staging.hpp
+index e933dfd..0b50261 100644
+--- a/src/dxmt/dxmt_staging.hpp
++++ b/src/dxmt/dxmt_staging.hpp
+@@ -25,9 +25,22 @@ public:
+   StagingMapResult tryMap(uint64_t coherent_seq_id, bool read, bool write);
+   void unmap();
+ 
++  static constexpr uint64_t kNoAllocation = ~0ull;
++
++  /**
++   * A copy to rename to: a retired one the GPU has finished with, or a new one.
++   * kNoAllocation when there is neither, because the rename budget is spent or the
++   * new copy could not get CPU-accessible memory; then wait for renameWaitSeqId().
++   */
+   uint64_t allocate(uint64_t coherent_seq_id);
+   void updateImmediateName(uint64_t current_seq_id, uint64_t allocation);
+ 
++  /**
++   * The sequence id to wait for when allocate() fails: when the oldest retired copy
++   * becomes free, or, with no retired copy, when the current one can be written in place.
++   */
++  uint64_t renameWaitSeqId();
++
+   void *
+   mappedImmediateMemory() {
+     return buffer_pool[immediate_name_]->mappedMemory(0);
+@@ -62,6 +75,7 @@ public:
+   uint64_t length;
+ 
+   StagingResource(WMT::Device device, uint64_t length, uint32_t bytes_per_row, uint32_t bytes_per_image);
++  ~StagingResource();
+ 
+ private:
+   struct QueueEntry {
+@@ -75,6 +89,8 @@ private:
+   std::atomic<uint32_t> refcount_ = {0u};
+   std::queue<QueueEntry> fifo;
+   dxmt::mutex mutex_;
++  // bytes of renamed copies in buffer_pool beyond the first allocation, held in RenameBudget
++  uint64_t renamed_bytes_ = 0;
+   bool mapped = false;
+   // prevent read from staging before
+   uint64_t cpu_coherent_after_finished_seq_id = 0;
+diff --git a/src/dxmt/dxmt_texture.cpp b/src/dxmt/dxmt_texture.cpp
+index 8da29ea..3bde4cb 100644
+--- a/src/dxmt/dxmt_texture.cpp
++++ b/src/dxmt/dxmt_texture.cpp
+@@ -1,8 +1,11 @@
+ #include "dxmt_texture.hpp"
+ #include "dxmt_residency.hpp"
++#include "log/log.hpp"
++#include "util_likely.hpp"
+ #include "wsi_platform.hpp"
+ #include <atomic>
+ #include <cassert>
++#include <utility>
+ 
+ namespace dxmt {
+ 
+@@ -175,9 +178,16 @@ Texture::allocate(Flags<TextureAllocationFlag> flags) {
+     buffer_info.memory.set(nullptr);
+ #ifdef __i386__
+     buffer_info.memory.set(wsi::aligned_malloc(bytes_per_image_, DXMT_PAGE_SIZE));
++    if (unlikely(!buffer_info.memory.ptr)) {
++      // Metal will allocate the memory itself, at an address a 32-bit process cannot reach
++      ERR_ONCE("Texture: out of address space for a CPU-visible linear texture of ", bytes_per_image_, " bytes");
++    }
+ #endif
+     auto buffer = device_.newBuffer(buffer_info);
+-    return new TextureAllocation(this, std::move(buffer), buffer_info.memory.get(), info, bytes_per_row_, flags);
++    // nullptr when the memory is GPU-private or out of a 32-bit process's reach
++    return new TextureAllocation(
++        this, std::move(buffer), buffer_info.memory.get_accessible_or_null(), info, bytes_per_row_, flags
++    );
+   }
+   auto texture = flags.test(TextureAllocationFlag::Shared) ? device_.newSharedTexture(info) : device_.newTexture(info);
+   return new TextureAllocation(this, std::move(texture), info, flags);
+diff --git a/src/dxmt/dxmt_texture.hpp b/src/dxmt/dxmt_texture.hpp
+index 9315ccf..2d3baef 100644
+--- a/src/dxmt/dxmt_texture.hpp
++++ b/src/dxmt/dxmt_texture.hpp
+@@ -213,6 +213,14 @@ public:
+     return info_.depth;
+   }
+ 
++  /**
++   * bytes of the buffer backing a linear texture allocation, 0 for other textures
++   */
++  unsigned
++  bytesPerImage() const {
++    return bytes_per_image_;
++  }
++
+   unsigned
+   width(TextureViewKey view) {
+     return std::max(info_.width >> view.mip_start, 1u);
+diff --git a/src/util/log/log.hpp b/src/util/log/log.hpp
+index 7e16e20..4aed18b 100644
+--- a/src/util/log/log.hpp
++++ b/src/util/log/log.hpp
+@@ -80,6 +80,12 @@ private:
+ 
+ #define ERR(...) Logger::err(str::format(__VA_ARGS__))
+ 
++#define WARN_ONCE(...)                                                         \
++  static bool s_warningShown = false;                                          \
++  if (!std::exchange(s_warningShown, true)) {                                  \
++    Logger::warn(str::format(__VA_ARGS__));                                    \
++  }
++
+ #define ERR_ONCE(...)                                                          \
+   static bool s_errorShown = false;                                            \
+   if (!std::exchange(s_errorShown, true)) {                                    \
+diff --git a/tests/dx11/dx11_staging_rename.cpp b/tests/dx11/dx11_staging_rename.cpp
+new file mode 100644
+index 0000000..6aa3cca
+--- /dev/null
++++ b/tests/dx11/dx11_staging_rename.cpp
+@@ -0,0 +1,205 @@
++// Regression test: repeated write-maps of a large staging resource that the GPU
++// still reads must not exhaust a 32-bit address space.
++//
++// Crysis 3 (32-bit) loads a level by writing a 4 MB staging buffer and copying it
++// to a default buffer hundreds of times without presenting or flushing. Each
++// write-map while the GPU still owes a copy made DXMT rename the staging resource
++// to a fresh 4 MB CPU allocation that was only recycled after the GPU finished;
++// nothing flushed, so the pool grew until _aligned_malloc failed and Map wrote
++// 4 MB to address 0.
++//
++// This test repeats that pattern (default 20 bursts of 300 map/write/unmap/copy
++// cycles of a 4 MB staging buffer, Flush only between bursts), counts committed
++// private 4 MB regions in its own address space, then reads the destination back
++// to check that every partial write landed and the rest of the data survived.
++//
++// usage: dx11_staging_rename [bursts] [maps_per_burst] [max_4mb_regions]
++// Exit 0: every map succeeded, the data is correct, and the number of 4 MB
++// regions stayed at or below max_4mb_regions (default 64, i.e. 256 MB).
++// Exit 1: a check failed. Exit 3: the process faulted (stock DXMT on i386).
++#include <d3d11.h>
++#include <windows.h>
++#include <chrono>
++#include <cstdio>
++#include <cstdlib>
++#include <cstring>
++
++static const UINT kSize = 4u << 20;
++static const UINT kStride = 4096; // one dword written per map, kStride apart
++
++static LONG WINAPI on_fault(EXCEPTION_POINTERS *info) {
++  std::printf("FAULT code=0x%08lx at %p (access %s 0x%p)\n", (unsigned long)info->ExceptionRecord->ExceptionCode,
++              info->ExceptionRecord->ExceptionAddress,
++              info->ExceptionRecord->NumberParameters > 1 && info->ExceptionRecord->ExceptionInformation[0] ? "write"
++                                                                                                             : "read",
++              info->ExceptionRecord->NumberParameters > 1 ? (void *)info->ExceptionRecord->ExceptionInformation[1]
++                                                          : nullptr);
++  std::fflush(stdout);
++  ExitProcess(3);
++  return EXCEPTION_EXECUTE_HANDLER;
++}
++
++struct AddressSpace {
++  unsigned regions4mb;
++  unsigned long long committed_mb;
++  unsigned long long largest_free_mb;
++};
++
++static AddressSpace measure() {
++  AddressSpace r = {};
++  MEMORY_BASIC_INFORMATION m;
++  ULONG_PTR limit = sizeof(void *) == 4 ? 0xffffffffu : (ULONG_PTR)0x7fffffffffffull;
++  ULONG_PTR a = 0x10000;
++  unsigned long long committed = 0, largest = 0;
++  while (a < limit && VirtualQuery((void *)a, &m, sizeof m)) {
++    unsigned long long size = m.RegionSize;
++    if (m.State == MEM_FREE) {
++      if (size > largest)
++        largest = size;
++    } else if (m.State == MEM_COMMIT) {
++      committed += size;
++      if (m.Type == MEM_PRIVATE && size >= kSize && size <= kSize + 0x10000)
++        r.regions4mb++;
++    }
++    ULONG_PTR next = (ULONG_PTR)m.BaseAddress + m.RegionSize;
++    if (next <= a)
++      break;
++    a = next;
++  }
++  r.committed_mb = committed >> 20;
++  r.largest_free_mb = largest >> 20;
++  return r;
++}
++
++int main(int argc, char **argv) {
++  SetUnhandledExceptionFilter(on_fault);
++  int bursts = argc > 1 ? std::atoi(argv[1]) : 20;
++  int maps = argc > 2 ? std::atoi(argv[2]) : 300;
++  unsigned max_regions = argc > 3 ? (unsigned)std::atoi(argv[3]) : 64;
++  int failures = 0;
++
++  ID3D11Device *device = nullptr;
++  ID3D11DeviceContext *context = nullptr;
++  D3D_FEATURE_LEVEL level = {};
++  HRESULT hr = D3D11CreateDevice(nullptr, D3D_DRIVER_TYPE_HARDWARE, nullptr, 0, nullptr, 0, D3D11_SDK_VERSION,
++                                 &device, &level, &context);
++  std::printf("D3D11CreateDevice hr=0x%08lx (%d-bit) bursts=%d maps/burst=%d max 4MB regions=%u\n",
++              (unsigned long)hr, (int)sizeof(void *) * 8, bursts, maps, max_regions);
++  if (FAILED(hr))
++    return 2;
++
++  D3D11_BUFFER_DESC sd = {};
++  sd.ByteWidth = kSize;
++  sd.Usage = D3D11_USAGE_STAGING;
++  sd.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
++  ID3D11Buffer *upload = nullptr;
++  hr = device->CreateBuffer(&sd, nullptr, &upload);
++  if (FAILED(hr)) {
++    std::printf("FAIL CreateBuffer(staging write) hr=0x%08lx\n", (unsigned long)hr);
++    return 1;
++  }
++  sd.CPUAccessFlags = D3D11_CPU_ACCESS_READ;
++  ID3D11Buffer *readback = nullptr;
++  hr = device->CreateBuffer(&sd, nullptr, &readback);
++  if (FAILED(hr)) {
++    std::printf("FAIL CreateBuffer(staging read) hr=0x%08lx\n", (unsigned long)hr);
++    return 1;
++  }
++  D3D11_BUFFER_DESC dd = {};
++  dd.ByteWidth = kSize;
++  dd.Usage = D3D11_USAGE_DEFAULT;
++  dd.BindFlags = D3D11_BIND_SHADER_RESOURCE;
++  ID3D11Buffer *target = nullptr;
++  hr = device->CreateBuffer(&dd, nullptr, &target);
++  if (FAILED(hr)) {
++    std::printf("FAIL CreateBuffer(default) hr=0x%08lx\n", (unsigned long)hr);
++    return 1;
++  }
++
++  D3D11_MAPPED_SUBRESOURCE mapped = {};
++  hr = context->Map(upload, 0, D3D11_MAP_WRITE, 0, &mapped);
++  if (FAILED(hr) || !mapped.pData) {
++    std::printf("FAIL initial Map hr=0x%08lx pData=%p\n", (unsigned long)hr, mapped.pData);
++    return 1;
++  }
++  std::memset(mapped.pData, 0xab, kSize);
++  context->Unmap(upload, 0);
++
++  AddressSpace start = measure();
++  std::printf("start: 4MB regions %u, committed %llu MB, largest free %llu MB\n", start.regions4mb,
++              start.committed_mb, start.largest_free_mb);
++
++  const UINT slots = kSize / kStride;
++  unsigned peak = start.regions4mb;
++  double worst_burst_ms = 0, total_ms = 0;
++  unsigned long long last_value = 0;
++  for (int b = 0; b < bursts && !failures; b++) {
++    auto t0 = std::chrono::steady_clock::now();
++    for (int i = 0; i < maps; i++) {
++      hr = context->Map(upload, 0, D3D11_MAP_WRITE, 0, &mapped);
++      if (FAILED(hr) || !mapped.pData) {
++        std::printf("FAIL Map burst %d map %d hr=0x%08lx pData=%p\n", b, i, (unsigned long)hr, mapped.pData);
++        failures++;
++        break;
++      }
++      unsigned value = (unsigned)(b * maps + i) + 1;
++      // partial write: everything else must be preserved by a rename
++      ((volatile unsigned *)mapped.pData)[(value % slots) * (kStride / 4)] = value;
++      last_value = value;
++      context->Unmap(upload, 0);
++      context->CopyResource(target, upload);
++    }
++    auto t1 = std::chrono::steady_clock::now();
++    double ms = std::chrono::duration<double, std::milli>(t1 - t0).count();
++    total_ms += ms;
++    if (ms > worst_burst_ms)
++      worst_burst_ms = ms;
++    AddressSpace now = measure();
++    if (now.regions4mb > peak)
++      peak = now.regions4mb;
++    std::printf("burst %2d: %8.2f ms (%.3f ms/map), 4MB regions %u, committed %llu MB, largest free %llu MB\n", b,
++                ms, ms / maps, now.regions4mb, now.committed_mb, now.largest_free_mb);
++    std::fflush(stdout);
++    context->Flush();
++  }
++
++  if (!failures) {
++    context->CopyResource(readback, target);
++    hr = context->Map(readback, 0, D3D11_MAP_READ, 0, &mapped);
++    if (FAILED(hr) || !mapped.pData) {
++      std::printf("FAIL readback Map hr=0x%08lx\n", (unsigned long)hr);
++      failures++;
++    } else {
++      // expected: slot s holds the last value v with v % slots == s, or 0xabababab if never written
++      const unsigned *data = (const unsigned *)mapped.pData;
++      unsigned bad = 0;
++      for (UINT s = 0; s < slots; s++) {
++        unsigned long long v = last_value;
++        while (v > 0 && v % slots != s)
++          v--;
++        unsigned want = v ? (unsigned)v : 0xababababu;
++        if (data[s * (kStride / 4)] != want || data[s * (kStride / 4) + 1] != 0xababababu)
++          bad++;
++      }
++      context->Unmap(readback, 0);
++      std::printf("%s readback: %u of %u slots wrong\n", bad ? "FAIL" : "PASS", bad, slots);
++      if (bad)
++        failures++;
++    }
++  }
++
++  bool bounded = peak <= max_regions;
++  std::printf("%s peak 4MB regions %u (start %u, limit %u)\n", bounded ? "PASS" : "FAIL", peak, start.regions4mb,
++              max_regions);
++  if (!bounded)
++    failures++;
++  std::printf("time: total %.1f ms, worst burst %.1f ms, mean %.3f ms/map\n", total_ms, worst_burst_ms,
++              bursts && maps ? total_ms / ((double)bursts * maps) : 0.0);
++  std::printf("%s\n", failures ? "RESULT FAIL" : "RESULT PASS");
++  readback->Release();
++  target->Release();
++  upload->Release();
++  context->Release();
++  device->Release();
++  return failures ? 1 : 0;
++}
+diff --git a/tests/dx11/meson.build b/tests/dx11/meson.build
+index 923a32a..2390168 100644
+--- a/tests/dx11/meson.build
++++ b/tests/dx11/meson.build
+@@ -33,3 +33,7 @@ executable('dx11_hdr_pq', ['dx11_hdr_pq.cpp'],
+ executable('dx11_buffer_rtv', ['dx11_buffer_rtv.cpp'],
+   dependencies: [ lib_d3d11 ]
+ )
++
++executable(dx11_staging_rename, [dx11_staging_rename.cpp],
++  dependencies: [ lib_d3d11 ]
++)
+-- 
+2.56.0
+

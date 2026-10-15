@@ -1,0 +1,104 @@
+From 8bad5a1ff7d7c785c71ba9dbae9f3658bb18ec62 Mon Sep 17 00:00:00 2001
+From: Gigi <42325924+g-cqd@users.noreply.github.com>
+Date: Sun, 11 Oct 2026 22:07:26 +0200
+Subject: [PATCH 3/6] fix(d3d11): retry pipelines whose compile lost the
+ compiler service
+
+When Apple's compiler service crashes on one pipeline, every pipeline
+compiling at that moment fails with XPC_ERROR_CONNECTION_INTERRUPTED,
+valid ones included, and their draws are then dropped. Retry pipeline
+creation up to twice when the error is an interrupted connection; the
+service has restarted by then.
+
+tests/dx11/dx11_failed_pipeline "all" mode, 5 runs per arch: without the
+retry the valid geometry-shader pipeline failed too in 1 of 5 x86_64 runs
+(2 of 7 counting earlier runs), with it 0 of 10 runs; the retries are
+spent only on the pipeline that crashes the compiler.
+---
+ src/d3d11/d3d11_pipeline.cpp    |  2 +-
+ src/d3d11/d3d11_pipeline.hpp    | 27 +++++++++++++++++++++++++++
+ src/d3d11/d3d11_pipeline_gs.cpp |  2 +-
+ src/d3d11/d3d11_pipeline_ts.cpp |  3 +--
+ 4 files changed, 30 insertions(+), 4 deletions(-)
+
+diff --git a/src/d3d11/d3d11_pipeline.cpp b/src/d3d11/d3d11_pipeline.cpp
+index 8ea32be..2f26b7d 100644
+--- a/src/d3d11/d3d11_pipeline.cpp
++++ b/src/d3d11/d3d11_pipeline.cpp
+@@ -96,7 +96,7 @@ public:
+     info.immutable_vertex_buffers = (1 << 16) | (1 << 29) | (1 << 30);
+     info.immutable_fragment_buffers = (1 << 29) | (1 << 30);
+ 
+-    state_ = device_->GetMTLDevice().newRenderPipelineState(info, err);
++    state_ = NewRenderPipelineStateRetryingInterrupted(device_->GetMTLDevice(), info, err);
+ 
+     if (state_ == nullptr) {
+       ERR("Failed to create PSO: ", err.description().getUTF8String());
+diff --git a/src/d3d11/d3d11_pipeline.hpp b/src/d3d11/d3d11_pipeline.hpp
+index 1a9c4f4..dedd095 100644
+--- a/src/d3d11/d3d11_pipeline.hpp
++++ b/src/d3d11/d3d11_pipeline.hpp
+@@ -6,6 +6,33 @@
+ #include "d3d11_shader.hpp"
+ #include "d3d11_state_object.hpp"
+ #include "util_hash.hpp"
++#include "log/log.hpp"
++#include <string>
++
++namespace dxmt {
++
++/**
++Creates a render pipeline state and retries when the connection to the Metal compiler
++service was interrupted. On M1/M2 GPUs the service crashes on some mesh pipelines (a
++pixel shader reading a varying the geometry shader does not write; Crysis 3). Every
++pipeline compiling at that moment then fails with XPC_ERROR_CONNECTION_INTERRUPTED,
++valid ones included; those compile once the service has restarted.
++*/
++template <typename Info>
++WMT::Reference<WMT::RenderPipelineState>
++NewRenderPipelineStateRetryingInterrupted(WMT::Device device, const Info &info, WMT::Reference<WMT::Error> &err) {
++  constexpr unsigned kMaxRetries = 2;
++  auto pso = device.newRenderPipelineState(info, err);
++  for (unsigned retry = 1; !pso && err && retry <= kMaxRetries; retry++) {
++    if (err.description().getUTF8String().find("XPC_ERROR_CONNECTION_INTERRUPTED") == std::string::npos)
++      break;
++    WARN("Metal compiler service connection interrupted, retrying pipeline creation (", retry, "/", kMaxRetries, ")");
++    pso = device.newRenderPipelineState(info, err);
++  }
++  return pso;
++}
++
++} // namespace dxmt
+ 
+ struct MTL_GRAPHICS_PIPELINE_DESC {
+   ManagedShader VertexShader;
+diff --git a/src/d3d11/d3d11_pipeline_gs.cpp b/src/d3d11/d3d11_pipeline_gs.cpp
+index 3868ce1..2567933 100644
+--- a/src/d3d11/d3d11_pipeline_gs.cpp
++++ b/src/d3d11/d3d11_pipeline_gs.cpp
+@@ -130,7 +130,7 @@ public:
+ 
+     info.raster_sample_count = SampleCount;
+ 
+-    state_mesh_ = device_->GetMTLDevice().newRenderPipelineState(info, err);
++    state_mesh_ = NewRenderPipelineStateRetryingInterrupted(device_->GetMTLDevice(), info, err);
+ 
+     if (state_mesh_ == nullptr) {
+       ERR("Failed to create mesh PSO (", shader_names_, "): ", err.description().getUTF8String());
+diff --git a/src/d3d11/d3d11_pipeline_ts.cpp b/src/d3d11/d3d11_pipeline_ts.cpp
+index 5332f2f..9212f97 100644
+--- a/src/d3d11/d3d11_pipeline_ts.cpp
++++ b/src/d3d11/d3d11_pipeline_ts.cpp
+@@ -164,8 +164,7 @@ public:
+ 
+     {
+       std::lock_guard<dxmt::mutex> lock(ts_global_mutex);
+-      state_rasterization_ =
+-          device_->GetMTLDevice().newRenderPipelineState(info, err);
++      state_rasterization_ = NewRenderPipelineStateRetryingInterrupted(device_->GetMTLDevice(), info, err);
+     }
+     if (state_rasterization_ == nullptr) {
+       ERR("Failed to create tessellation raster PSO (", shader_names_, "): ",
+-- 
+2.56.0
+

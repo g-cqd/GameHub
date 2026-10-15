@@ -1,0 +1,34 @@
+winemac: Emulate display modes and use native full screen for covering windows.
+
+An exclusive full-screen DXGI swap chain makes DXMT call
+ChangeDisplaySettingsEx(CDS_FULLSCREEN). On a Retina desktop at 120 Hz it
+asks for the desktop size at 60 Hz, which winemac resolves to the 1:1
+low-resolution mode of that size: it captured every display and switched
+the hardware mode, turning Retina mode off for every window, all on the
+main thread while the game's thread waited. Battlefield 4 hung right after
+that switch and Battlefield 3 ended up neither full screen nor focused.
+
+With the new FullscreenMode setting (HKCU\Software\Wine\Mac Driver,
+prefix-wide; native by default, borderless, or legacy for the old
+behaviour):
+
+- The driver reports only the current mode, so win32u emulates the others:
+  it lists the native mode with the standard sizes below it, keeps the mode
+  a program sets as the current one for EnumDisplaySettings, GetMonitorInfo
+  and DXGI, and scales windows and input to the physical mode.
+  ChangeDisplaySettings never touches the hardware or captures displays.
+
+- In native mode, an unowned top-level window without a title bar that
+  covers its monitor and draws with Metal, OpenGL or D3DMetal enters a
+  native macOS full-screen space, asynchronously, and the application is
+  activated with the window key. GDI-only windows stay borderless windows.
+  In the space the Win32 frame is kept and AppKit's frame (below the camera
+  housing) is not reported back; the content view's bounds fit the content
+  into it, keeping the aspect ratio, and mouse events, GetCursorPos,
+  SetCursorPos and ClipCursor are mapped through the same scaling. Leaving
+  the space by hand stops re-entry until Win32 changes its mind.
+
+- The letterbox mask of an emulated mode is now in content view
+  coordinates and Cocoa units (it was in Win32 screen pixels), and is drawn
+  in the scaled coordinates while in the space. In Retina mode the Metal
+  layer filters linearly, so a smaller emulated mode is resampled smoothly.

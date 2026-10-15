@@ -1,0 +1,27 @@
+ntdll: Do not pass the x87sidecar's ROSETTA_DISABLE_AOT on to child processes.
+
+The x87sidecar starts each 32-bit process it hooks with
+ROSETTA_DISABLE_AOT=1, so that Rosetta JIT-translates the whole process and
+the hook is reached. Rosetta reads the variable once, when the process
+starts, but the variable stayed in the environment, and every process the
+hooked one started inherited it. A 64-bit child never runs under the
+sidecar, yet it then lost Rosetta's ahead-of-time translation of its unix
+libraries and JIT-translated them at every start.
+
+EA's background service is such a hooked 32-bit process, and it starts
+EA's 64-bit elevation proxy (EAGEP), which must answer it within 3.5 s.
+Under a 32-bit parent with the sidecar, EAGEP took 1414 ms median from
+CreateProcess to its IPC connect (p90 1527 ms, n=8), at 1.9 times the CPU
+time of the same start with AOT (1800 against 952 ms). With this change it
+takes 932 ms (p90 955 ms, n=8, same harness, interleaved). A fresh runtime
+now also fills the AOT cache for the child's libraries (23 entries for
+EAGEP), where it created none before.
+
+preloader_exec saves the value from before the sidecar in
+WINE_X87_SAVED_ROSETTA_DISABLE_AOT ("=value", or "-" if it was unset) just
+before it execs the sidecar. The started process puts it back right after
+the cooperative handshake, before init_environment imports the unix
+environment, and removes the saved copy. The hooked process keeps JIT,
+since Rosetta has already read the variable; a 32-bit child goes through
+the sidecar again, which sets the variable again for it. A value the user
+set before the sidecar is kept.

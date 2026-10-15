@@ -1,0 +1,25 @@
+win32u: Cache the macOS font file list for the wineserver session.
+
+Every process that loads user32 runs font_init(), which asks CoreText for
+the available fonts with kCTFontCollectionRemoveDuplicatesOption. Removing
+the duplicates takes 1.4 to 1.7 s per process under Rosetta (0.8 s of it
+CPU in the process) for 2942 descriptors, against 70 ms without the
+option, and it is the whole of the 1.4 s gap seen after the scan of
+share/wine/fonts. EA's elevation proxy (EAGEP) paid it before it could
+answer the EA background service, which gives up after 3.5 s.
+
+CoreText does not keep the first file of a set of duplicates (30 of 707
+sets keep another one here), so the de-duplication cannot be redone
+cheaply without changing which fonts load. Instead, the first process of
+a wineserver session stores the resulting file list, in load order, in
+the volatile key HKCU\Software\Wine\Fonts\MacFontCache, with the device,
+inode and modification time of the standard font folders and of the
+folder of every listed file. Later processes replay the list while those
+folders are unchanged, and ask CoreText again otherwise. The fonts are
+parsed and added exactly as before, in the same order, so the font list
+does not change. WINE_MAC_FONT_CACHE=0 disables the cache.
+
+Fonts that CoreText activates without changing a folder, such as Font
+Book activation of a font in place or fonts an application registers
+for the session, are seen at the next wineserver start rather than at
+the next process start.
