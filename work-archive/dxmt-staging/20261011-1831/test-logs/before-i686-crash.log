@@ -1,0 +1,33 @@
+compatdb: wineboot.exe [x86_64]
+compatdb:   rules = stgtest-0
+compatdb:   dxgi = dxmt (from /Volumes/ExT2/GameHub/Runtimes/hub-0-winemacfs-dxmtstg/lib/wine/dxgi/dxmt)
+compatdb:   d3d9 = mtld3d (from /Volumes/ExT2/GameHub/Runtimes/hub-0-winemacfs-dxmtstg/lib/wine/d3d9/mtld3d)
+compatdb: services.exe [x86_64]
+compatdb:   rules = stgtest-0
+compatdb:   dxgi = dxmt (from /Volumes/ExT2/GameHub/Runtimes/hub-0-winemacfs-dxmtstg/lib/wine/dxgi/dxmt)
+compatdb:   d3d9 = mtld3d (from /Volumes/ExT2/GameHub/Runtimes/hub-0-winemacfs-dxmtstg/lib/wine/d3d9/mtld3d)
+compatdb: winedevice.exe [x86_64]
+compatdb:   rules = stgtest-0
+compatdb:   dxgi = dxmt (from /Volumes/ExT2/GameHub/Runtimes/hub-0-winemacfs-dxmtstg/lib/wine/dxgi/dxmt)
+compatdb:   d3d9 = mtld3d (from /Volumes/ExT2/GameHub/Runtimes/hub-0-winemacfs-dxmtstg/lib/wine/d3d9/mtld3d)
+compatdb: plugplay.exe [x86_64]
+compatdb:   rules = stgtest-0
+compatdb:   dxgi = dxmt (from /Volumes/ExT2/GameHub/Runtimes/hub-0-winemacfs-dxmtstg/lib/wine/dxgi/dxmt)
+compatdb:   d3d9 = mtld3d (from /Volumes/ExT2/GameHub/Runtimes/hub-0-winemacfs-dxmtstg/lib/wine/d3d9/mtld3d)
+compatdb: svchost.exe [x86_64]
+compatdb:   rules = stgtest-0
+compatdb:   dxgi = dxmt (from /Volumes/ExT2/GameHub/Runtimes/hub-0-winemacfs-dxmtstg/lib/wine/dxgi/dxmt)
+compatdb:   d3d9 = mtld3d (from /Volumes/ExT2/GameHub/Runtimes/hub-0-winemacfs-dxmtstg/lib/wine/d3d9/mtld3d)
+compatdb: winedevice.exe [x86_64]
+compatdb:   rules = stgtest-0
+compatdb:   dxgi = dxmt (from /Volumes/ExT2/GameHub/Runtimes/hub-0-winemacfs-dxmtstg/lib/wine/dxgi/dxmt)
+compatdb:   d3d9 = mtld3d (from /Volumes/ExT2/GameHub/Runtimes/hub-0-winemacfs-dxmtstg/lib/wine/d3d9/mtld3d)
+compatdb: staging_rename_test-i686.exe [i386]
+compatdb:   rules = stgtest-0
+compatdb:   dxgi = dxmt (from /Volumes/ExT2/GameHub/Runtimes/hub-0-winemacfs-dxmtstg/lib/wine/dxgi/dxmt)
+compatdb:   d3d9 = mtld3d (from /Volumes/ExT2/GameHub/Runtimes/hub-0-winemacfs-dxmtstg/lib/wine/d3d9/mtld3d)
+info:  Maximum supported feature level: D3D_FEATURE_LEVEL_11_1
+info:  Using feature level D3D_FEATURE_LEVEL_11_0
+D3D11CreateDevice hr=0x00000000 (32-bit) bursts=2 maps/burst=1000 max 4MB regions=64
+start: 4MB regions 2, committed 55 MB, largest free 2048 MB
+FAULT code=0xc0000005 at 7AF96959 (access write 0x00000000)

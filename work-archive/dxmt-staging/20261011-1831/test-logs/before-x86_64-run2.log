@@ -1,0 +1,56 @@
+compatdb: wineboot.exe [x86_64]
+compatdb:   rules = stgtest-0
+compatdb:   dxgi = dxmt (from /Volumes/ExT2/GameHub/Runtimes/hub-0-winemacfs-dxmtstg-base/lib/wine/dxgi/dxmt)
+compatdb:   d3d9 = mtld3d (from /Volumes/ExT2/GameHub/Runtimes/hub-0-winemacfs-dxmtstg-base/lib/wine/d3d9/mtld3d)
+compatdb: services.exe [x86_64]
+compatdb:   rules = stgtest-0
+compatdb:   dxgi = dxmt (from /Volumes/ExT2/GameHub/Runtimes/hub-0-winemacfs-dxmtstg-base/lib/wine/dxgi/dxmt)
+compatdb:   d3d9 = mtld3d (from /Volumes/ExT2/GameHub/Runtimes/hub-0-winemacfs-dxmtstg-base/lib/wine/d3d9/mtld3d)
+compatdb: winedevice.exe [x86_64]
+compatdb:   rules = stgtest-0
+compatdb:   dxgi = dxmt (from /Volumes/ExT2/GameHub/Runtimes/hub-0-winemacfs-dxmtstg-base/lib/wine/dxgi/dxmt)
+compatdb:   d3d9 = mtld3d (from /Volumes/ExT2/GameHub/Runtimes/hub-0-winemacfs-dxmtstg-base/lib/wine/d3d9/mtld3d)
+compatdb: plugplay.exe [x86_64]
+compatdb:   rules = stgtest-0
+compatdb:   dxgi = dxmt (from /Volumes/ExT2/GameHub/Runtimes/hub-0-winemacfs-dxmtstg-base/lib/wine/dxgi/dxmt)
+compatdb:   d3d9 = mtld3d (from /Volumes/ExT2/GameHub/Runtimes/hub-0-winemacfs-dxmtstg-base/lib/wine/d3d9/mtld3d)
+compatdb: svchost.exe [x86_64]
+compatdb:   rules = stgtest-0
+compatdb:   dxgi = dxmt (from /Volumes/ExT2/GameHub/Runtimes/hub-0-winemacfs-dxmtstg-base/lib/wine/dxgi/dxmt)
+compatdb:   d3d9 = mtld3d (from /Volumes/ExT2/GameHub/Runtimes/hub-0-winemacfs-dxmtstg-base/lib/wine/d3d9/mtld3d)
+compatdb: winedevice.exe [x86_64]
+compatdb:   rules = stgtest-0
+compatdb:   dxgi = dxmt (from /Volumes/ExT2/GameHub/Runtimes/hub-0-winemacfs-dxmtstg-base/lib/wine/dxgi/dxmt)
+compatdb:   d3d9 = mtld3d (from /Volumes/ExT2/GameHub/Runtimes/hub-0-winemacfs-dxmtstg-base/lib/wine/d3d9/mtld3d)
+compatdb: staging_rename_test-x86_64.exe [x86_64]
+compatdb:   rules = stgtest-0
+compatdb:   dxgi = dxmt (from /Volumes/ExT2/GameHub/Runtimes/hub-0-winemacfs-dxmtstg-base/lib/wine/dxgi/dxmt)
+compatdb:   d3d9 = mtld3d (from /Volumes/ExT2/GameHub/Runtimes/hub-0-winemacfs-dxmtstg-base/lib/wine/d3d9/mtld3d)
+info:  Maximum supported feature level: D3D_FEATURE_LEVEL_11_1
+info:  Using feature level D3D_FEATURE_LEVEL_11_0
+D3D11CreateDevice hr=0x00000000 (64-bit) bursts=20 maps/burst=300 max 4MB regions=100000
+start: 4MB regions 0, committed 59 MB, largest free 117435343 MB
+burst  0:   345.24 ms (1.151 ms/map), 4MB regions 1, committed 63 MB, largest free 117435343 MB
+burst  1:   113.88 ms (0.380 ms/map), 4MB regions 1, committed 63 MB, largest free 117435343 MB
+burst  2:   246.23 ms (0.821 ms/map), 4MB regions 1, committed 63 MB, largest free 117435343 MB
+burst  3:   195.91 ms (0.653 ms/map), 4MB regions 1, committed 63 MB, largest free 117435343 MB
+burst  4:   101.63 ms (0.339 ms/map), 4MB regions 1, committed 63 MB, largest free 117435343 MB
+burst  5:    38.70 ms (0.129 ms/map), 4MB regions 1, committed 63 MB, largest free 117435343 MB
+burst  6:    40.34 ms (0.134 ms/map), 4MB regions 1, committed 63 MB, largest free 117435343 MB
+burst  7:    42.44 ms (0.141 ms/map), 4MB regions 1, committed 63 MB, largest free 117435343 MB
+burst  8:    44.87 ms (0.150 ms/map), 4MB regions 1, committed 63 MB, largest free 117435343 MB
+burst  9:    41.23 ms (0.137 ms/map), 4MB regions 1, committed 63 MB, largest free 117435343 MB
+burst 10:    40.58 ms (0.135 ms/map), 4MB regions 1, committed 63 MB, largest free 117435343 MB
+burst 11:    40.94 ms (0.136 ms/map), 4MB regions 1, committed 63 MB, largest free 117435343 MB
+burst 12:    45.15 ms (0.151 ms/map), 4MB regions 1, committed 63 MB, largest free 117435343 MB
+burst 13:    39.56 ms (0.132 ms/map), 4MB regions 1, committed 63 MB, largest free 117435343 MB
+burst 14:    39.86 ms (0.133 ms/map), 4MB regions 1, committed 63 MB, largest free 117435343 MB
+burst 15:    39.66 ms (0.132 ms/map), 4MB regions 1, committed 63 MB, largest free 117435343 MB
+burst 16:    41.32 ms (0.138 ms/map), 4MB regions 1, committed 63 MB, largest free 117435343 MB
+burst 17:    45.61 ms (0.152 ms/map), 4MB regions 1, committed 63 MB, largest free 117435343 MB
+burst 18:    42.52 ms (0.142 ms/map), 4MB regions 1, committed 63 MB, largest free 117435343 MB
+burst 19:    39.67 ms (0.132 ms/map), 4MB regions 1, committed 63 MB, largest free 117435343 MB
+PASS readback: 0 of 1024 slots wrong
+PASS peak 4MB regions 1 (start 0, limit 100000)
+time: total 1625.4 ms, worst burst 345.2 ms, mean 0.271 ms/map
+RESULT PASS

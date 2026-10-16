@@ -1,0 +1,33 @@
+compatdb: staging_rename_test-i686.exe [i386]
+compatdb:   rules = stgtest-0
+compatdb:   dxgi = dxmt (from /Volumes/ExT2/GameHub/Runtimes/hub-0-winemacfs-dxmtstg/lib/wine/dxgi/dxmt)
+compatdb:   d3d9 = mtld3d (from /Volumes/ExT2/GameHub/Runtimes/hub-0-winemacfs-dxmtstg/lib/wine/d3d9/mtld3d)
+info:  Maximum supported feature level: D3D_FEATURE_LEVEL_11_1
+info:  Using feature level D3D_FEATURE_LEVEL_11_0
+warn:  StagingResource: rename budget reached (64 MB of copies of a 4194304-byte resource), waiting for the GPU instead
+D3D11CreateDevice hr=0x00000000 (32-bit) bursts=20 maps/burst=300 max 4MB regions=64
+start: 4MB regions 2, committed 55 MB, largest free 2048 MB
+burst  0:    79.90 ms (0.266 ms/map), 4MB regions 19, committed 124 MB, largest free 2048 MB
+burst  1:    57.20 ms (0.191 ms/map), 4MB regions 19, committed 124 MB, largest free 2048 MB
+burst  2:    60.62 ms (0.202 ms/map), 4MB regions 19, committed 124 MB, largest free 2048 MB
+burst  3:    57.11 ms (0.190 ms/map), 4MB regions 19, committed 124 MB, largest free 2048 MB
+burst  4:    58.68 ms (0.196 ms/map), 4MB regions 19, committed 124 MB, largest free 2048 MB
+burst  5:    55.98 ms (0.187 ms/map), 4MB regions 19, committed 124 MB, largest free 2048 MB
+burst  6:    58.66 ms (0.196 ms/map), 4MB regions 19, committed 124 MB, largest free 2048 MB
+burst  7:    57.02 ms (0.190 ms/map), 4MB regions 19, committed 124 MB, largest free 2048 MB
+burst  8:    57.64 ms (0.192 ms/map), 4MB regions 19, committed 124 MB, largest free 2048 MB
+burst  9:    65.38 ms (0.218 ms/map), 4MB regions 19, committed 124 MB, largest free 2048 MB
+burst 10:    58.06 ms (0.194 ms/map), 4MB regions 19, committed 124 MB, largest free 2048 MB
+burst 11:    62.22 ms (0.207 ms/map), 4MB regions 19, committed 124 MB, largest free 2048 MB
+burst 12:    60.94 ms (0.203 ms/map), 4MB regions 19, committed 124 MB, largest free 2048 MB
+burst 13:    74.24 ms (0.247 ms/map), 4MB regions 19, committed 124 MB, largest free 2048 MB
+burst 14:    70.19 ms (0.234 ms/map), 4MB regions 19, committed 124 MB, largest free 2048 MB
+burst 15:    67.32 ms (0.224 ms/map), 4MB regions 19, committed 124 MB, largest free 2048 MB
+burst 16:    59.77 ms (0.199 ms/map), 4MB regions 19, committed 124 MB, largest free 2048 MB
+burst 17:    58.16 ms (0.194 ms/map), 4MB regions 19, committed 124 MB, largest free 2048 MB
+burst 18:    58.56 ms (0.195 ms/map), 4MB regions 19, committed 124 MB, largest free 2048 MB
+burst 19:    59.58 ms (0.199 ms/map), 4MB regions 19, committed 124 MB, largest free 2048 MB
+PASS readback: 0 of 1024 slots wrong
+PASS peak 4MB regions 19 (start 2, limit 64)
+time: total 1237.2 ms, worst burst 79.9 ms, mean 0.206 ms/map
+RESULT PASS

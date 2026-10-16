@@ -1,0 +1,39 @@
+compatdb: wineboot.exe [x86_64]
+compatdb:   rules = stgtest-0
+compatdb:   dxgi = dxmt (from /Volumes/ExT2/GameHub/Runtimes/hub-0-winemacfs-dxmtstg/lib/wine/dxgi/dxmt)
+compatdb:   d3d9 = mtld3d (from /Volumes/ExT2/GameHub/Runtimes/hub-0-winemacfs-dxmtstg/lib/wine/d3d9/mtld3d)
+compatdb: services.exe [x86_64]
+compatdb:   rules = stgtest-0
+compatdb:   dxgi = dxmt (from /Volumes/ExT2/GameHub/Runtimes/hub-0-winemacfs-dxmtstg/lib/wine/dxgi/dxmt)
+compatdb:   d3d9 = mtld3d (from /Volumes/ExT2/GameHub/Runtimes/hub-0-winemacfs-dxmtstg/lib/wine/d3d9/mtld3d)
+compatdb: winedevice.exe [x86_64]
+compatdb:   rules = stgtest-0
+compatdb:   dxgi = dxmt (from /Volumes/ExT2/GameHub/Runtimes/hub-0-winemacfs-dxmtstg/lib/wine/dxgi/dxmt)
+compatdb:   d3d9 = mtld3d (from /Volumes/ExT2/GameHub/Runtimes/hub-0-winemacfs-dxmtstg/lib/wine/d3d9/mtld3d)
+compatdb: plugplay.exe [x86_64]
+compatdb:   rules = stgtest-0
+compatdb:   dxgi = dxmt (from /Volumes/ExT2/GameHub/Runtimes/hub-0-winemacfs-dxmtstg/lib/wine/dxgi/dxmt)
+compatdb:   d3d9 = mtld3d (from /Volumes/ExT2/GameHub/Runtimes/hub-0-winemacfs-dxmtstg/lib/wine/d3d9/mtld3d)
+compatdb: svchost.exe [x86_64]
+compatdb:   rules = stgtest-0
+compatdb:   dxgi = dxmt (from /Volumes/ExT2/GameHub/Runtimes/hub-0-winemacfs-dxmtstg/lib/wine/dxgi/dxmt)
+compatdb:   d3d9 = mtld3d (from /Volumes/ExT2/GameHub/Runtimes/hub-0-winemacfs-dxmtstg/lib/wine/d3d9/mtld3d)
+compatdb: winedevice.exe [x86_64]
+compatdb:   rules = stgtest-0
+compatdb:   dxgi = dxmt (from /Volumes/ExT2/GameHub/Runtimes/hub-0-winemacfs-dxmtstg/lib/wine/dxgi/dxmt)
+compatdb:   d3d9 = mtld3d (from /Volumes/ExT2/GameHub/Runtimes/hub-0-winemacfs-dxmtstg/lib/wine/d3d9/mtld3d)
+compatdb: staging_rename_test-i686.exe [i386]
+compatdb:   rules = stgtest-0
+compatdb:   dxgi = dxmt (from /Volumes/ExT2/GameHub/Runtimes/hub-0-winemacfs-dxmtstg/lib/wine/dxgi/dxmt)
+compatdb:   d3d9 = mtld3d (from /Volumes/ExT2/GameHub/Runtimes/hub-0-winemacfs-dxmtstg/lib/wine/d3d9/mtld3d)
+info:  Maximum supported feature level: D3D_FEATURE_LEVEL_11_1
+info:  Using feature level D3D_FEATURE_LEVEL_11_0
+warn:  StagingResource: rename budget reached (64 MB of copies of a 4194304-byte resource), waiting for the GPU instead
+D3D11CreateDevice hr=0x00000000 (32-bit) bursts=2 maps/burst=1000 max 4MB regions=64
+start: 4MB regions 2, committed 55 MB, largest free 2048 MB
+burst  0:   236.75 ms (0.237 ms/map), 4MB regions 19, committed 124 MB, largest free 2048 MB
+burst  1:   206.86 ms (0.207 ms/map), 4MB regions 19, committed 124 MB, largest free 2048 MB
+PASS readback: 0 of 1024 slots wrong
+PASS peak 4MB regions 19 (start 2, limit 64)
+time: total 443.6 ms, worst burst 236.8 ms, mean 0.222 ms/map
+RESULT PASS

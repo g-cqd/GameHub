@@ -1,0 +1,32 @@
+compatdb: staging_rename_test-x86_64.exe [x86_64]
+compatdb:   rules = stgtest-0
+compatdb:   dxgi = dxmt (from /Volumes/ExT2/GameHub/Runtimes/hub-0-winemacfs-dxmtstg-base/lib/wine/dxgi/dxmt)
+compatdb:   d3d9 = mtld3d (from /Volumes/ExT2/GameHub/Runtimes/hub-0-winemacfs-dxmtstg-base/lib/wine/d3d9/mtld3d)
+info:  Maximum supported feature level: D3D_FEATURE_LEVEL_11_1
+info:  Using feature level D3D_FEATURE_LEVEL_11_0
+D3D11CreateDevice hr=0x00000000 (64-bit) bursts=20 maps/burst=300 max 4MB regions=100000
+start: 4MB regions 0, committed 59 MB, largest free 117435343 MB
+burst  0:   326.60 ms (1.089 ms/map), 4MB regions 1, committed 63 MB, largest free 117435343 MB
+burst  1:    92.14 ms (0.307 ms/map), 4MB regions 1, committed 63 MB, largest free 117435343 MB
+burst  2:    49.41 ms (0.165 ms/map), 4MB regions 1, committed 63 MB, largest free 117435343 MB
+burst  3:    40.68 ms (0.136 ms/map), 4MB regions 1, committed 63 MB, largest free 117435343 MB
+burst  4:    42.89 ms (0.143 ms/map), 4MB regions 1, committed 63 MB, largest free 117435343 MB
+burst  5:    41.15 ms (0.137 ms/map), 4MB regions 1, committed 63 MB, largest free 117435343 MB
+burst  6:    40.12 ms (0.134 ms/map), 4MB regions 1, committed 63 MB, largest free 117435343 MB
+burst  7:    40.46 ms (0.135 ms/map), 4MB regions 1, committed 63 MB, largest free 117435343 MB
+burst  8:    40.15 ms (0.134 ms/map), 4MB regions 1, committed 63 MB, largest free 117435343 MB
+burst  9:    44.27 ms (0.148 ms/map), 4MB regions 1, committed 63 MB, largest free 117435343 MB
+burst 10:    39.38 ms (0.131 ms/map), 4MB regions 1, committed 63 MB, largest free 117435343 MB
+burst 11:    39.55 ms (0.132 ms/map), 4MB regions 1, committed 63 MB, largest free 117435343 MB
+burst 12:    40.27 ms (0.134 ms/map), 4MB regions 1, committed 63 MB, largest free 117435343 MB
+burst 13:    44.42 ms (0.148 ms/map), 4MB regions 1, committed 63 MB, largest free 117435343 MB
+burst 14:    39.62 ms (0.132 ms/map), 4MB regions 1, committed 63 MB, largest free 117435343 MB
+burst 15:    39.35 ms (0.131 ms/map), 4MB regions 1, committed 63 MB, largest free 117435343 MB
+burst 16:    40.69 ms (0.136 ms/map), 4MB regions 1, committed 63 MB, largest free 117435343 MB
+burst 17:    44.89 ms (0.150 ms/map), 4MB regions 1, committed 63 MB, largest free 117435343 MB
+burst 18:    39.44 ms (0.131 ms/map), 4MB regions 1, committed 63 MB, largest free 117435343 MB
+burst 19:    44.04 ms (0.147 ms/map), 4MB regions 1, committed 63 MB, largest free 117435343 MB
+PASS readback: 0 of 1024 slots wrong
+PASS peak 4MB regions 1 (start 0, limit 100000)
+time: total 1169.5 ms, worst burst 326.6 ms, mean 0.195 ms/map
+RESULT PASS

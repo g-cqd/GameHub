@@ -1,0 +1,1772 @@
+{
+  "version": 1,
+  "updated": "2026-10-16",
+  "policy": "EAAC-INVESTIGATION-CONTROL.md",
+  "active": null,
+  "next_question": "Recover the actual failure-selection condition in shared BFV/BF1 component16f0592c using isolated Wine-side context/module observation, not an unsafe pending-Mach-exception debugger detach. BFV/BF1 actual baseline signatures match exactly; no unchanged normal launch needed. Keep F1dcd29 version separate. E026 return-register hypothesis refuted only for its covered older research paths.",
+  "historical_results": [
+    {
+      "id": "H-01",
+      "question": "Does bounded embedded-PE scanning find a native driver?",
+      "evidence": "/Users/gc/.agora/work/logs/job-73.log",
+      "result": "Only outer GUI PE headers in scanned files",
+      "status": "bounded-negative",
+      "do_not_repeat_without": "New artifact hash or demonstrated scanner coverage defect"
+    },
+    {
+      "id": "H-02",
+      "question": "Do tested Brotli interpretations decode opaque resources?",
+      "evidence": "/Users/gc/.agora/work/logs/job-76.log",
+      "result": "No accepted decoded output",
+      "status": "bounded-negative",
+      "do_not_repeat_without": "Evidence identifying Brotli format or a framing defect"
+    },
+    {
+      "id": "H-03",
+      "question": "Does fourth-return substitution alone remove the captured error path?",
+      "evidence": [
+        "/Users/gc/.agora/work/logs/job-60.log",
+        "/Users/gc/.agora/work/logs/job-62.log"
+      ],
+      "result": "Sampled values still reach error callback arguments",
+      "status": "refuted-within-captured-state",
+      "do_not_repeat_without": "New relevant captured state or demonstrated replay defect"
+    },
+    {
+      "id": "H-04",
+      "question": "Does replay match preceding captured continuations?",
+      "evidence": "/Users/gc/.agora/work/logs/job-82.log",
+      "result": "Three continuations match 16 registers and next RIP; fourth reaches uncaptured memory with fatal callback arguments",
+      "status": "observed-bounded"
+    },
+    {
+      "id": "H-05",
+      "question": "Did task-90 eliminate initialization failure?",
+      "evidence": "/Users/gc/eaac-archive/eaac-acquisition-20261015/task90-test2.log",
+      "sha256": "74eeaa14947f7274036b3edfb6696985828c02236a8859fc7882e1cb372b26c6",
+      "result": "Second raw 0x101 occurs; E111000D remains at line 4311",
+      "status": "refuted-for-this-run"
+    },
+    {
+      "id": "H-06",
+      "question": "Are the core evidence artifacts intact?",
+      "evidence": "/Users/gc/eaac-archive/eaac-acquisition-20261015/evidence-integrity-audit-20261016.json",
+      "result": "Nine of nine sizes and SHA-256 hashes match",
+      "status": "observed"
+    }
+  ],
+  "new_experiment_required_fields": [
+    "id",
+    "parent_task",
+    "owner",
+    "question",
+    "alternatives",
+    "inputs_with_sha256",
+    "source_runtime_revision",
+    "prefix",
+    "command_or_query",
+    "changed_variable",
+    "predictions",
+    "semantic_predicate",
+    "capture_endpoint",
+    "runtime_limit_seconds",
+    "output_limit_bytes",
+    "prior_evidence_checked",
+    "duplicate_check",
+    "deadline_utc",
+    "outcome_decisions"
+  ],
+  "experiments": [
+    {
+      "id": "E-001",
+      "parent_task": "eaac-syscall-evidence-gate",
+      "owner": "fb477ec502ff0bb8",
+      "question": "Do stub encoding and dispatch use one consistent profile for raw 0x101?",
+      "alternatives": [
+        "Same profile in both paths",
+        "Dispatch override disagrees with stub encoder"
+      ],
+      "inputs_with_sha256": {
+        "/Users/gc/Developer/wine/dlls/ntdll/unix/winsyscall.c": "0beaa18941bd6734373a9da405152bb8c407f3dbc01f027d76760555451ec1f4",
+        "/Users/gc/Developer/wine/dlls/ntdll/unix/win10_19045_syscalls.h": "f326c46ee97b6ee57524a34343c8a09bdc73c0ce57568a425307d2b0d10358e4"
+      },
+      "source_runtime_revision": "0413180984c87789aeae6bf510878299a0f1e117; source-only analysis",
+      "prefix": "none; no execution",
+      "command_or_query": "Trace load_windows_syscall_cache, eaac_patch_windows_zw_stubs and wine_syscall_id_for_windows_nr through local source and table.",
+      "changed_variable": "none; source consistency query",
+      "predictions": {
+        "consistent": "0x101 encodes and resolves to the same named operation",
+        "inconsistent": "Win10 encoder writes 0x101 for NtInitializeRegistry but dispatch resolves it to NtGetNextThread"
+      },
+      "semantic_predicate": "Compare operation identity for table entries and actual dispatcher override",
+      "capture_endpoint": "table/cache/stub-writer call sites identified",
+      "runtime_limit_seconds": 0,
+      "output_limit_bytes": 16384,
+      "prior_evidence_checked": [
+        "H-05",
+        "task-90 note",
+        "current source"
+      ],
+      "duplicate_check": "Prior run establishes advancement, not producer/consumer profile agreement. This query examines both paths.",
+      "started_utc": "2026-10-16T11:58:30.657432+00:00",
+      "deadline_utc": "2026-10-16T12:43:30.657432+00:00",
+      "outcome_decisions": {
+        "consistent": "Proceed to next predicate",
+        "inconsistent": "Fail deployment gate; retain acquisition lane",
+        "unresolved": "Keep gate blocked; identify missing call path"
+      },
+      "ended_utc": "2026-10-16T11:59:25.622491+00:00",
+      "status": "observed-inconsistency",
+      "actual_runtime_launches": 0,
+      "actual_builds": 0,
+      "result": "Win10 stub producer assigns 0x101 to NtInitializeRegistry; shared dispatch map overwrites it to NtGetNextThread. Both foreign syscall and patched-stub paths use that map.",
+      "conclusion_boundary": "Source-level mapping inconsistency established. Correct EAAC foreign profile and remaining fatal predicate unresolved. No execution proof of a particular affected stub call.",
+      "decision": "Fail deployment gate; no production change; resume acquisition trace.",
+      "evidence": [
+        "wine/dlls/ntdll/unix/win10_19045_syscalls.h:283",
+        "wine/dlls/ntdll/unix/winsyscall.c:243",
+        "wine/dlls/ntdll/unix/winsyscall.c:410",
+        "wine/dlls/ntdll/unix/signal_x86_64.c:3205",
+        "wine/dlls/ntdll/unix/signal_x86_64.c:3672"
+      ],
+      "correction": "NtInitializeRegistry is commented out in ntdll.spec:251. Actual emitted stub/affected round trip not established; retain only table/raw-dispatch discrepancy."
+    },
+    {
+      "id": "E-002",
+      "parent_task": "task-8",
+      "owner": "fb477ec502ff0bb8",
+      "question": "Are literal opaque-resource IDs used in exception-table-delimited executable code in the complete service capture?",
+      "alternatives": [
+        "Literal-ID consumer candidate exists",
+        "No candidate within literal/linear-decode coverage"
+      ],
+      "inputs_with_sha256": {
+        "/Users/gc/Developer/GameHub/research/eaac/resource_id_consumers.py": "d444ce82f2e170b7b41428c6a0590f99fc84609b29882260f63daf3f43d840dd",
+        "/Users/gc/eaac-archive/eaac-acquisition-20261015/codex-service-complete-module.bin": "ed84fa5a5b24c6bdcf5f0d34c93eedbf9fcd38fdd2fe689c45356984cad940eb"
+      },
+      "source_runtime_revision": "Service capture from job-88; no target execution",
+      "prefix": "none",
+      "command_or_query": [
+        "/Volumes/ExT2/GameHub/work/codex-eaac-context/analysis-venv/bin/python",
+        "/Users/gc/Developer/GameHub/research/eaac/resource_id_consumers.py",
+        "/Users/gc/eaac-archive/eaac-acquisition-20261015/codex-service-complete-module.bin"
+      ],
+      "changed_variable": "Query literal resource IDs rather than prior shared-prefix bytes",
+      "predictions": {
+        "candidate": "Decoded immediate use inside valid exception-table function",
+        "none": "No decoded literal uses; consumer remains unresolved, computed IDs not excluded"
+      },
+      "semantic_predicate": "Validated PE/base/SizeOfImage; enumerate literal candidates and exact decoded immediate uses",
+      "capture_endpoint": "Structured candidate inventory or explicit incomplete error",
+      "runtime_limit_seconds": 60,
+      "output_limit_bytes": 16384,
+      "prior_evidence_checked": [
+        "gameservice-resource-api-rip-candidates.json",
+        "current-gameservice-cert-focused-ghidra.log",
+        "H-01",
+        "H-02"
+      ],
+      "duplicate_check": "Existing candidate analysis covers resource 10001 certificate consumer, not current complete-capture literal 10100/10150 uses. No decoder guess or PE scan repeated.",
+      "started_utc": "2026-10-16T12:00:23.563554+00:00",
+      "deadline_utc": "2026-10-16T12:45:23.563554+00:00",
+      "outcome_decisions": {
+        "candidate": "One focused consumer trace",
+        "none": "Close literal approach; identify a targeted resource API observation",
+        "incomplete": "Record instrumentation gap before any retry"
+      },
+      "ended_utc": "2026-10-16T12:01:46.111154+00:00",
+      "status": "bounded-negative",
+      "job": "job-97",
+      "actual_seconds": 0.994,
+      "capacity_wait_seconds": 0.1,
+      "execution_seconds": 0.9,
+      "exit_status": 0,
+      "result": "No four-byte literal 10100/10150 in executable sections; two 10001 candidates only. Computed IDs and indirect paths remain outside coverage.",
+      "evidence": "/Users/gc/eaac-archive/eaac-acquisition-20261015/resource-id-consumers-20261016.json",
+      "evidence_sha256": "bd180c173d534d7be21a8faadecbb83f248382654f520841c9f8c4cf72615b84",
+      "decision": "Close literal-ID scan approach; one targeted existing Wine resource-channel observation, no rebuild."
+    },
+    {
+      "id": "E-003",
+      "parent_task": "task-8",
+      "owner": "fb477ec502ff0bb8",
+      "question": "Are opaque resource IDs requested through Wine resource APIs before the known service initialization failure?",
+      "alternatives": [
+        "Observed resource request identifies consumption before fatal",
+        "No request observed before fatal; later/custom parsing remains unknown"
+      ],
+      "inputs_with_sha256": {
+        "/Users/gc/Developer/GameHub/research/eaac/observe_resources.py": "0f6370de3bac62dcf392c7e88d68186ee1b1e2569dbb018628a01dd3082be64d",
+        "/Volumes/ExT2/GameHub/work/eaac-current-install-20261015/prefix/drive_c/Program Files/EA/AC/EAAntiCheat.GameService.exe": "b634b7652d1e2a4d010cc10b0fcf8d27ba14e4ca2729fb47b78d5f17060a613c",
+        "/Volumes/ExT2/GameHub/work/codex-eaac-context/runtime/bin/wine": "efe44f4eb5aa258185e56237ba060e1670a9eb4dd84485da63239ad5436cd989"
+      },
+      "source_runtime_revision": "Existing research runtime; exact wine hash recorded, binary equivalence to main not assumed",
+      "prefix": "/Volumes/ExT2/GameHub/work/eaac-current-install-20261015/prefix",
+      "command_or_query": [
+        "python3",
+        "/Users/gc/Developer/GameHub/research/eaac/observe_resources.py"
+      ],
+      "changed_variable": "Enable resource and module channels on already reproduced isolated service startup",
+      "predictions": {
+        "requested": "LdrFindResource trace shows 10100/10150 before endpoint",
+        "none": "Known fatal with functioning resource traces but no opaque-ID event"
+      },
+      "semantic_predicate": "Require nonzero resource traces and observed endpoint; inspect module/IDs; deadline or output limit is incomplete, not negative",
+      "capture_endpoint": "First known fatal message, process exit,30s deadline or16MiB log",
+      "runtime_limit_seconds": 35,
+      "output_limit_bytes": 16777216,
+      "prior_evidence_checked": [
+        "E-002",
+        "codex-service-complete-run.log",
+        "current-installer-private-file-trace.log"
+      ],
+      "duplicate_check": "Prior selected logs contain zero resource-channel events; this observes a previously absent channel without source changes.",
+      "started_utc": "2026-10-16T12:01:46.147652+00:00",
+      "deadline_utc": "2026-10-16T12:21:46.147652+00:00",
+      "outcome_decisions": {
+        "requested": "Use observed consumer to target one next analysis",
+        "none": "Close startup API-consumption approach; do not repeat unchanged service startup",
+        "incomplete": "Record missing measurement; no automatic rerun"
+      },
+      "ended_utc": "2026-10-16T12:03:11.782998+00:00",
+      "status": "observed-stage-limited",
+      "job": "job-98",
+      "exit_status": 0,
+      "target_returncode": -9,
+      "external_stop": true,
+      "actual_seconds": 6.388,
+      "execution_seconds": 6.3,
+      "result": "890 Wine resource events; no opaque-ID requests before fatal at RVA 00CB7DC5. This is not the prior 00457425 fatal stage.",
+      "conclusion_boundary": "Only current standalone startup before this fatal endpoint; no evidence of consumption by manually mapped service DLL, later installation paths or custom parser.",
+      "evidence": "/Users/gc/eaac-archive/eaac-acquisition-20261015/resource-observation-20261016.json",
+      "decision": "Do not repeat this standalone service observation. Observe installer acquisition path once with resource tracing."
+    },
+    {
+      "id": "E-004",
+      "parent_task": "task-8",
+      "owner": "fb477ec502ff0bb8",
+      "question": "Which resource IDs does the known installer path request during installation?",
+      "alternatives": [
+        "Opaque-ID requests observed",
+        "Only other resources observed",
+        "Path fails before observation"
+      ],
+      "inputs_with_sha256": {
+        "/Users/gc/Developer/GameHub/research/eaac/observe_resources.py": "aaf621d0705262f0d4af7bdaf551c9dcdc7f33f9c612b835220decf0d3550fd7",
+        "/Volumes/ExT2/GameHub/work/eaac-current-install-20261015/prefix/drive_c/Inputs/EAAntiCheat.Installer.exe": "d0396b7fe0331cef94278ed015c93012cd9ab67eb02e3775abd6660e96f5b6eb"
+      },
+      "source_runtime_revision": "Existing research runtime; exact wine hash recorded, binary equivalence to main not assumed",
+      "prefix": "/Volumes/ExT2/GameHub/work/eaac-current-install-20261015/prefix",
+      "command_or_query": [
+        "python3",
+        "/Users/gc/Developer/GameHub/research/eaac/observe_resources.py",
+        "--mode",
+        "installer"
+      ],
+      "changed_variable": "Installer entry path rather than standalone service; same resource observation method",
+      "predictions": {
+        "requested": "Resource traces identify opaque ID/module",
+        "none": "Known installation endpoint without opaque-ID event"
+      },
+      "semantic_predicate": "Trace channel active; endpoint and target exit separately recorded; identify requested IDs and module, not merely wrapper exit",
+      "capture_endpoint": "First known fatal message, process exit,30s deadline or16MiB log",
+      "runtime_limit_seconds": 35,
+      "output_limit_bytes": 16777216,
+      "prior_evidence_checked": [
+        "E-003",
+        "job-2 historical installer reproduction"
+      ],
+      "duplicate_check": "Prior installer run did not enable resource channel; this queries acquisition path rather than repeating only missing-driver check.",
+      "started_utc": "2026-10-16T12:03:11.783111+00:00",
+      "deadline_utc": "2026-10-16T12:23:11.783111+00:00",
+      "outcome_decisions": {
+        "requested": "Target observed consumer",
+        "none": "Close API resource path; no further launches this block",
+        "incomplete": "Record blocker; no automatic retry"
+      },
+      "ended_utc": "2026-10-16T12:04:45.216839+00:00",
+      "status": "incomplete-cleanup-error",
+      "job": "job-99",
+      "exit_status": 1,
+      "actual_seconds": 11.263,
+      "execution_seconds": 11.2,
+      "result": "1425 resource events; installer requests RCDATA102 and child requests RCDATA10001 twice. No opaque-ID event in retained log. Wrapper raised PermissionError during group cleanup, so target exit status and final endpoint are not established. Process inspection found no remaining EAAC target after job.",
+      "conclusion_boundary": "Positive resource calls in retained log are usable observations. No complete-run negative or installer-success claim is justified.",
+      "evidence": "/Users/gc/eaac-archive/eaac-acquisition-20261015/resource-observation-installer-20261016.log",
+      "evidence_sha256": "1f5b6ad5a253353ce202641982fd36f98b8878dd7d9c602e37a71d95d2ad61e1",
+      "decision": "No third launch. Preserve partial evidence; fix wrapper cleanup without relaunch; acquisition remains unresolved."
+    },
+    {
+      "id": "E-005",
+      "parent_task": "task-8",
+      "owner": "fb477ec502ff0bb8",
+      "question": "What command-line operation names does the installer actually recognize?",
+      "alternatives": [
+        "Recorded --install/--title names match parser",
+        "Prior invocation uses unsupported or different option semantics"
+      ],
+      "inputs_with_sha256": {
+        "/Volumes/ExT2/GameHub/work/eaac-current-install-20261015/prefix/drive_c/Inputs/EAAntiCheat.Installer.exe": "d0396b7fe0331cef94278ed015c93012cd9ab67eb02e3775abd6660e96f5b6eb"
+      },
+      "source_runtime_revision": "Publisher installer d0396b7f; existing focused Ghidra analysis",
+      "prefix": "none; static only",
+      "command_or_query": "Disassemble string helper RVA2ec80 and decode only literals referenced by the saved CLI parser; trace matched install branch.",
+      "changed_variable": "Examine parser options rather than assuming command syntax from installer exit code",
+      "predictions": {
+        "matching": "Decoded option keys and value semantics match invocation",
+        "different": "Decoded keys or branch semantics contradict prior invocation"
+      },
+      "semantic_predicate": "Helper instruction semantics and exact string bytes support decoded names; correlate with existing parser call sites",
+      "capture_endpoint": "String helper and CLI operation selection identified or explicit missing edge",
+      "runtime_limit_seconds": 60,
+      "output_limit_bytes": 16384,
+      "prior_evidence_checked": [
+        "current-installer-cli-focused-ghidra.txt",
+        "E-004"
+      ],
+      "duplicate_check": "Prior analysis preserved encrypted-string calls without decoding option names. No resource scan or target launch repeated.",
+      "started_utc": "2026-10-16T12:08:30.171545+00:00",
+      "deadline_utc": "2026-10-16T12:53:30.171545+00:00",
+      "outcome_decisions": {
+        "matching": "Follow selected branch to acquisition call",
+        "different": "Correct reproduction specification before any future launch",
+        "unresolved": "Record exact helper/branch gap"
+      },
+      "status": "partially-resolved",
+      "ended_utc": "2026-10-16T12:09:49.529071+00:00",
+      "jobs": [
+        "job-100",
+        "job-101"
+      ],
+      "result": "CLI keys are encoded byte arrays passed through helper2ec80. Identified scalar decoding loop2ee20..2ee56 and key table9f2e0. Option names not yet decoded.",
+      "decision": "Close helper-location query; apply identified scalar transform as distinct derived-data query. No target launch.",
+      "execution_seconds": 0.4
+    },
+    {
+      "id": "E-006",
+      "parent_task": "task-8",
+      "owner": "fb477ec502ff0bb8",
+      "question": "What parser option names result from the identified scalar string transformation?",
+      "alternatives": [
+        "Recorded --install/--title names match parser",
+        "Prior invocation uses unsupported or different option semantics"
+      ],
+      "inputs_with_sha256": {
+        "/Volumes/ExT2/GameHub/work/eaac-current-install-20261015/prefix/drive_c/Inputs/EAAntiCheat.Installer.exe": "d0396b7fe0331cef94278ed015c93012cd9ab67eb02e3775abd6660e96f5b6eb"
+      },
+      "source_runtime_revision": "Publisher installer d0396b7f; existing focused Ghidra analysis",
+      "prefix": "none; static only",
+      "command_or_query": "Apply helper scalar instruction arithmetic to exact parser byte arrays and key table; correlate decoded names with saved parser branch.",
+      "changed_variable": "Decode identified helper rather than treating payload encoding as unknown",
+      "predictions": {
+        "matching": "Readable option keys match invocation",
+        "different": "Recovered option keys contradict prior invocation"
+      },
+      "semantic_predicate": "Decode by source instruction arithmetic with exact32-bit wrap and table; check recognized operation branch and report derivation premises",
+      "capture_endpoint": "String helper and CLI operation selection identified or explicit missing edge",
+      "runtime_limit_seconds": 60,
+      "output_limit_bytes": 16384,
+      "prior_evidence_checked": [
+        "E-005",
+        "job-101 scalar loop"
+      ],
+      "duplicate_check": "First application of identified CLI string decoder; no compression-format guess.",
+      "started_utc": "2026-10-16T12:09:49.529313+00:00",
+      "deadline_utc": "2026-10-16T12:54:49.529313+00:00",
+      "outcome_decisions": {
+        "matching": "Follow selected branch to acquisition call",
+        "different": "Correct reproduction specification before any future launch",
+        "unresolved": "Record exact helper/branch gap"
+      },
+      "ended_utc": "2026-10-16T12:11:09.412701+00:00",
+      "status": "derived",
+      "jobs": [
+        "job-102"
+      ],
+      "result": "Decoded 26 CLI literals including install,title,read-cfg,update-title and CDN host selection. Saved parser install branch calls FUN1400200e0.",
+      "conclusion_boundary": "Derived from exact scalar loop. Vector-path equivalence and runtime branch choice not independently verified; recognized keys alone do not prove successful installation.",
+      "decision": "Follow identified install handler with focused decompilation; no launch.",
+      "evidence": "/Users/gc/eaac-archive/eaac-acquisition-20261015/cli-query-job-102.log",
+      "execution_seconds": 0.2,
+      "additional_validation": {
+        "reason": "New helper decompilation exposes vector constants; permanent decoder checks their equality to scalar masks.",
+        "command": [
+          "python3",
+          "research/eaac/decode_installer_strings.py",
+          "publisher-installer",
+          "saved-cli-parser",
+          "--helper",
+          "cli"
+        ],
+        "status": "passed",
+        "job": "job-117",
+        "result": "Pinned-artifact decoder accepts all26 CLI literals after scalar/vector mask agreement."
+      }
+    },
+    {
+      "id": "E-007",
+      "parent_task": "task-8",
+      "owner": "fb477ec502ff0bb8",
+      "question": "What does identified install handler1400200e0 invoke to install service/driver artifacts?",
+      "alternatives": [
+        "Recorded --install/--title names match parser",
+        "Prior invocation uses unsupported or different option semantics"
+      ],
+      "inputs_with_sha256": {
+        "/Volumes/ExT2/GameHub/work/eaac-current-install-20261015/prefix/drive_c/Inputs/EAAntiCheat.Installer.exe": "d0396b7fe0331cef94278ed015c93012cd9ab67eb02e3775abd6660e96f5b6eb"
+      },
+      "source_runtime_revision": "Publisher installer d0396b7f; existing focused Ghidra analysis",
+      "prefix": "none; static only",
+      "command_or_query": "Retained Ghidra project, no whole-program analysis; focused handler1400200e0..14002025e and helper14002ec80..14002efe1 for scalar/vector verification.",
+      "changed_variable": "Follow actual matched install handler rather than opaque resource guesses",
+      "predictions": {
+        "acquisition": "Handler directly extracts/downloads/starts driver acquisition",
+        "delegation": "Handler delegates through named object or indirect call; identify exact next edge"
+      },
+      "semantic_predicate": "Complete focused decompilation of selected exception-table ranges with artifact hash and language; report direct calls/indirect unresolved edge",
+      "capture_endpoint": "Two focused functions or explicit analysis failure",
+      "runtime_limit_seconds": 120,
+      "output_limit_bytes": 16384,
+      "prior_evidence_checked": [
+        "E-005",
+        "E-006",
+        "saved CLI parser install branch"
+      ],
+      "duplicate_check": "Install handler not present in prior focused CLI function output. Original temp project was deleted; replacement is retained to prevent repeated imports.",
+      "started_utc": "2026-10-16T12:11:09.412825+00:00",
+      "deadline_utc": "2026-10-16T12:56:09.412825+00:00",
+      "outcome_decisions": {
+        "acquisition": "Follow observed artifact operation",
+        "delegation": "Trace one identified callee/vtable edge",
+        "incomplete": "Record exact analysis gap, no tool switch loop"
+      },
+      "status": "observed-delegation",
+      "ended_utc": "2026-10-16T12:12:42.333987+00:00",
+      "jobs": [
+        "job-103",
+        "job-104"
+      ],
+      "result": "Install coordinator delegates first to object at offset0x20, constructed by FUN14003d524; coordinator constructor1ff74 stores its fifth parameter there. No direct driver extraction in this coordinator.",
+      "conclusion_boundary": "Static selected-function analysis. Constructor1ff74 lacks a matching pdata entry; bounded analysis used next known function as upper bound, not a proven exception-table range.",
+      "decision": "Resolve object virtual method, not another runtime launch.",
+      "evidence": [
+        "/Users/gc/eaac-archive/eaac-acquisition-20261015/installer-handler-focused-20261016.log",
+        "/Users/gc/eaac-archive/eaac-acquisition-20261015/installer-coordinator-focused-20261016.log"
+      ],
+      "execution_seconds": 19.4
+    },
+    {
+      "id": "E-008",
+      "parent_task": "task-8",
+      "owner": "fb477ec502ff0bb8",
+      "question": "Which concrete method is called on the installer coordinator offset0x20 object?",
+      "alternatives": [
+        "Recorded --install/--title names match parser",
+        "Prior invocation uses unsupported or different option semantics"
+      ],
+      "inputs_with_sha256": {
+        "/Volumes/ExT2/GameHub/work/eaac-current-install-20261015/prefix/drive_c/Inputs/EAAntiCheat.Installer.exe": "d0396b7fe0331cef94278ed015c93012cd9ab67eb02e3775abd6660e96f5b6eb"
+      },
+      "source_runtime_revision": "Publisher installer d0396b7f; existing focused Ghidra analysis",
+      "prefix": "none; static only",
+      "command_or_query": "Disassemble install coordinator and object constructor3d524; read only identified vtable slots and decompile resolved method.",
+      "changed_variable": "Resolve concrete virtual target rather than leave CFG guard wrapper as opaque",
+      "predictions": {
+        "resolved": "Exact concrete method and artifact operation identified",
+        "unresolved": "Object provenance or method slot unavailable; record missing edge"
+      },
+      "semantic_predicate": "Constructor assigns vtable; callsite offset and table entry resolve executable target; inspect that target",
+      "capture_endpoint": "Two focused functions or explicit analysis failure",
+      "runtime_limit_seconds": 120,
+      "output_limit_bytes": 16384,
+      "prior_evidence_checked": [
+        "E-007"
+      ],
+      "duplicate_check": "First concrete virtual target resolution for this install path.",
+      "started_utc": "2026-10-16T12:12:42.333987+00:00",
+      "deadline_utc": "2026-10-16T12:57:42.333987+00:00",
+      "outcome_decisions": {
+        "acquisition": "Follow observed artifact operation",
+        "delegation": "Trace one identified callee/vtable edge",
+        "incomplete": "Record exact analysis gap, no tool switch loop"
+      },
+      "status": "resolved-target",
+      "ended_utc": "2026-10-16T12:13:56.075973+00:00",
+      "jobs": [
+        "job-105",
+        "job-106"
+      ],
+      "result": "Coordinator offset0x20 object uses vtable14009f310. Slot0x18 resolves to14003dac0, which performs registry prerequisites/title registration, not driver extraction. Coordinator proceeds to next object only if this method returns true.",
+      "decision": "Decode prerequisite registry paths and compare isolated-prefix evidence before any launch.",
+      "evidence": [
+        "/Users/gc/.agora/work/logs/job-105.log",
+        "/Users/gc/eaac-archive/eaac-acquisition-20261015/install-prerequisite-focused-20261016.log"
+      ],
+      "execution_seconds": 4.2
+    },
+    {
+      "id": "E-009",
+      "parent_task": "task-8",
+      "owner": "fb477ec502ff0bb8",
+      "question": "Which registry prerequisites gate the install coordinator, and are they present in the isolated prefix?",
+      "alternatives": [
+        "Recorded --install/--title names match parser",
+        "Prior invocation uses unsupported or different option semantics"
+      ],
+      "inputs_with_sha256": {
+        "/Volumes/ExT2/GameHub/work/eaac-current-install-20261015/prefix/drive_c/Inputs/EAAntiCheat.Installer.exe": "d0396b7fe0331cef94278ed015c93012cd9ab67eb02e3775abd6660e96f5b6eb"
+      },
+      "source_runtime_revision": "Publisher installer d0396b7f; existing focused Ghidra analysis",
+      "prefix": "none; static only",
+      "command_or_query": "Focused string helper040af0; decode exact calls from prerequisite method; read only corresponding registry keys in isolated prefix.",
+      "changed_variable": "Test exact install prerequisites rather than assuming installer reaches extraction",
+      "predictions": {
+        "missing": "Required key missing in prefix text, potential early-return condition needing runtime validation",
+        "present": "Keys present; gate remains unproved, follow next concrete install method"
+      },
+      "semantic_predicate": "Decoded registry paths supported by helper; existence checked with explicit snapshot bounds; no claim of execution without trace",
+      "capture_endpoint": "Two focused functions or explicit analysis failure",
+      "runtime_limit_seconds": 120,
+      "output_limit_bytes": 16384,
+      "prior_evidence_checked": [
+        "E-008",
+        "install-prerequisite-focused-20261016.log"
+      ],
+      "duplicate_check": "First examination of resolved installation prerequisites.",
+      "started_utc": "2026-10-16T12:13:56.075973+00:00",
+      "deadline_utc": "2026-10-16T12:58:56.075973+00:00",
+      "outcome_decisions": {
+        "acquisition": "Follow observed artifact operation",
+        "delegation": "Trace one identified callee/vtable edge",
+        "incomplete": "Record exact analysis gap, no tool switch loop"
+      },
+      "instrumentation_correction": {
+        "failed_job": "job-108",
+        "cause": "One textual substitution changed slice start but not slice end, producing empty key table.",
+        "retry_reason": "Correct both bounds and assert16-byte key; no target-state change and no hypothesis result from failed decoding.",
+        "presence_correction": "Normalize trailing separators, exclude file paths and infer parent existence from serialized child keys. Initial SOFTWARE\\EA exact-only negative is not a missing-key conclusion."
+      },
+      "status": "derived-snapshot",
+      "ended_utc": "2026-10-16T12:15:47.407561+00:00",
+      "jobs": [
+        "job-107",
+        "job-108",
+        "job-109"
+      ],
+      "result": "Decoded exact registry prerequisites and minifilter settings. Corrected snapshot resolves CurrentControlSet link to ControlSet001; kernel-service and instance keys are present. Only driver file is absent. Exact-path negatives without alias resolution are invalid.",
+      "conclusion_boundary": "Presence uses exact or descendant keys because Wine omits empty parent serialization; initial exact-only presence output is superseded. Snapshot is not live-registry or executed-branch evidence.",
+      "decision": "Inspect identified kernel-service fallback03e47c before attributing failure or editing registry.",
+      "evidence": [
+        "/Users/gc/eaac-archive/eaac-acquisition-20261015/install-prerequisite-focused-20261016.log",
+        "/Users/gc/.agora/work/logs/job-109.log"
+      ],
+      "execution_seconds": 5.0,
+      "alias_correction": {
+        "supersedes": "Initial missing kernel-service key conclusion from exact path matching",
+        "evidence": "/Users/gc/eaac-archive/eaac-acquisition-20261015/kernel-service-registration-snapshot-20261016.json",
+        "link_target": "\\Registry\\Machine\\System\\ControlSet001",
+        "result": "Kernel-service and instance registration ARE present under ControlSet001. Driver file absent. No missing-key repair is justified."
+      }
+    },
+    {
+      "id": "E-010",
+      "parent_task": "task-8",
+      "owner": "fb477ec502ff0bb8",
+      "question": "Does fallback03e47c create the genuine driver file or only configure its kernel-service registration?",
+      "alternatives": [
+        "Recorded --install/--title names match parser",
+        "Prior invocation uses unsupported or different option semantics"
+      ],
+      "inputs_with_sha256": {
+        "/Volumes/ExT2/GameHub/work/eaac-current-install-20261015/prefix/drive_c/Inputs/EAAntiCheat.Installer.exe": "d0396b7fe0331cef94278ed015c93012cd9ab67eb02e3775abd6660e96f5b6eb",
+        "/Users/gc/Developer/GameHub/research/eaac/decode_installer_strings.py": "2f720811ba4e59f34cdc4a5930d5d8404694e7adfd57c18f5b7397aeb9caea69"
+      },
+      "source_runtime_revision": "Publisher installer d0396b7f; existing focused Ghidra analysis",
+      "prefix": "none; static only",
+      "command_or_query": "Focused decompilation of exact fallback range03e47c identified from prerequisite method.",
+      "changed_variable": "Follow observed kernel-service registration fallback rather than infer missing registry key is causal",
+      "predictions": {
+        "extract": "Fallback contains actual driver acquisition/write operation",
+        "registration": "Fallback only creates service/configuration for expected path"
+      },
+      "semantic_predicate": "Identify concrete APIs and any writer/acquisition call; unresolved indirect edge stays explicit",
+      "capture_endpoint": "Two focused functions or explicit analysis failure",
+      "runtime_limit_seconds": 120,
+      "output_limit_bytes": 16384,
+      "prior_evidence_checked": [
+        "E-009",
+        "install-prerequisite-focused-20261016.log"
+      ],
+      "duplicate_check": "First analysis of identified kernel-service fallback.",
+      "started_utc": "2026-10-16T12:15:47.407561+00:00",
+      "deadline_utc": "2026-10-16T13:00:47.407561+00:00",
+      "outcome_decisions": {
+        "acquisition": "Follow observed artifact operation",
+        "delegation": "Trace one identified callee/vtable edge",
+        "incomplete": "Record exact analysis gap, no tool switch loop"
+      },
+      "second_query": "Inspect registry write helpers0468c4/046998 and decode fallback literals with scalar/vector mask agreement; retained decoder code hash below.",
+      "status": "resolved-registration",
+      "ended_utc": "2026-10-16T12:18:43.562156+00:00",
+      "jobs": [
+        "job-110",
+        "job-111",
+        "job-112"
+      ],
+      "result": "Fallback configures kernel service and minifilter registry values. Decoded FltMgr,FSFilter Activity Monitor,ImagePath,Type,Start,Altitude. Two write helpers resolve to RegSetKeyValueA/RegSetValueExA. No driver acquisition/write identified in inspected fallback.",
+      "conclusion_boundary": "Static code, not proof this branch executed. Driver ownership/extraction elsewhere unresolved.",
+      "decision": "Validate exact argument normalization before advancing another install stage.",
+      "evidence": [
+        "/Users/gc/eaac-archive/eaac-acquisition-20261015/kernel-registration-fallback-focused-20261016.log",
+        "/Users/gc/eaac-archive/eaac-acquisition-20261015/kernel-registry-writers-focused-20261016.log",
+        "/Users/gc/.agora/work/logs/job-112.log"
+      ],
+      "execution_seconds": 12.2
+    },
+    {
+      "id": "E-011",
+      "parent_task": "task-8",
+      "owner": "fb477ec502ff0bb8",
+      "question": "Does the installer normalize --install and --title to the matched keys, or leave an extra hyphen?",
+      "alternatives": [
+        "Recorded --install/--title names match parser",
+        "Prior invocation uses unsupported or different option semantics"
+      ],
+      "inputs_with_sha256": {
+        "/Volumes/ExT2/GameHub/work/eaac-current-install-20261015/prefix/drive_c/Inputs/EAAntiCheat.Installer.exe": "d0396b7fe0331cef94278ed015c93012cd9ab67eb02e3775abd6660e96f5b6eb",
+        "/Users/gc/Developer/GameHub/research/eaac/decode_installer_strings.py": "2f720811ba4e59f34cdc4a5930d5d8404694e7adfd57c18f5b7397aeb9caea69"
+      },
+      "source_runtime_revision": "Publisher installer d0396b7f; existing focused Ghidra analysis",
+      "prefix": "none; static only",
+      "command_or_query": "Focused helper02dbad and exact separator bytes from CLI parser, then derive normalization for prior arguments.",
+      "changed_variable": "Verify exact option token normalization before assuming matched install branch",
+      "predictions": {
+        "recognized": "All leading hyphens removed or accepted",
+        "unrecognized": "One hyphen remains and install/title keys do not match"
+      },
+      "semantic_predicate": "Actual helper instructions plus delimiter bytes establish token behavior; runtime remains separate",
+      "capture_endpoint": "Two focused functions or explicit analysis failure",
+      "runtime_limit_seconds": 120,
+      "output_limit_bytes": 16384,
+      "prior_evidence_checked": [
+        "saved CLI parser at026a94",
+        "E-006",
+        "E-010"
+      ],
+      "duplicate_check": "Option strings decoded; normalization itself not yet analyzed.",
+      "started_utc": "2026-10-16T12:18:43.562156+00:00",
+      "deadline_utc": "2026-10-16T13:03:43.562156+00:00",
+      "outcome_decisions": {
+        "acquisition": "Follow observed artifact operation",
+        "delegation": "Trace one identified callee/vtable edge",
+        "incomplete": "Record exact analysis gap, no tool switch loop"
+      },
+      "status": "derived-recognized",
+      "ended_utc": "2026-10-16T12:20:15.532112+00:00",
+      "jobs": [
+        "job-113",
+        "job-114"
+      ],
+      "result": "Option helper trims all leading/trailing separator characters using first-not-of and last-not-of searches. Separator is UTF16 hyphen. --install maps to install and --title maps to title.",
+      "conclusion_boundary": "Static normalization proves key syntax, not which runtime branches succeeded.",
+      "decision": "Keep command syntax; follow coordinator next concrete method rather than speculate CLI typo.",
+      "evidence": [
+        "/Users/gc/eaac-archive/eaac-acquisition-20261015/option-normalization-focused-20261016.log",
+        "/Users/gc/eaac-archive/eaac-acquisition-20261015/option-trim-search-focused-20261016.log"
+      ],
+      "execution_seconds": 9.7
+    },
+    {
+      "id": "E-012",
+      "parent_task": "task-8",
+      "owner": "fb477ec502ff0bb8",
+      "question": "What concrete artifact operation follows registry prerequisites in install coordinator?",
+      "alternatives": [
+        "Recorded --install/--title names match parser",
+        "Prior invocation uses unsupported or different option semantics"
+      ],
+      "inputs_with_sha256": {
+        "/Volumes/ExT2/GameHub/work/eaac-current-install-20261015/prefix/drive_c/Inputs/EAAntiCheat.Installer.exe": "d0396b7fe0331cef94278ed015c93012cd9ab67eb02e3775abd6660e96f5b6eb",
+        "/Users/gc/Developer/GameHub/research/eaac/decode_installer_strings.py": "2f720811ba4e59f34cdc4a5930d5d8404694e7adfd57c18f5b7397aeb9caea69"
+      },
+      "source_runtime_revision": "Publisher installer d0396b7f; existing focused Ghidra analysis",
+      "prefix": "none; static only",
+      "command_or_query": "Resolve object constructor00b5d4 and virtual slot0x20 called by coordinator020147; inspect resolved method.",
+      "changed_variable": "Follow actual next coordinator stage after verified option normalization",
+      "predictions": {
+        "artifact": "Resolved method identifies artifact extraction/install operation",
+        "other": "Resolved method is another prerequisite; record exact next operation"
+      },
+      "semantic_predicate": "Constructor/vtable/callsite agree on target; selected function exposes operation or explicit missing edge",
+      "capture_endpoint": "Two focused functions or explicit analysis failure",
+      "runtime_limit_seconds": 120,
+      "output_limit_bytes": 16384,
+      "prior_evidence_checked": [
+        "E-007",
+        "E-008",
+        "E-011"
+      ],
+      "duplicate_check": "Next coordinator object offset0x10 has not been resolved previously.",
+      "started_utc": "2026-10-16T12:20:15.532112+00:00",
+      "deadline_utc": "2026-10-16T13:05:15.532112+00:00",
+      "outcome_decisions": {
+        "acquisition": "Follow observed artifact operation",
+        "delegation": "Trace one identified callee/vtable edge",
+        "incomplete": "Record exact analysis gap, no tool switch loop"
+      },
+      "status": "resolved-child-invocation",
+      "ended_utc": "2026-10-16T12:23:37.914583+00:00",
+      "jobs": [
+        "job-115",
+        "job-116"
+      ],
+      "result": "Constructor00b5d4 sets vtable09e970; slot0x20 resolves013320. Method copies installer, calls resource102 helper01075a, and later starts child with PACKER_FUNCTIONALITY suffix; WaitForSingleObject10000 followed by TerminateProcess/CloseHandle. No GetExitCodeProcess in inspected method.",
+      "conclusion_boundary": "Static chain establishes available path and child handling, not that prior runs reached/succeeded every branch. Resource102 helper internals and final virtual call unresolved. No driver recovered.",
+      "decision": "Acquire child exact arguments and module identity before choosing targeted observation. Do not reuse standalone no-argument service result as same-stage evidence.",
+      "evidence": [
+        "/Users/gc/eaac-archive/eaac-acquisition-20261015/payload-object-focused-20261016.log",
+        "/Users/gc/eaac-archive/eaac-acquisition-20261015/post-registration-install-focused-20261016.log"
+      ],
+      "execution_seconds": 14.4
+    },
+    {
+      "id": "E-013",
+      "parent_task": "task-8",
+      "owner": "fb477ec502ff0bb8",
+      "question": "How does resource102 get extracted, and what exact command/environment is constructed for the packer child?",
+      "alternatives": [
+        "Recorded --install/--title names match parser",
+        "Prior invocation uses unsupported or different option semantics"
+      ],
+      "inputs_with_sha256": {
+        "/Volumes/ExT2/GameHub/work/eaac-current-install-20261015/prefix/drive_c/Inputs/EAAntiCheat.Installer.exe": "d0396b7fe0331cef94278ed015c93012cd9ab67eb02e3775abd6660e96f5b6eb",
+        "/Users/gc/Developer/GameHub/research/eaac/decode_installer_strings.py": "2f720811ba4e59f34cdc4a5930d5d8404694e7adfd57c18f5b7397aeb9caea69"
+      },
+      "source_runtime_revision": "Publisher installer d0396b7f; existing focused Ghidra analysis",
+      "prefix": "none; static only",
+      "command_or_query": "Retained Ghidra focused resource helper01075a and apparent quote/environment helper002665; correlate with saved coordinator and existing logs.",
+      "changed_variable": "Resolve actual extraction API and argument/environment assembly rather than treating decompiler variable names as contracts",
+      "predictions": {
+        "argument": "Helper builds actual child command-line suffix",
+        "environment": "Helper builds environment block or transforms bytes, invalidating earlier suffix assumption"
+      },
+      "semantic_predicate": "Concrete API call and parameter dataflow distinguish command line from environment; exact child path remains bounded by proven object fields",
+      "capture_endpoint": "Two focused functions or explicit analysis failure",
+      "runtime_limit_seconds": 120,
+      "output_limit_bytes": 16384,
+      "prior_evidence_checked": [
+        "E-012",
+        "post-registration-install-focused-20261016.log",
+        "packer-child-argument-20261016.json"
+      ],
+      "duplicate_check": "First analysis of these two direct callees; no new target launch.",
+      "started_utc": "2026-10-16T12:27:36.038212+00:00",
+      "deadline_utc": "2026-10-16T13:12:36.038212+00:00",
+      "outcome_decisions": {
+        "acquisition": "Follow observed artifact operation",
+        "delegation": "Trace one identified callee/vtable edge",
+        "incomplete": "Record exact analysis gap, no tool switch loop"
+      },
+      "status": "resolved-extraction-child-identity",
+      "ended_utc": "2026-10-16T12:30:01.549372+00:00",
+      "jobs": [
+        "job-118"
+      ],
+      "result": "Resource102 helper uses FindResourceW/LoadResource/SizeofResource/LockResource then archive entry iteration. Existing trace identifies child as eaanticheat.gameservice.dll with exact PACKER_FUNCTIONALITY token; actual NtCreateUserProcess line captures it. Prior job2 after CatRoot correction reaches certificate/cache operations.",
+      "conclusion_boundary": "Archive helper downstream byte-write internals not fully traced; no resource102 driver asserted. Child observed in existing logs, not newly launched. No-argument service.exe capture is not this child.",
+      "decision": "Resolve post-extraction final virtual target before selecting another runtime experiment.",
+      "evidence": [
+        "/Users/gc/eaac-archive/eaac-acquisition-20261015/resource102-child-focused-20261016.log",
+        "/Users/gc/eaac-archive/eaac-acquisition-20261015/current-installer-private-install.log:947,950",
+        "/Users/gc/.agora/work/logs/job-2.log:55298,55716"
+      ],
+      "execution_seconds": 6.3
+    },
+    {
+      "id": "E-014",
+      "parent_task": "task-8",
+      "owner": "fb477ec502ff0bb8",
+      "question": "What does the final virtual call in post-registration installer013320 actually do?",
+      "alternatives": [
+        "Recorded --install/--title names match parser",
+        "Prior invocation uses unsupported or different option semantics"
+      ],
+      "inputs_with_sha256": {
+        "/Volumes/ExT2/GameHub/work/eaac-current-install-20261015/prefix/drive_c/Inputs/EAAntiCheat.Installer.exe": "d0396b7fe0331cef94278ed015c93012cd9ab67eb02e3775abd6660e96f5b6eb",
+        "/Users/gc/Developer/GameHub/research/eaac/decode_installer_strings.py": "2f720811ba4e59f34cdc4a5930d5d8404694e7adfd57c18f5b7397aeb9caea69"
+      },
+      "source_runtime_revision": "Publisher installer d0396b7f; existing focused Ghidra analysis",
+      "prefix": "none; static only",
+      "command_or_query": "Inspect final virtual slot in013320 and resolve through vtable09e970; focused analysis of resolved target.",
+      "changed_variable": "Resolve remaining concrete install stage instead of assuming packer child performs driver extraction",
+      "predictions": {
+        "driver": "Final target performs driver extraction/start",
+        "service": "Final target performs service registration or another step"
+      },
+      "semantic_predicate": "Callsite offset and constructor-established vtable resolve exact method; concrete API behavior or unresolved edge identified",
+      "capture_endpoint": "Two focused functions or explicit analysis failure",
+      "runtime_limit_seconds": 120,
+      "output_limit_bytes": 16384,
+      "prior_evidence_checked": [
+        "E-012",
+        "E-013",
+        "post-registration-install-focused-20261016.log"
+      ],
+      "duplicate_check": "Final virtual target not analyzed previously.",
+      "started_utc": "2026-10-16T12:30:01.549372+00:00",
+      "deadline_utc": "2026-10-16T13:15:01.549372+00:00",
+      "outcome_decisions": {
+        "acquisition": "Follow observed artifact operation",
+        "delegation": "Trace one identified callee/vtable edge",
+        "incomplete": "Record exact analysis gap, no tool switch loop"
+      },
+      "status": "resolved-optional-extraction",
+      "ended_utc": "2026-10-16T12:35:10.332617+00:00",
+      "jobs": [
+        "job-119",
+        "job-120"
+      ],
+      "result": "Final call in013320 uses vtable slot0x28, target013f20. If object field0x238 is nonzero, target calls the same resource102 helper01075a with another section key and destination field0x228; otherwise returns1. No child exit-code check or direct driver operation in this short method.",
+      "conclusion_boundary": "Section name remains encoded through helper01c290; no invented Title label. Extraction helper downstream write implementation not exhaustively traced. Genuine driver not recovered.",
+      "decision": "Close final-call question; no installer launch warranted. Remaining acquisition question is actual expected.sys writer or distinct service startup path.",
+      "evidence": [
+        "/Users/gc/.agora/work/logs/job-119.log",
+        "/Users/gc/eaac-archive/eaac-acquisition-20261015/final-install-method-focused-20261016.log"
+      ],
+      "execution_seconds": 6.2
+    },
+    {
+      "id": "E-015",
+      "parent_task": "task-8",
+      "owner": "fb477ec502ff0bb8",
+      "question": "Can a driver path or writer/acquisition function be identified in the service DLL from existing file and full-module capture?",
+      "alternatives": [
+        "Path-to-consumer anchor identifies writer and byte source",
+        "No validated static anchor; missing dataflow edge remains unresolved"
+      ],
+      "inputs_with_sha256": {
+        "/Volumes/ExT2/GameHub/work/eaac-current-install-20261015/prefix/drive_c/Program Files/EA/AC/EAAntiCheat.GameService.dll": "b0de4818d365f6f02a970a7eb77cb57a4b4a141e94ba177056d321da0f746e2d",
+        "/Users/gc/eaac-archive/eaac-acquisition-20261015/codex-service-complete-module.bin": "ed84fa5a5b24c6bdcf5f0d34c93eedbf9fcd38fdd2fe689c45356984cad940eb",
+        "/Users/gc/Developer/GameHub/research/eaac/driver_writer_anchors.py": "b10bedd30d6745596b90038ed117decf0d137f99ccc482315095888bffd5dca5",
+        "/Users/gc/Developer/GameHub/research/eaac/raw_writer_wrappers.py": "847b7f0c8b9af0eb38c6dc37ab6a11ac899462367bb7f390f5fd9cf17a4ab709"
+      },
+      "source_runtime_revision": "Publisher installer d0396b7f; existing focused Ghidra analysis",
+      "prefix": "none; static only",
+      "command_or_query": "Query1 bounded driver-path literal and RIP-relative consumer inventory on source PE plus complete mapped capture. Query2 focused analysis of strongest observed anchor or writer import consumer.",
+      "changed_variable": "Trace expected driver filename/path and writer APIs instead of resource IDs or compression prefixes",
+      "predictions": {
+        "anchor": "Candidate executable consumer links driver path to file write/extraction/download",
+        "no_anchor": "No validated plain-text/direct-reference anchor; obfuscated resolution or uncaptured phase remains missing"
+      },
+      "semantic_predicate": "Explicit path bytes, correctly based executable consumer, and write/acquisition call chain; report inferred types and incomplete coverage",
+      "capture_endpoint": "Two focused static queries or named missing edge",
+      "runtime_limit_seconds": 120,
+      "output_limit_bytes": 16384,
+      "prior_evidence_checked": [
+        "E-002 literal resource ID scan",
+        "E-013/E-014 installer extraction chain",
+        "current-gameservice-failing-caller-ghidra.txt",
+        "codex-service-complete-module.bin identity"
+      ],
+      "duplicate_check": "Driver path/consumer mapping on complete mapped image has not been inventoried; not an embedded-PE or resource-ID rescan.",
+      "started_utc": "2026-10-16T12:38:36.168268+00:00",
+      "deadline_utc": "2026-10-16T13:23:36.168268+00:00",
+      "outcome_decisions": {
+        "anchor": "Trace concrete bytes source",
+        "no_anchor": "Close with exact missing edge; no new launch or guessed decoder",
+        "incomplete": "Record tool limitation and stop within two-query limit"
+      },
+      "query1_result": {
+        "job": "job-121",
+        "execution_seconds": 2.4,
+        "result": "No selected plaintext driver literals or selected writer imports in either pinned artifact. Computed/encoded names and indirect imports excluded."
+      },
+      "query2": "Derive raw syscall-wrapper numbers from captured RIP-relative key values and supported straight-line EAX operations; identify NtCreateFile/NtWriteFile wrappers and direct callers. No emulated syscall execution and no invented register/memory inputs.",
+      "status": "unresolved-static-writer",
+      "ended_utc": "2026-10-16T12:47:18.392666+00:00",
+      "jobs": [
+        "job-121",
+        "job-122"
+      ],
+      "execution_seconds": 2.9,
+      "actual_builds": 0,
+      "actual_runtime_launches": 0,
+      "result": "Query1 no selected plaintext path/import anchors on file or capture. Query2 finds600 raw opcode sites and derives93 straight-line suffix values under captured key state; none identifies a selected writer wrapper. Candidate opcode reachability is unvalidated.",
+      "conclusion_boundary": "No claim that writer or driver requirement is absent. Missing edge: executed file-open/write call with driver filename/handle and its buffer producer. Encrypted names, indirect dispatch and later states remain outside coverage.",
+      "decision": "Two-query budget exhausted; close static approach. User clarifies driver-file recovery is not an unconditional goal or dependency; investigate actual anti-cheat startup failure first.",
+      "evidence": [
+        "/Users/gc/eaac-archive/eaac-acquisition-20261015/static-acquisition-job-121.log",
+        "/Users/gc/eaac-archive/eaac-acquisition-20261015/static-acquisition-job-122.log"
+      ]
+    },
+    {
+      "id": "E-016",
+      "parent_task": "task-9",
+      "owner": "fb477ec502ff0bb8",
+      "question": "Does the global0x101 override break the existing Win10 registry syscall contract, and does removing only that override repair it?",
+      "alternatives": [
+        "Override bypasses registry fallback and breaks regression cases",
+        "Existing regression does not reproduce discrepancy"
+      ],
+      "inputs_with_sha256": {
+        "/Users/gc/Developer/wine/dlls/ntdll/tests/syscall.c": "332c38697492963ed507fd3fdf72b3924c39e52676132b0f4a78312ec40cb09a",
+        "/Users/gc/Developer/wine/dlls/ntdll/unix/winsyscall.c": "0beaa18941bd6734373a9da405152bb8c407f3dbc01f027d76760555451ec1f4"
+      },
+      "source_runtime_revision": "Main0413180984c plus test selector; research runtime diagnostic fork with same override",
+      "prefix": "/Volumes/ExT2/GameHub/work/eaac-current-install-20261015/prefix",
+      "command_or_query": "Build existing syscall.c standalone with registry_dispatch selector; run baseline, remove global override, rebuild focused ntdll, rerun identical test.",
+      "changed_variable": "Only removal of global0x101 NtGetNextThread override between baseline and corrected runtime",
+      "predictions": {
+        "broken": "Existing raw registry invalid/boundary tests fail as INVALID_HANDLE",
+        "fixed": "Same tests pass using existing known-syscall registry fallback"
+      },
+      "semantic_predicate": "Wine test summary with nonzero executed assertions and zero skips; baseline must fail and same cases pass after minimal correction",
+      "capture_endpoint": "Test exit/summary; no game launch",
+      "runtime_limit_seconds": 120,
+      "output_limit_bytes": 16777216,
+      "prior_evidence_checked": [
+        "E-001 source-map gate",
+        "syscall.c existing registry cases",
+        "ntdll.spec commented NtInitializeRegistry export"
+      ],
+      "duplicate_check": "First actual behavioral regression measurement; prior gate only compared source tables and incorrectly implied an emitted NtInitializeRegistry stub.",
+      "started_utc": "2026-10-16T12:54:56.680863+00:00",
+      "deadline_utc": "2026-10-16T14:24:56.680863+00:00",
+      "outcome_decisions": {
+        "broken": "Minimal code correction then same test",
+        "not_reproduced": "No source correction; inspect runtime identity",
+        "incomplete": "Record build/instrumentation defect, no false pass"
+      },
+      "build_configuration_failures": {
+        "jobs": [
+          "job-123",
+          "job-124",
+          "job-125"
+        ],
+        "result": "Standalone harness needs console headers, USE_COMPILER_EXCEPTIONS and repositoryO2. Forced WIN32_NO_STATUS hid ntstatus definitions; corrected wrapper preserves original include order. No runtime test executed yet and no dispatcher correction applied.",
+        "rederived_configuration": "Include ntstatus first, then WIN32_NO_STATUS/windows.h, then original test source; O2 and compiler exceptions. Stop setup if this does not compile."
+      },
+      "instrumentation_change": {
+        "reason": "Standalone Wine harness reached unresolved WineCRT/debug imports. Stop that approach; diagnostic uses ordinaryMinGW runtime and same existing regression inputs with explicit raw ABI.",
+        "failed_build_jobs": [
+          "job-123",
+          "job-124",
+          "job-125",
+          "job-126"
+        ],
+        "test_selector_removed": true,
+        "probe_sha256": "9514e5fb0479c22d2ab3f7df682b1ca7cae9824f3f23f157e337904ca0a20e6f"
+      },
+      "status": "incomplete-instrumentation",
+      "ended_utc": "2026-10-16T13:05:33.884547+00:00",
+      "actual_builds": 5,
+      "actual_runtime_launches": 2,
+      "jobs": [
+        "job-123",
+        "job-124",
+        "job-125",
+        "job-126",
+        "job-127",
+        "job-128",
+        "job-129"
+      ],
+      "result": "Four harness builds failed; diagnostic probe compiled. Both launches terminated with host SIGSEGV (-11), no recorded syscall statuses or foreign syscall 0x101 trace. No baseline regression or repair demonstrated.",
+      "decision": "Stop this instrumentation approach at two launches; no dispatcher edit or deployment. Runtime identity must be established before further behavioral conclusions.",
+      "conclusion_boundary": "No conclusion about registry call behavior or E111000D causality. Host crash cause unresolved; no diagnostic reports found in user/system standard directories.",
+      "runtime_ntdll_sha256": "7b452e0816230dccbb7f4ea80cce214a1335975253ba109b8421fe40ba8ef8ed",
+      "build_ntdll_sha256": "bafd646c225789532b24577c86bf8fb09fb6e2a5c16e42abc74323c89b9b200d",
+      "evidence": [
+        {
+          "path": "/Users/gc/eaac-archive/eaac-acquisition-20261015/registry-contract-job-123.log",
+          "sha256": "b355a8c0e733d2cd7b81637cf0c9093d6b15e34bd5a5fc98058a5d5bf4862896"
+        },
+        {
+          "path": "/Users/gc/eaac-archive/eaac-acquisition-20261015/registry-contract-job-124.log",
+          "sha256": "ab3ee0c536249fd2f069573b9aa058b68ab13fd49bff41f7122a7bf32d8c2ae3"
+        },
+        {
+          "path": "/Users/gc/eaac-archive/eaac-acquisition-20261015/registry-contract-job-125.log",
+          "sha256": "fcdc08fd403586f17cca03dde94f63526b88e80af4fc4925beba36c3f2efce2a"
+        },
+        {
+          "path": "/Users/gc/eaac-archive/eaac-acquisition-20261015/registry-contract-job-126.log",
+          "sha256": "56e6885dd50cd2b6e6dd61e24057080e0b2414b3cdb10839f0ff33f8830b8544"
+        },
+        {
+          "path": "/Users/gc/eaac-archive/eaac-acquisition-20261015/registry-contract-job-127.log",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "path": "/Users/gc/eaac-archive/eaac-acquisition-20261015/registry-contract-job-128.log",
+          "sha256": "632d4c26cdfb02613addddc7e365d1942f9cb2568b77602b3f43e075b76bb2da"
+        },
+        {
+          "path": "/Users/gc/eaac-archive/eaac-acquisition-20261015/registry-contract-job-129.log",
+          "sha256": "70c1760309845f12364dcab6efa6ebfbf7ff6f39d5e46472ae654646d9bd4f68"
+        },
+        {
+          "path": "/Users/gc/eaac-archive/eaac-acquisition-20261015/registry-contract-baseline.log",
+          "sha256": "ddf9a5551dbe3683352cd1cd3e1b65ae22a41bd6ac501fd9380ac512a8e5911a"
+        },
+        {
+          "path": "/Users/gc/eaac-archive/eaac-acquisition-20261015/registry-contract-baseline-trace.log",
+          "sha256": "ea6e48b440aa2db782839f87a0937b14482cfcec33f3e5dba05377f29af7445a"
+        }
+      ]
+    },
+    {
+      "id": "E-017",
+      "parent_task": "task-9",
+      "owner": "fb477ec502ff0bb8",
+      "question": "Does diagnostic startup fail because the probe path is outside the isolated prefix drive mappings?",
+      "alternatives": [
+        "Built-in cmd works and C-drive probe reaches main/syscall",
+        "Runtime startup also fails on mapped executable"
+      ],
+      "inputs_with_sha256": {
+        "runtime_ntdll": "7b452e0816230dccbb7f4ea80cce214a1335975253ba109b8421fe40ba8ef8ed"
+      },
+      "source_runtime_revision": "Research task90-test2; every nonzero-offset Mach-O section hash matches build ntdll.so. Whole-file mismatch alone not evidence of different code.",
+      "prefix": "/Volumes/ExT2/GameHub/work/eaac-current-install-20261015/prefix",
+      "command_or_query": "One built-in cmd /c echo control; one diagnostic executable placed inside C drive, with stderr markers before each syscall.",
+      "changed_variable": "Replace inaccessible /tmp executable path with mapped C-drive path; add unbuffered measurement markers.",
+      "predictions": {
+        "path": "cmd control and C-drive executable reach explicit markers",
+        "startup": "cmd control also fails"
+      },
+      "semantic_predicate": "Require CONTROL_OK or PROBE_MAIN, then status for each syscall; no exit-only success",
+      "capture_endpoint": "Process exit or 20 second deadline; 1MiB output cap",
+      "runtime_limit_seconds": 45,
+      "output_limit_bytes": 1048576,
+      "prior_evidence_checked": [
+        "E-016",
+        "dosdevices/z: -> z-empty; /tmp executable is outside prefix mappings",
+        "identical Mach-O section hashes"
+      ],
+      "duplicate_check": "New observed path-mapping defect; does not repeat unchanged raw probe. Two launches maximum.",
+      "started_utc": "2026-10-16T13:07:40.470617+00:00",
+      "deadline_utc": "2026-10-16T13:27:40.471016+00:00",
+      "outcome_decisions": {
+        "mapped": "Record statuses, no inferred EAAC cause",
+        "startup": "Capture debugger startup next; no syscall correction"
+      },
+      "status": "observed-mapped-probe",
+      "ended_utc": "2026-10-16T13:09:08.498419+00:00",
+      "actual_builds": 1,
+      "actual_runtime_launches": 2,
+      "jobs": [
+        "job-130",
+        "job-131",
+        "job-132"
+      ],
+      "result": "Mapped cmd prints CONTROL_OK and exits0; mapped diagnostic prints PROBE_MAIN, records SIGSYS raw0x101 -> Wine0x9a and REGISTRY_RESULT=c0000008, exits0.",
+      "conclusion_boundary": "Mapped placement repairs diagnostic usability. Exact cause of previous host SIGSEGV is not proven by this comparison because source was reduced and markers added. No E111000D causal conclusion. All nonzero-offset Mach-O sections match between build and signed runtime.",
+      "decision": "Use Windows paths inside mapped C drive for diagnostics. Stop isolated registry work; prioritize observed real EA/F1 launch failure.",
+      "evidence": [
+        {
+          "path": "/Users/gc/eaac-archive/eaac-acquisition-20261015/mapped-control.log",
+          "sha256": "b916f72bdc605b70700977cb21910d939b72e6bc9b16ab8aa065ca00af2a8840"
+        },
+        {
+          "path": "/Users/gc/eaac-archive/eaac-acquisition-20261015/mapped-probe.log",
+          "sha256": "ae4d0fef8573ebfc61c57050fcf20776c3eee048ea59fb8b68a70f222482955d"
+        }
+      ]
+    },
+    {
+      "id": "E-018",
+      "parent_task": "task-9",
+      "owner": "fb477ec502ff0bb8",
+      "question": "What is the first observed blocker of the current normal authenticated F1 launch?",
+      "alternatives": [
+        "EA authentication/license blocks launch",
+        "Anti-cheat initialization fails before game",
+        "Game reaches protected gameplay"
+      ],
+      "inputs_with_sha256": {},
+      "source_runtime_revision": "Installed production runtime, unchanged; select installed EA13.809",
+      "prefix": "/Volumes/ExT2/GameHub/Prefix",
+      "command_or_query": "Start installed EA Desktop using existing startup environment; verify authentication; one EALauncher origin2 content16425782 request; correlate fresh EA logs and Wine seh traces.",
+      "changed_variable": "Current normal EA launch rather than standalone anti-cheat invocation",
+      "predictions": {
+        "auth": "Current client login/session endpoint observed",
+        "anticheat": "EA process coordinator launches anti-cheat and fatal result observed",
+        "success": "Actual F1 gameplay and genuine protection evidence"
+      },
+      "semantic_predicate": "Require client authentication state and actual launcher process/result; exit0 of request is insufficient",
+      "capture_endpoint": "EA readiness, then first launch blocker or bounded observation; do not kill EA session",
+      "runtime_limit_seconds": 180,
+      "output_limit_bytes": 16777216,
+      "prior_evidence_checked": [
+        "E017",
+        "EADesktopVerbose.bak F1 launch16425782",
+        "Current ps: no Wine/EA processes"
+      ],
+      "duplicate_check": "First current authenticated path observation after diagnostic repair; no driver or syscall speculative change",
+      "started_utc": "2026-10-16T13:11:57.973561+00:00",
+      "deadline_utc": "2026-10-16T13:31:57.973657+00:00",
+      "outcome_decisions": {
+        "auth": "Preserve session, report exact authentication dependency",
+        "fatal": "Trace first causal operation, no status patch",
+        "success": "Verify game/protection requirements"
+      },
+      "status": "observed-production-failure",
+      "ended_utc": "2026-10-16T13:18:01.699065+00:00",
+      "result": "EA authenticated true/Online; one content16425782 request approved; missing license triggers reactivation. Two automatic launcher instances observed, both report E111000D at0026FA30 Conflicting software detected. Production launcher DLL/exe hashes differ from research copies. No F1 process/gameplay.",
+      "actual_builds": 3,
+      "actual_game_requests": 1,
+      "launcher_host_pids": [
+        45429,
+        45518
+      ],
+      "launcher_guest_pids": [
+        1140,
+        3056
+      ],
+      "jobs": [
+        "job-133",
+        "job-134",
+        "job-135",
+        "job-136",
+        "job-137",
+        "job-138",
+        "job-139",
+        "job-140",
+        "job-150",
+        "job-151"
+      ],
+      "instrumentation_failures": [
+        "Default LLDB module loading timed out25s; minimal-module setting completed attach/stack/detach in1.9s.",
+        "First observer incorrectly used trace thread ID1148 as process ID; corrected Toolhelp snapshot measures1140/3056."
+      ],
+      "decision": "Do not transfer research00457425 conclusions to production0026FA30. Inspect current mapped publisher module and direct fatal caller.",
+      "evidence": [
+        "normal-ea-current.log",
+        "normal-f1-window-text-corrected.log",
+        "normal-f1-launcher-stacks-minimal.log"
+      ],
+      "cleanup": "Later ps shows both measured launcher hostPIDs absent; helper found no matching dialogs/processes, so normal dismissal was not performed or credited. EA hostPID43467 remains alive. Native log reactivation completes after120s without license. Exact launcher exitcodes were not recovered in selected fresh log."
+    },
+    {
+      "id": "E-019",
+      "parent_task": "task-9",
+      "owner": "fb477ec502ff0bb8",
+      "question": "What immediate operation/predicate selects current production fatal0026FA30?",
+      "alternatives": [
+        "Direct API contract failure visible",
+        "Obfuscated state without recovered causal edge"
+      ],
+      "inputs_with_sha256": {
+        "production_launcher_dll": "dcd29dab2cfa12a5211ccbf09c82b2d7f765932b4cc9779f832abd3f9c974ad7"
+      },
+      "source_runtime_revision": "Unmodified production runtime and production launcher, E018 live owned PID45429",
+      "prefix": "/Volumes/ExT2/GameHub/Prefix",
+      "command_or_query": "Read mapped module at validated PE base; inspect exact fatal caller/pdata bounded static query; no new game launch.",
+      "changed_variable": "Actual production binary instead of different research artifact",
+      "predictions": {
+        "direct": "Concrete operation/result links to fatal",
+        "obfuscated": "Name exact missing edge; do not invent API semantics"
+      },
+      "semantic_predicate": "Validate module header/size/base then identify caller/control-flow evidence rather than UI wording",
+      "capture_endpoint": "One live module read and two focused static queries maximum",
+      "runtime_limit_seconds": 120,
+      "output_limit_bytes": 4096,
+      "prior_evidence_checked": [
+        "E018 production failure and file hashes",
+        "Historical research00457425 mismatch"
+      ],
+      "duplicate_check": "Production dcd29 artifact differs from7d53 research artifact; current fatal0026FA30 not analyzed under this identity.",
+      "started_utc": "2026-10-16T13:18:01.699200+00:00",
+      "deadline_utc": "2026-10-16T14:03:01.699205+00:00",
+      "outcome_decisions": {
+        "direct": "Validate actual contract with focused regression",
+        "obfuscated": "Close bounded query and retain causal unknown"
+      },
+      "status": "unresolved-obfuscated-caller",
+      "ended_utc": "2026-10-16T13:22:03.428849+00:00",
+      "jobs": [
+        "job-141",
+        "job-142",
+        "job-143"
+      ],
+      "actual_builds": 0,
+      "actual_runtime_launches": 0,
+      "result": "Validated mapped PE base100100000, SizeOfImage1793000, SHA95476c37...; pdata contains fatalRVA26fa30 in26e917..27a38d. Candidate callback call[r13+60] ends exactly26fa30. Obfuscated surrounding branches prevent causal API identification.",
+      "decision": "Two static queries exhausted. Do not infer OS operation from error wording. Verify launch artifact integrity before deeper replay.",
+      "conclusion_boundary": "Historical20261012/14 records already describe this production fatal. E018 is current revalidation, not discovery of a new error. Captured current artifact identity is newly pinned."
+    },
+    {
+      "id": "E-020",
+      "parent_task": "task-9",
+      "owner": "fb477ec502ff0bb8",
+      "question": "Do installed production anti-cheat wrapper and launcher files match their embedded Authenticode digests?",
+      "alternatives": [
+        "Cryptographically intact embedded publisher signatures",
+        "Modified or unsigned artifact invalidates installed-baseline premise"
+      ],
+      "inputs_with_sha256": {
+        "preloader_l.dll": "577f2c445b20270a807c5bf92939a3c72a6e55588c63b60d2ab68162cfe138ae",
+        "launcher.dll": "dcd29dab2cfa12a5211ccbf09c82b2d7f765932b4cc9779f832abd3f9c974ad7",
+        "launcher.exe": "4265e4b290af43a3b1d1278ffb76bd4232e53ff4e45c38477518e5617f1def6f"
+      },
+      "source_runtime_revision": "Installed production binaries, no execution or edits",
+      "prefix": "none; disk integrity check",
+      "command_or_query": "LIEF documented verify_signature plus certificate subject; temporary analysis dependency outside repository.",
+      "changed_variable": "Check cryptographic content integrity rather than infer authenticity from filename/certificate presence",
+      "predictions": {
+        "valid": "Embedded signature and file digest verify",
+        "invalid": "Explicit digest/signature failure or no signature"
+      },
+      "semantic_predicate": "Verify authentihash and signature separately; do not treat certificate subject as verification; trust-store/revocation outside coverage",
+      "capture_endpoint": "One verification across3artifacts",
+      "runtime_limit_seconds": 90,
+      "output_limit_bytes": 4096,
+      "prior_evidence_checked": [
+        "E018 hash mismatch production/research",
+        "ntdll production resource/export modifications documented",
+        "Preloader certificate table present; Wine-specific strings found"
+      ],
+      "duplicate_check": "No current cryptographic signature result in consulted handoff; file hash alone does not verify publisher content.",
+      "started_utc": "2026-10-16T13:22:03.428953+00:00",
+      "deadline_utc": "2026-10-16T13:37:03.428955+00:00",
+      "outcome_decisions": {
+        "valid": "Close wrapper-replacement hypothesis",
+        "invalid": "Identify publisher original/backup before replacement; no invented valid signatures"
+      },
+      "status": "verified-embedded-signatures",
+      "ended_utc": "2026-10-16T13:24:11.046918+00:00",
+      "jobs": [
+        "job-144",
+        "job-145",
+        "job-146"
+      ],
+      "result": "LIEF1.0.0 default signature verification and HASH_ONLY both OK for production preloader_l.dll, launcher.dll and launcher.exe; embedded subjects Electronic Arts/EA SPEAR AntiCheat Engineering. First install attempt failed because analysis venv lacks pip; hostpip isolatedtarget succeeded.",
+      "conclusion_boundary": "Embedded signature integrity verified, not Windows trust-store/revocation or runtime compatibility. No binary replacement justified.",
+      "evidence": "/Users/gc/eaac-archive/eaac-acquisition-20261015/production-authenticode-verification.json"
+    },
+    {
+      "id": "E-021",
+      "parent_task": "task-9",
+      "owner": "fb477ec502ff0bb8",
+      "question": "Does production signed preloader select an explicit Wine syscall-emulation capability branch?",
+      "alternatives": [
+        "Explicit capability branch distinguishes supported behavior",
+        "Wine rejection unconditional or branch unresolved"
+      ],
+      "inputs_with_sha256": {
+        "preloader_l.dll": "577f2c445b20270a807c5bf92939a3c72a6e55588c63b60d2ab68162cfe138ae"
+      },
+      "source_runtime_revision": "Signed production preloader; no runtime modification",
+      "prefix": "none; static only",
+      "command_or_query": "Query1 identify wine_get_version reference and containing pdata function; query2 focused decompile of that actual function.",
+      "changed_variable": "Investigate signed explicit capability message instead of presuming Wine masking is necessary",
+      "predictions": {
+        "capability": "Specific capability API/branch observed",
+        "reject": "Wine path rejects or no dataflow established"
+      },
+      "semantic_predicate": "Require concrete branch condition/callee, not string-only inference",
+      "capture_endpoint": "Two focused queries, no target launch",
+      "runtime_limit_seconds": 90,
+      "output_limit_bytes": 16384,
+      "prior_evidence_checked": [
+        "E020 signature integrity",
+        "preloader_s research decomp is different hash",
+        "production preloader strings syscall emulation disabled and Wine unsupported"
+      ],
+      "duplicate_check": "Existing source decomp in archive is new preloader_s; current production preloader577f branch not recovered in consulted source.",
+      "started_utc": "2026-10-16T13:24:11.047061+00:00",
+      "deadline_utc": "2026-10-16T14:09:11.047063+00:00",
+      "outcome_decisions": {
+        "capability": "Inspect legitimate capability contract",
+        "reject": "Record explicit restriction, do not invent supported compatibility"
+      },
+      "status": "observed-preloader-wine-lookup-branch",
+      "ended_utc": "2026-10-16T13:28:26.262574+00:00",
+      "jobs": [
+        "job-147",
+        "job-148",
+        "job-149"
+      ],
+      "actual_runtime_launches": 0,
+      "result": "Production init pdata11a0..1eaa references wine_get_version and LdrGetProcedureAddress; recovered branch sets E111000B on non-null lookup. No E111000F condition established in selected function; direct helper1000 remains uninspected. First query failed architecture mismatch between x86 analysisvenv and arm64LIEF; corrected query uses PEstruct+Capstone only.",
+      "conclusion_boundary": "Decompiler local aliases/types inferred; no claim all Wine paths reject or emulation message guarantees support.",
+      "decision": "Close two-query phase. One specifically identified helper1000 must be inspected to explain capability error before implementation."
+    },
+    {
+      "id": "E-022",
+      "parent_task": "task-9",
+      "owner": "fb477ec502ff0bb8",
+      "question": "What does production init direct helper RVA1000 return, and does it establish Wine syscall capability semantics?",
+      "alternatives": [
+        "Identified capability check and precise contract",
+        "Generic module discovery without capability contract"
+      ],
+      "inputs_with_sha256": {
+        "preloader_l.dll": "577f2c445b20270a807c5bf92939a3c72a6e55588c63b60d2ab68162cfe138ae"
+      },
+      "source_runtime_revision": "Signed production preloader, no changes",
+      "prefix": "none",
+      "command_or_query": "Focused decompile first pdata function1000..11a0 and entry context only; no broad scan.",
+      "changed_variable": "Resolve concrete direct helper identified by E021, not repeat init query",
+      "predictions": {
+        "capability": "E111000F status emitted at specific operation",
+        "discovery": "Helper resolves original ntdll module/export without explicit capability test"
+      },
+      "semantic_predicate": "Concrete calls/returnvalue/branch; inspect emitted code if decompiler types ambiguous",
+      "capture_endpoint": "One direct helper decomp, one follow-up only if needed",
+      "runtime_limit_seconds": 90,
+      "output_limit_bytes": 8192,
+      "prior_evidence_checked": [
+        "E021 query149 exact missing directhelper"
+      ],
+      "duplicate_check": "Named helper1000 was outside E021 selectedrange and retained research_preloader_s is differentartifact.",
+      "started_utc": "2026-10-16T13:28:26.262698+00:00",
+      "deadline_utc": "2026-10-16T13:48:26.262700+00:00",
+      "outcome_decisions": {
+        "capability": "Define truthful compatibility behavior",
+        "discovery": "Close string-only supported-Wine inference"
+      },
+      "status": "resolved-module-discovery-helper",
+      "ended_utc": "2026-10-16T13:31:26.233747+00:00",
+      "jobs": [
+        "job-152",
+        "job-153"
+      ],
+      "actual_runtime_launches": 0,
+      "result": "Helper1000 opens/maps ntdll section, uses relocation/header or RtlPcToFileHeader fallback, unmaps and returns module base. No E111000F return recovered. Executable-section scan has zero raw E111000F literals/decoded immediate candidates; computed statuses excluded.",
+      "decision": "Close helper and message-only capability inference. No supported Wine capability contract established. Native syscall behavior can instead be investigated through signed Microsoft kernel artifacts without executing Windows."
+    },
+    {
+      "id": "E-023",
+      "parent_task": "task-9",
+      "owner": "fb477ec502ff0bb8",
+      "question": "Can Microsoft-signed Windows10 kernel and matching public symbols establish NtInitializeRegistry invalid-flag behavior without a Windows machine?",
+      "alternatives": [
+        "Signed kernel plus exact symbol identifies relevant status branch",
+        "Artifacts/symbols unavailable or static behavior remains state-dependent"
+      ],
+      "inputs_with_sha256": {},
+      "source_runtime_revision": "Native Windows10 reference artifact to be selected/pinned before analysis",
+      "prefix": "none; static analysis, no VM/Windows execution",
+      "command_or_query": "Retrieve bounded Winbindex metadata as index only; download chosen kernel from Microsoft symbolserver; verify SHA/signature; obtain matching PDB by PE debug GUID; inspect only NtInitializeRegistry.",
+      "changed_variable": "Use original native implementation instead of ReactOS/Wine guesses or machine-dependent reference capture",
+      "predictions": {
+        "resolved": "Exact native function/status branch for invalid flag visible",
+        "unresolved": "Name missing artifact/symbol/state dependence and stop"
+      },
+      "semantic_predicate": "Microsoft-hosted artifact with verified content integrity, matching PDB GUID/age, concrete function branch; no execution equivalence claim",
+      "capture_endpoint": "Metadata plus bounded kernel/PDB downloads; two focused function queries",
+      "runtime_limit_seconds": 180,
+      "output_limit_bytes": 8192,
+      "prior_evidence_checked": [
+        "E016/E017 syscall discrepancy",
+        "Native Win10/Win11 syscall numbering unresolved",
+        "No Windows machine permitted",
+        "Microsoft public symbolstore documented atlearn.microsoft.com/en-us/windows/win32/debug/using-symsrv"
+      ],
+      "duplicate_check": "First direct native-kernel contract analysis; prior native-reference route assumed running Windows was required.",
+      "started_utc": "2026-10-16T13:31:26.234010+00:00",
+      "deadline_utc": "2026-10-16T14:16:26.234012+00:00",
+      "outcome_decisions": {
+        "resolved": "Use proven contract to accept/refute minimal Wine correction",
+        "unresolved": "Retain unknown; no guessed return statuses"
+      },
+      "status": "resolved-native-invalid-flag-contract",
+      "ended_utc": "2026-10-16T13:40:21.916252+00:00",
+      "jobs": [
+        "job-154",
+        "job-155",
+        "job-156",
+        "job-157",
+        "job-158",
+        "job-159",
+        "job-160"
+      ],
+      "actual_runtime_launches": 0,
+      "actual_builds": 0,
+      "result": "Microsoft-hosted signed kernel10.0.19041.5794 SHAf394a43b... verifies signature/hash. Native on-disk service table[0x101] RVA78df90 and[0xf9] RVA6ba070 agree with PDB symbols NtInitializeRegistry/NtGetNextThread. Native invalid low16flags outside0..2/1000..13e7 returnC000000D; user-mode13e8 has special privilege-dependent path, not general kernel-range behavior. Original invalidD8F0 result is supported; mapping it to NtGetNextThread is not justified.",
+      "conclusion_boundary": "Static reference, no native execution/game-success claim. PDB GUID matches; DBI age1 matches PE age1, PDB info age5 recorded. Initial signed-shift SSDT decoding was wrong for on-disk RVA entries and corrected in job160. Valid-flag outcomes state-dependent; special13e8 user branch can returnC0000061, so existing blanketACCESS_DENIED claim lacks native support.",
+      "evidence": [
+        "native-kernel-reference-manifest.json",
+        "native-win10-symbols.log",
+        "job-158.log",
+        "job-159.log",
+        "job-160.log"
+      ],
+      "decision": "Remove unconditional research/global override with invalid-flag regression; do not infer that status mismatch causes F1 fatal. Track special13e8 fallback semantics separately."
+    },
+    {
+      "id": "E-024",
+      "parent_task": "task-9",
+      "owner": "fb477ec502ff0bb8",
+      "question": "Does removing only unconditional0x101 override restore native-supported Win10 invalid-flag results?",
+      "alternatives": [
+        "Six invalid-flag cases fail baseline and pass corrected runtime",
+        "Cases fail for another reason or instrumentation incomplete"
+      ],
+      "inputs_with_sha256": {
+        "native_kernel": "f394a43b4aad1936af9a4fc6954904c22b9193a105b26cb9113a18652068eed4"
+      },
+      "source_runtime_revision": "Main0413180984c and existing research fork; preserve diagnostic/thread guard edits",
+      "prefix": "/Volumes/ExT2/GameHub/work/eaac-current-install-20261015/prefix",
+      "command_or_query": "Mapped C diagnostic uses six existing syscall.c invalid cases; baseline must fail, remove override, focused research ntdll build/sign/deploy, same binary must pass.",
+      "changed_variable": "Only removal of unconditional Win11-style0x101 alias between runs",
+      "predictions": {
+        "baseline": "INVALID_HANDLE instead of native-supportedINVALID_PARAMETER",
+        "corrected": "Six cases INVALID_PARAMETER"
+      },
+      "semantic_predicate": "Six measured non-skipped assertions, baseline nonzero and correctedzero; no game or protection success inferred",
+      "capture_endpoint": "Two diagnostic launches, one focused library build, deadline",
+      "runtime_limit_seconds": 120,
+      "output_limit_bytes": 16777216,
+      "prior_evidence_checked": [
+        "E017 observed INVALID_HANDLE",
+        "E023 native invalid-flag contract",
+        "Existing permanent syscall.c invalid-condition test"
+      ],
+      "duplicate_check": "Earlier E016 did not reach test; E017 measured one mapped case. Native reference now supplies justification and this is first baseline/correction regression pair.",
+      "started_utc": "2026-10-16T13:40:21.916377+00:00",
+      "deadline_utc": "2026-10-16T14:10:21.916379+00:00",
+      "outcome_decisions": {
+        "pass": "Keep minimal correction with evidence, original F1 rejection unresolved",
+        "fail": "Restore research runtime backup; do not deploy guessed fix"
+      },
+      "status": "verified-regression-repaired",
+      "ended_utc": "2026-10-16T13:46:05.199780+00:00",
+      "jobs": [
+        "job-161",
+        "job-162",
+        "job-163",
+        "job-164",
+        "job-165",
+        "job-166"
+      ],
+      "actual_runtime_launches": 2,
+      "actual_builds": 2,
+      "build_breakdown": {
+        "diagnostic_executable": 1,
+        "research_ntdll": 1
+      },
+      "result": "Identical six-case executable: baseline6/6 FAIL withC0000008 exit1; corrected6/6 PASS withC000000D exit0. Removed only nine-line unconditional alias from main/researchwinsyscall.c; those source files have identical SHAed4ae31e... Research library build passed, staged ad-hoc signature verified then atomic runtime replacement. Production runtime unchanged.",
+      "conclusion_boundary": "Focused diagnostic covers existing permanent six invalid-condition cases. Full Wine test harness/suite was not built/run. No F1 gameplay or E111000D repair claimed; production already uses original mapping.",
+      "decision": "Keep minimal source correction and research runtime; retain original signed runtime backup. Resume causal F1 failure investigation with native Windows10 contract rather than fabricated NtGetNextThread alias.",
+      "instrumentation_notes": [
+        "Research wineserver-k exits1 when no server lock exists (verified source main.c:exit(!ret)); ps showed only production wineserver. Follow-up research-w returned0. No production process signaled."
+      ],
+      "evidence": [
+        "registry-six-baseline.log",
+        "registry-six-corrected.log",
+        "registry-correction-runtime.json"
+      ]
+    },
+    {
+      "id": "E-025",
+      "parent_task": "task-9",
+      "owner": "fb477ec502ff0bb8",
+      "question": "Does native Windows10 syscall exit establish register/flag side effects missing from Wine foreign-call emulation?",
+      "alternatives": [
+        "Native exit changes guest volatile registers beyond the current Wine RAX/RCX/R11 model",
+        "Native exit restores the currently modeled state or selected branch remains unresolved"
+      ],
+      "inputs_with_sha256": {
+        "native_kernel": "f394a43b4aad1936af9a4fc6954904c22b9193a105b26cb9113a18652068eed4",
+        "native_pdb": "a98c6aa4164972276750805f7f4b799a0c1bb4882bbbf2dc82e446b549c57db8"
+      },
+      "source_runtime_revision": "Verified Microsoft Windows10 kernel/reference manifest, Wine currentworkingtree E024",
+      "prefix": "none; static query first",
+      "command_or_query": "Query1 recover KiSystemServiceExit bounded disassembly from exact PDB address/pdata; query2 inspect relevant generic return path and target continuation consumers only if established.",
+      "changed_variable": "Examine complete native syscall return ABI rather than changing NTSTATUS guesses",
+      "predictions": {
+        "difference": "Concrete zeroing/restoration instruction changes guest tuple beyond current implementation",
+        "same": "No supported behavioral correction from this path"
+      },
+      "semantic_predicate": "Exact signed native instructions and branch applicability; no kernel execution/Windows capture claimed",
+      "capture_endpoint": "Two focused static queries, no game launch unless a measurable new defect is established",
+      "runtime_limit_seconds": 120,
+      "output_limit_bytes": 16384,
+      "prior_evidence_checked": [
+        "E023 native NTSTATUS supports original result",
+        "Captured first3 continuations match Wine replay, not native Windows",
+        "Current sigsys unsupported branch onlywritesRAX/RCX/R11"
+      ],
+      "duplicate_check": "Native KiSystemServiceExit instructions not previously inspected; this tests syscall side effects independently of disproved status alias.",
+      "started_utc": "2026-10-16T13:48:25.518045+00:00",
+      "deadline_utc": "2026-10-16T14:33:25.518421+00:00",
+      "outcome_decisions": {
+        "difference": "Compare target-consumed state; add native-supported regression before fix",
+        "same": "Close ABI hypothesis, no return-state patch"
+      },
+      "status": "closed-static-budget-causality-unresolved",
+      "query2_plan": {
+        "owner_harness": "pi",
+        "query": "Inspect signed native alternate exit RVA A16DC0 (maximum 512 bytes through first terminal return) and first basic block of each existing four-probe research launcher continuation (maximum 64 instructions each). Report read-before-write of RDX/R8/R9/R10/XMM0..5 with branch boundary explicit. No extrapolation to different production launcher.",
+        "script": "/Users/gc/eaac-archive/eaac-acquisition-20261015/e025-query2.py",
+        "deadline_utc": "2026-10-16T14:33:25.518421+00:00",
+        "limits": "Remaining second static query only; 120 seconds; 16384 output bytes; zero launches/builds; stop at basic-block boundary or uncaptured code.",
+        "predictions": "Alternate exit may preserve or replace prior clearing. A continuation reading changed state establishes a bounded consumer candidate, not F1 causality. No read before block end leaves downstream consumption unknown.",
+        "decision": "Archive static evidence and close the two-query budget. No Wine patch without native-supported regression and demonstrated applicability."
+      },
+      "query1_result": {
+        "job": "job-168",
+        "evidence": "/Users/gc/eaac-archive/eaac-acquisition-20261015/native-syscall-exit-query1.log",
+        "sha256": "c0a82a698bae9275cb66f969190c7ab828dbc1e7ef79bec61142e06db8613842",
+        "result": "Inspected normal native user syscall exit clearsRDX, normallyR10, XMM0..5, and usesR8=userRSP/R9=userRBP. AlternateKVA returnA16DC0 and target consumers uninspected. No code patch or F1 causality established.",
+        "execution_seconds": 1.1
+      },
+      "handoff": "/Users/gc/Developer/GameHub/docs/eaac/EAAC-DEVELOPER-HANDOFF-20261016.md",
+      "focused_static_queries_used": 2,
+      "query2_result": {
+        "job": "job-169",
+        "evidence": "/Users/gc/eaac-archive/eaac-acquisition-20261015/native-syscall-exit-query2.log",
+        "sha256": "5189608898f0adb631b26c54ae770c2f68e5aa636bb6a55806041d497644ab93",
+        "execution_seconds": 1.9,
+        "exit_status": 0,
+        "native_observation": "Alternate exit A16DC0..A16E1C ends SYSRETQ, restoring RBP from R9 and RSP from R8; none of its decoded paths overwrite RDX/R8/R9/R10/XMM0..5. It does not undo the clearing observed in query1. Actual runtime path applicability remains unknown.",
+        "target_observation": "Each of four research continuation first basic blocks stores R11/RAX/RCX and flags, then direct-jumps. No watched-register read in those blocks. Consumers beyond jumps remain unknown; production launcher is a different binary.",
+        "semantic_result": "Native alternate-return question answered within static boundary. Target causality unresolved. Not evidence for an anti-cheat-specific patch or protected-game success.",
+        "next_decision": "Close E025 two-query budget with no Wine changes. Next separately registered discriminating question must follow the newly identified direct jump continuations to first read or full overwrite, with captured-memory coverage; stop at unknown edge. Prioritize production-artifact applicability before any integration. Require regression before patch."
+      },
+      "actual_runtime_launches": 0,
+      "actual_builds": 0
+    },
+    {
+      "id": "E-026",
+      "parent_task": "task-9",
+      "owner": "fb477ec502ff0bb8 / pi",
+      "question": "Along the existing validated research continuations beyond E025's direct jumps, which incoming volatile-register bytes are read before overwrite, and does the native return-state model change a semantic endpoint?",
+      "alternatives": ["Differences are overwritten before use", "Differences are consumed but do not establish failure causality", "Native-supported return state changes an evidenced semantic endpoint"],
+      "inputs_with_sha256": {
+        "research_module": "3d04844246600418855e122a0d002a0de6aabe9cda93c139675093172a3bfa14",
+        "four_context_log": "9908bcb5dc514ec3b9ae91b29c057cf61268a947b70908008a85cf3977741901",
+        "replay_script": "7bbe30f101f6930952bc97416766f97b4d8b5184f6e469e14b10cbe29333b5ab",
+        "native_query2": "5189608898f0adb631b26c54ae770c2f68e5aa636bb6a55806041d497644ab93"
+      },
+      "source_runtime_revision": "Wine HEAD0413180984c plus preserved E024 diff; offline research artifact only, NOT production launcher",
+      "prefix": "none; offline emulator, no Windows execution",
+      "command_or_query": "e026-consumers.py wraps immutable validated replay with byte-aware read-before-write tracking; first query four baseline continuations. Optional second query uses native normal-return tuple only if discriminating consumers exist, never guessed NTSTATUS sweep.",
+      "changed_variable": "Observe incoming volatile-state consumption along captured path beyond newly identified direct edges; optional paired tuple comparison only",
+      "predictions": {"dead": "All differing bytes overwritten before read", "live": "Exact instruction reads incoming bytes", "causal": "Paired native model changes evidenced endpoint with coverage complete to endpoint"},
+      "semantic_predicate": "Require explicit next-syscall/register agreement, captured-memory stop or fatal callback. Process exit0 alone never success. No actual F1 causal claim from different research build.",
+      "capture_endpoint": "First consumption/overwrite for watched bytes through existing 20000 instruction boundary, next syscall or missing memory; two focused queries maximum",
+      "runtime_limit_seconds": 120,
+      "output_limit_bytes": 16384,
+      "prior_evidence_checked": ["E025 query2 direct jump boundaries", "Original replay first3 match16 registers and RIP", "Native normal/alternate exit references"],
+      "duplicate_check": "E025 stopped before newly identified direct jumps. E026 traces those edges with access tracking rather than repeating entry disassembly or guessing return statuses.",
+      "started_utc": "2026-10-16T13:59:55Z",
+      "deadline_utc": "2026-10-16T14:44:55Z",
+      "outcome_decisions": {"dead": "Close volatile-state hypothesis for covered paths", "live": "Bounded paired model test with native applicability caveat", "missing": "Record exact missing state; no invented mappings", "causal": "Require artifact applicability and regression before Wine patch"},
+      "status": "closed-register-hypothesis-refuted-for-covered-research-paths",
+      "focused_queries_used": 1,
+      "result": {
+        "job": "job-170",
+        "evidence": "/Users/gc/eaac-archive/eaac-acquisition-20261015/e026-baseline-results.json",
+        "sha256": "9faab169175ff19068792efd28f20a6a088eb6e08b7b30381a4f04d0e123a935",
+        "execution_seconds": 3.9,
+        "overwrite_instruction_verification": "job174 confirms all sixteen first full overwrites are unconditional mov/movabs/lea, including32bit zero-extension; no conditional-write inference used.",
+        "exit_status": 0,
+        "observed": "All four covered continuations overwrite incoming RDX/R8/R9/R10 before reads; no incoming XMM0..5 read. First3 replay3061/2230/1818 instructions and all16registers+RIP match next captures. Fourth2911instructions reaches existing E111000D reporter arguments, then uncaptured callback pointer6ffffd5fa0b0.",
+        "decision": "Skip optional native tuple comparison: no differing incoming register consumers, so no discriminating prediction. No syscall-return patch justified for these research failures. Production artifact remains separate; inspect its existing actual call sequence next.",
+        "limitations": "Static native behavior remains a generic difference but not causal here. Decoder partial-write limitations retained in result file. Fourth callback memory remains uncaptured; not a successful full run."
+      },
+      "actual_runtime_launches": 0,
+      "actual_builds": 0
+    },
+    {
+      "id": "E-027",
+      "parent_task": "task-9",
+      "owner": "fb477ec502ff0bb8 / pi",
+      "question": "Does the actual production launcher trace proceed beyond the fourth canary, and what observed operation immediately precedes the E111000D reporter?",
+      "alternatives": ["Production fails directly in canary evaluation", "Production proceeds into additional operations before reporting failure", "Trace lacks results needed for causal attribution"],
+      "inputs_with_sha256": {"production_module": "95476c3729bc593eaab9a76f7809b20272ab61c2e35010b0f91a21f945c4e0d2"},
+      "source_runtime_revision": "E018 unchanged production runtime, trace thread047c/0bf4; source current syscall table names are provisional until runtime byte identity verified",
+      "prefix": "none; existing logs only",
+      "command_or_query": "e027-production-sequence.py extracts thread-specific sequence after raw101 through termination, preserving trace line references. Decode traced wine IDs against retained table with provisional-source caveat; separate helper thread0f28. One focused query only.",
+      "changed_variable": "Actual production sequence rather than applying research canary fatal conclusions to different artifact",
+      "predictions": {"direct": "No additional calls", "later": "Ordered additional syscall events", "missing": "Operation results not recorded, causal attribution stays unresolved"},
+      "semantic_predicate": "Exact thread+line correlation and observed call sequence, not API names alone. Do not infer an API failure from its invocation.",
+      "capture_endpoint": "One filtered production thread sequence from canary4 to termination, maximum16384bytes output",
+      "runtime_limit_seconds": 30,
+      "output_limit_bytes": 16384,
+      "prior_evidence_checked": ["E018 actual launch", "E019 fatal reporter static query exhausted", "E026 research ABI hypothesis closed", "normal-ea-current.log contains postcanary patched-stub calls"],
+      "duplicate_check": "No production-specific postcanary ordered call inventory in reviewed E018..E026. Not a repeat of E019 obfuscated fatal disassembly.",
+      "started_utc": "2026-10-16T14:04:00Z",
+      "deadline_utc": "2026-10-16T14:19:00Z",
+      "outcome_decisions": {"direct": "Find needed production canary context", "later": "Identify earliest unresolved operation/result boundary for targeted capture", "missing": "No patch; name exact missing result/edge"},
+      "status": "closed-call-inventory-causality-unresolved",
+      "result": {
+        "job": "job-171",
+        "evidence": "/Users/gc/eaac-archive/eaac-acquisition-20261015/e027-production-sequence.json",
+        "trace_sha256": "c3e6d83b1ead9c2fda8c57fc95af6a568fc7c5f027583ffb02c75f7339d297d1",
+        "observed": "Both actual launcher threads show many patched-stub calls between raw101 returnC000000D and termination. Invocation sequence includes provisional names file/section/registry/UI operations. This refutes only the literal claim of no intervening calls in production.",
+        "boundary": "These may be error-reporting/UI initialization AFTER selection of E111000D. Sequence alone does not establish that startup passed canary validation. Return statuses are absent. Table names provisional until runtime identity checked.",
+        "next": "Recover production modal-dialog guest stack past original ten-frame LLDB cutoff; identify reporter call boundary before interpreting postcanary operations. One changed-observation authenticated launch permitted; no target patch."
+      },
+      "actual_runtime_launches": 0,
+      "actual_builds": 0
+    },
+    {
+      "id": "E-028",
+      "parent_task": "task-9",
+      "owner": "fb477ec502ff0bb8 / pi",
+      "question": "Can an extended guest stack at the actual production failure distinguish launcher failure selection from subsequent error-reporting/UI calls?",
+      "alternatives": ["Guest unwind reaches publisher reporter and launcher callsite", "Wine dispatcher boundary prevents unwind", "Fresh normal launch does not produce the same observable failure"],
+      "inputs_with_sha256": {"production_launcher_dll": "dcd29dab2cfa12a5211ccbf09c82b2d7f765932b4cc9779f832abd3f9c974ad7", "production_preloader": "577f2c445b20270a807c5bf92939a3c72a6e55588c63b60d2ab68162cfe138ae"},
+      "source_runtime_revision": "Unchanged installed production runtime; existing authenticated EA PID43467, wineserver43472; revalidate before launch",
+      "prefix": "/Volumes/ExT2/GameHub/Prefix; no experimental prefix configuration edits",
+      "command_or_query": "e028-production-stack.py: repeat exact previously observed normal EALauncher origin2 content16425782 request once; identify newly created launcher hostPIDs by ps; LLDB minimal/preloadfalse attach one owned child, thread backtrace all -c64, read guest frame where available, detach. No writes, no bypass or breakpoint in publisher code.",
+      "changed_variable": "Extended unwind beyond previous10frame cutoff, NOT a changed target or guessed result",
+      "predictions": {"unwind": "Publisher reporter and launcher frame identify stage boundary", "blocked": "Exact Wine unwind boundary documented; no causal inference", "different": "Record actual failure with identity, no transfer from old run"},
+      "semantic_predicate": "Actual attached owned launcher and recovered stack frame addresses; request exit0 not success. No game/playability claim.",
+      "capture_endpoint": "One game request, at most one attached child,64frames/thread; detach even if command error; no EA/server kill",
+      "runtime_limit_seconds": 120,
+      "output_limit_bytes": 16777216,
+      "prior_evidence_checked": ["E018 exact request command from completed job134 inspected as untrusted data", "Existing modal trace captured only10frames; thread2 ended at dispatcher", "E027 ambiguity between startup and reporter calls"],
+      "duplicate_check": "New missing observable is guest stack beyond dispatcher, not another baseline reproduction. Use working LLDB settings; do not install tools or reset launch budget.",
+      "started_utc": "2026-10-16T14:05:00Z",
+      "deadline_utc": "2026-10-16T14:25:00Z",
+      "outcome_decisions": {"unwind": "Resolve nearest causal caller with existing module", "blocked": "Stop at missing unwind state, no second unchanged launch", "different": "Pin new actual endpoint before further analysis"},
+      "status": "closed-two-launch-budget-debugger-stop-handling-unresolved",
+      "first_attempt": {
+        "job": "job-172",
+        "request_exit": 0,
+        "request_seconds": 14.133,
+        "measurement_defect": "Immediate ps after request helper exit preceded asynchronous EA IPC delivery and publisher child creation. Actual EADesktop.log8011..8090 confirms request14:07:05, guestPID3252 created14:07:21, terminated14:07:27 with signed exit-518979571 = unsignedE111000D. No debugger attach occurred.",
+        "evidence": "/Users/gc/eaac-archive/eaac-acquisition-20261015/e028-result.json",
+        "actual_launch_requests": 1
+      },
+      "corrected_plan": "Second and final launch waits on kqueue file-write events for actual EA publisher-child creation, rather than helper exit. Attach newly created owned child; set breakpoint ONLY in Wine ntdll.so NtTerminateProcess, continue to observed termination, capture64frame stack and current arguments, detach. Never change publisher bytes/return values. LLDB wait bounded with SIGINT-to-debugger cleanup before detach. No third launch.",
+      "second_attempt": {
+        "job": "job-173",
+        "evidence": "/Users/gc/eaac-archive/eaac-acquisition-20261015/e028-result2.json",
+        "result_sha256": "07bc91f90f15e7b187f0a946b1d30c76498740d27642eeb052646a5b0a8d51a9",
+        "actual_seconds": 57.535,
+        "observed": "Event-driven watcher detected owned hostPID68457, LLDB attached at intentional patched-stub int2e GPFLT. Batch stopped before queued breakpoint/backtrace/detach commands. Debugger exit0 is NOT capture success; no guest stack or proven detach recovered. PID68457 later absent, no exitcode attributed. Automatic later launcher host68950 also subsequently absent.",
+        "semantic_result": "Measurement failed; not a reproduced guest crash diagnosis. NtTerminateProcess breakpoint never installed, publisher protection/return values never modified.",
+        "actual_game_endpoint": "EA nonverbose log8191 creates guestPID1912 at14:10:10.999;8220 records exit-518979571/E111000D at14:10:16.094. EA credential/license reactivation still fails to create license16425782.dlf. No game success.",
+        "ea_events_evidence": "/Users/gc/eaac-archive/eaac-acquisition-20261015/e028-ea-events.json",
+        "ea_events_sha256": "8d7949a552881197f356b5f70003cccb05cc4863682f527f1b20aa5f38b66dcc",
+        "cleanup": "No LLDB, F1 or anti-cheat launcher remains on final process inspection; original EA43467 and wineserver43472 alive. No generic kill or production binary/config changes."
+      },
+      "decision": "Two launch requests exhausted. No third launch. Validate explicit LLDB exception/crash-command path and guaranteed detach using a non-game fixture before any future production capture. Do not repeat helper-exit timing or treat expected int2e GPFLT as game fault. Task9 unresolved.",
+      "actual_runtime_launches": 2,
+      "actual_builds": 0
+    },
+    {
+      "id": "E-029", "parent_task": "task-9", "owner": "fb477ec502ff0bb8 / pi",
+      "question": "Can LLDB capture and explicitly detach at a handled x86 int2e exception using crash-command fallback?",
+      "alternatives": ["Ordinary batch commands are skipped on exception", "Crash fallback captures stack and detaches while fixture recovers", "Debugger behavior remains unusable"],
+      "inputs_with_sha256": {"new_fixture": "source and binary hashes recorded after creation; no publisher input"},
+      "source_runtime_revision": "Host Apple LLDB2103; x86_64 self-owned C fixture with SIGSEGV recovery, no Wine or EA launch",
+      "prefix": "none",
+      "command_or_query": "e029-debugger-test.py compiles one non-game fixture, runs red ordinary-batch and green crash-fallback cases, asserts capture/detach/recovery markers",
+      "changed_variable": "LLDB exception-command fallback only; identical fixture in red and green",
+      "predictions": {"red": "No queued capture after int2e stop", "green": "Crash handler prints stack/detach and fixture recovery"},
+      "semantic_predicate": "Explicit capture marker, actual fixture stack, explicit detach and fixture recovery; debugger exit0 alone insufficient",
+      "capture_endpoint": "One fixture compile and two bounded debugger cases; no game requests",
+      "runtime_limit_seconds": 90, "output_limit_bytes": 16384,
+      "prior_evidence_checked": ["E028 batch exits at GPFLT before later commands"],
+      "duplicate_check": "New non-game regression of observed measurement defect, not another production launch",
+      "started_utc": "2026-10-16T14:15:00Z", "deadline_utc": "2026-10-16T14:30:00Z",
+      "outcome_decisions": {"green": "Reuse proven capture path for BFV", "fail": "Stop debugger repair at15min; no blind game launch"},
+      "status": "closed-debugger-interferes-with-pending-mach-exception",
+      "result": {"jobs": ["job-175", "job-176", "job-178", "job-179"], "observed": "Crash fallback captures/detaches but fixture recovery markers missing even with persistent output. Direct fixture control exits0 with both markers. Attempt3 allowing SIGSEGV and continuing re-stops at same Mach GPFLT, never reaches safe boundary. Stop after3failed fixture checks; no game debugger attachment authorized by this gate.", "decision": "Use non-interfering EA/Wine log baselines for BFV/BF1; debugger issue remains unresolved. No tools installed."},
+      "actual_game_requests": 0
+    },
+    {
+      "id": "E-030", "parent_task": "task-9", "owner": "fb477ec502ff0bb8 / pi",
+      "question": "Which installed anti-cheat artifacts and normal launch identities are shared across F1 24, BFV and staged BF1?",
+      "alternatives": ["Identical shared components", "Different versions requiring separate validation", "BF1 incomplete or files change during read"],
+      "inputs_with_sha256": {"manifest_and_binaries": "hash read-only selected files; refuse changed-during-read result"},
+      "source_runtime_revision": "Installed EA game directories and installer metadata only; no modifications",
+      "prefix": "none",
+      "command_or_query": "Read manifest contentIDs/gameVersion/runtime launchers; stable SHA256 of selected preloader/launcher components and PE versions, not game asset scan",
+      "changed_variable": "Cross-title comparison instead of assuming F1-only artifacts",
+      "predictions": {"same": "Identical hashes support component reuse", "different": "Per-artifact diagnosis required", "staged": "Do not launch or rename BF1 staged files"},
+      "semantic_predicate": "Exact stable hashes and installed-vs-staged distinction; same error text alone not shared cause",
+      "capture_endpoint": "Selected files only; no large asset scan, no staged-file writes",
+      "runtime_limit_seconds": 30, "output_limit_bytes": 16384,
+      "prior_evidence_checked": ["User authorizes BFV/BF1", "BFV manifestcontent196216/version1.0.78.11385", "BF1 currently DiP_Staged"],
+      "duplicate_check": "Newly installed BF titles not in F1 artifact inventory",
+      "started_utc": "2026-10-16T14:15:00Z", "deadline_utc": "2026-10-16T14:30:00Z",
+      "outcome_decisions": {"same": "Group exact shared components for diagnosis", "different": "Retain separate input identities", "staged": "Wait for EA installation completion before BF1 launch"},
+      "status": "observed-shared-battlefield-components",
+      "result": {"job": "job-177", "evidence": "e030-title-inventory.json", "observed": "BFV and BF1 launcherDLL16f0592c/EXEfb8e2831/preloader4c6e86f0 identical, configs differ. F1 all three components differ. BF1 staged files finalized during inventory; EA EADesktop.log8284 at14:17:51.397 explicitlyInstalled, so now eligible for a normal launch. BFVcontent196216, BF1content1026023."},
+      "actual_game_requests": 0
+    },
+    {
+      "id": "E-031", "parent_task": "task-9", "owner": "fb477ec502ff0bb8 / pi",
+      "question": "What is the first observed normal authenticated Battlefield V launch endpoint with the installed shared Battlefield anti-cheat components?",
+      "alternatives": ["EA license/client blocks", "Publisher startup fails", "Actual protected gameplay"],
+      "inputs_with_sha256": {"launcherDLL": "16f0592c3677e536e1d0b27245699edf2cf76cd6bc7a9dbfa25abed20f0f1219", "preloader": "4c6e86f0d794419df5a9d0bf1871a8295eedf9726a4109f796a66d8f645b75df"},
+      "source_runtime_revision": "Unchanged production runtime/EA session and installed BFVmanifestcontent196216; no debugger",
+      "prefix": "/Volumes/ExT2/GameHub/Prefix",
+      "command_or_query": "ea-title-baseline.py BFV196216: one normal EALauncher origin2 request, event-driven EA.log and existing Wine trace observation, no configuration edits/debugger",
+      "changed_variable": "Installed BattlefieldV instead of F1; same existing runtime and normal launcher",
+      "predictions": {"blocked": "Exact EA/protection process result recorded", "same": "Actual same stage must be observed, not inferred from code alone", "success": "Game process plus actual required protection/playable session evidence"},
+      "semantic_predicate": "EA acceptance and publisher/game process result, request helperexit0 insufficient; no gameplay claim from process creation",
+      "capture_endpoint": "One request, first endpoint or120s; max16MiB private trace; no extra launches/kill/download changes",
+      "runtime_limit_seconds": 120, "output_limit_bytes": 16777216,
+      "prior_evidence_checked": ["E029 debugger unsafe", "E030 installed shared hashes", "BF1nowInstalled in EA.log"],
+      "duplicate_check": "First actual BFV normal request in this investigation",
+      "started_utc": "2026-10-16T14:20:00Z", "deadline_utc": "2026-10-16T14:40:00Z",
+      "outcome_decisions": {"blocked": "Compare BF1 genuine endpoint with no guessed fix", "success": "Verify protected gameplay separately", "timeout": "No unchanged retry; retain exact missing result"},
+      "status": "observed-publisher-E111000D",
+      "result": {"job": "job-180", "evidence": "E-031-result.json", "seconds": 34.065, "actual_EA_exit": "0xe111000d", "fatal_report_rva": "002615E0", "EA_guest_pid": 2636, "observed": "One explicit request, two automatic publisher thread traces; raw4/4/4/101 at10038fa20/10033d399/100345b06/1003c4b56; unsupported101 returnsC000000D. EA license file missing. No bfv.exe/gameplay, no live owned launcher, EA preserved.", "decision": "Compare exact BF1 shared-artifact path, no unchanged retry or patch"},
+      "actual_game_requests": 1
+    },
+    {
+      "id": "E-032", "parent_task": "task-9", "owner": "fb477ec502ff0bb8 / pi",
+      "question": "Does completed Battlefield1 installation reproduce BFV's observed normal startup stage using identical anti-cheat components?",
+      "alternatives": ["Same shared startup stage", "Title-specific client/license/protection difference", "Playable protected session"],
+      "inputs_with_sha256": {"launcherDLL": "16f0592c3677e536e1d0b27245699edf2cf76cd6bc7a9dbfa25abed20f0f1219", "preloader": "4c6e86f0d794419df5a9d0bf1871a8295eedf9726a4109f796a66d8f645b75df"},
+      "source_runtime_revision": "EA.log8284 confirmsInstalled14:17:51; completed files matchBFV; unchanged runtime",
+      "prefix": "/Volumes/ExT2/GameHub/Prefix",
+      "command_or_query": "ea-title-baseline.py BF11026023 after BFV endpoint and no running publisher; same non-interfering observation wrapper",
+      "changed_variable": "BF1 title/config only; exact shared preloader/launcher bytes",
+      "predictions": {"same": "Equivalent startup operation/status sequence", "different": "Earliest observed title-specific divergence"},
+      "semantic_predicate": "Match actual binary/operation/status/stage, not just error text; installed gate and no concurrent launch",
+      "capture_endpoint": "One normal request, first endpoint/120s,16MiBmax; never edit staged files",
+      "runtime_limit_seconds": 120, "output_limit_bytes": 16777216,
+      "prior_evidence_checked": ["E030 exact shared components", "EA installation completion"],
+      "duplicate_check": "First completed-install BF1 normal request",
+      "started_utc": "2026-10-16T14:20:00Z", "deadline_utc": "2026-10-16T14:40:00Z",
+      "outcome_decisions": {"same": "Prioritize component-level contract diagnosis", "different": "Keep title-specific prerequisites separate", "success": "Verify protection and gameplay separately"},
+      "status": "observed-same-Battlefield-publisher-failure",
+      "result": {"job": "job-181", "evidence": "E-032-result.json", "seconds": 34.056, "actual_EA_exit": "0xe111000d", "fatal_report_rva": "002615E0", "EA_guest_pid": 4608, "observed": "After EAInstalled gate, one request produces same exact raw-call locations/invalidflagresult/fataloffset as BFV, two automatic launcher thread traces. License file missing. No bf1.exe/gameplay or live owned launcher. EA preserved.", "decision": "Component-level shared startup diagnosis justified; config/license differences retained, causal condition still unknown"},
+      "actual_game_requests": 1
+    },
+    {
+      "id": "E-033", "parent_task": "task-9", "owner": "fb477ec502ff0bb8 / pi",
+      "question": "Are the observed raw-call and fatal-report signatures identical across both Battlefield title baselines?",
+      "alternatives": ["Exact shared component-stage signature", "Only same error text, different call locations/results"],
+      "inputs_with_sha256": {"E031_result": "computed and retained by comparison", "E032_result": "computed and retained by comparison"},
+      "source_runtime_revision": "Existing E031/E032 unchanged production baseline artifacts, no execution of publisher",
+      "prefix": "none",
+      "command_or_query": "e033-compare-baselines.py normalizes only per-thread labels; compares all four syscall numbers/RIPs/translatedIDs/args, unsupported return and fatalreportcode/RVA",
+      "changed_variable": "Compare title-specific trace identity while holding actual shared publisher bytes constant",
+      "predictions": {"same": "All observed per-thread signatures identical", "different": "Specific divergence named"},
+      "semantic_predicate": "Exact signature comparison with original result hashes; same code alone insufficient; no causal claim",
+      "capture_endpoint": "Read two bounded result files;20seconds;16384bytes",
+      "runtime_limit_seconds": 20, "output_limit_bytes": 16384,
+      "prior_evidence_checked": ["E030 exact shared file hashes", "E031/E032 real EA monitored exits"],
+      "duplicate_check": "New cross-title comparison, no repeated baseline or target launch",
+      "started_utc": "2026-10-16T14:24:00Z", "deadline_utc": "2026-10-16T14:34:00Z",
+      "outcome_decisions": {"same": "Keep one shared Battlefield component lane and separate F1 version lane", "different": "Preserve per-title diagnosis"},
+      "status": "observed-exact-Battlefield-stage-equivalence",
+      "result": {"job": "job-182", "evidence": "e033-baseline-comparison.json", "sha256": "9a32849c7aa9b83f4d4ef60201a6f3c22942e193eb303198b531ee8b7ba263bb", "observed": "All four observed publisher thread signatures across BFV/BF1 equal: same raw4/4/4/101 numbers, addresses, translated IDs and arguments, C000000D result and E111000D/002615E0 reporter. Components identical; configs differ. No causal failure-selection condition established.", "decision": "One shared Battlefield component lane, separate F1 artifact lane. Prefer non-interfering isolated Wine-side observation; no speculative per-title fix. EA session/install completion preserved; no game/debugger/fixture remains."},
+      "actual_game_requests": 0
+    }
+  ],
+  "objective_clarification": {
+    "date": "2026-10-16",
+    "user_goal": "Run EA anti-cheat protected games truthfully on this Mac: F1 24 plus user-authorized Battlefield V and Battlefield1. BF1 installation completed at14:17:51 and both Battlefield baselines attempted normally. Generalize evidenced Wine fixes, not fabricated protection or per-title success responses. No Windows machine.",
+    "correction": "Driver/kernel architecture has publisher and registration evidence; necessity of prior recovery of this exact file and causality for current error are unproved.",
+    "not_success": [
+      "missing-file search",
+      "fake service/device success",
+      "disabled protection",
+      "playable window without authentic anti-cheat evidence"
+    ],
+    "next_evidence": "Earliest causally established genuine startup failure and required operation, independent of assumed driver filename."
+  }
+}
