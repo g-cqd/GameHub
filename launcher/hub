@@ -14,8 +14,8 @@ Options for play: --restart (stop what runs in the prefix first), --runtime NAME
 
 Layout (HUB_ROOT, default /Volumes/ExT2/GameHub): Prefix/ (one prefix), Runtimes/, Library/{Steam,Ubisoft,Epic}, "EA Games"/,
 Hub/{Logs,State,Home,Temp}. This script and launcher/settings live in the repo; nothing else is needed from it on ExT2.
-Only one Wine runtime can serve the prefix at a time (wineserver version mismatch), so switching between runtimes
-(Steam on hub-1, EA on hub-0) stops the launcher that is running.
+Only one Wine runtime can serve the prefix at a time (wineserver version mismatch), so switching between launchers
+stops the launcher that is running.
 """
 import argparse, glob, json, os, re, shutil, subprocess, sys, time
 from pathlib import Path
@@ -30,8 +30,8 @@ UBISOFT = ROOT / "Library/Ubisoft"
 EA_GAMES = ROOT / "EA Games"
 X87_HELPER = RUNTIMES / "hub-0-helpers-fpr/x87sidecar"   # external sidecar for runtimes that do not bundle one
 
-# Which runtime each launcher runs on (override with --runtime / HUB_RUNTIME). EA stays on the runtime the EA identity was set up with.
-PROVIDER_RUNTIME = {"steam": "hub-1", "ea": "hub-0-winemacfs-dxmtrtv-noWineVer", "ubisoft": "hub-1", "direct": "hub-1", "epic": "hub-1"}
+# Which runtime each launcher runs on (override with --runtime / HUB_RUNTIME). Every launcher now defaults to hub-1.
+PROVIDER_RUNTIME = {"steam": "hub-1", "ea": "hub-1", "ubisoft": "hub-1", "direct": "hub-1", "epic": "hub-1"}
 
 # Knowledge about specific games. status: verified (seen working), unverified (never confirmed), blocked (needs anti-cheat that is not bypassed).
 EA_KNOWN = {

@@ -19,7 +19,7 @@ runtime and launcher each needs, starts it, and starts the game.
 - `hub list` games, their launcher, and whether each is known to work; `hub play <game>` (alias, Steam app id or part of the name, e.g. `hub play aoa`, `hub play bf4`).
 - `hub start steam|ea|ubisoft`, `hub status`, `hub stop [game]`, `hub doctor`.
 - Options: `--restart`, `--runtime NAME`, `--metalfx [FACTOR]`, `--dxgi wined3d`, `--debug SPEC`, `--no-wait`, `--force`.
-- Steam runs on `hub-1`, EA on `hub-0-winemacfs-dxmtrtv-noWineVer`. One runtime serves the prefix at a time, so switching launchers stops the other one (refused while a game runs, unless `--restart`).
+- All launchers (Steam, EA, Ubisoft, Epic) run on the unified `hub-1` runtime. Switching launchers cleanly stops the other one (refused while a game runs, unless `--restart`).
 
 ## What makes it work (do not remove)
 1. Steam overlay files are moved to `_overlay-disabled` (the overlay crashes AoA right after its intro). `start-steam.sh` re-applies this.
