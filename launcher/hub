@@ -31,7 +31,7 @@ EA_GAMES = ROOT / "EA Games"
 X87_HELPER = RUNTIMES / "hub-0-helpers-fpr/x87sidecar"   # external sidecar for runtimes that do not bundle one
 
 # Which runtime each launcher runs on (override with --runtime / HUB_RUNTIME). EA stays on the runtime the EA identity was set up with.
-PROVIDER_RUNTIME = {"steam": "hub-1", "ea": "hub-0-winemacfs-dxmtrtv-noWineVer", "ubisoft": "hub-1", "direct": "hub-1"}
+PROVIDER_RUNTIME = {"steam": "hub-1", "ea": "hub-0-winemacfs-dxmtrtv-noWineVer", "ubisoft": "hub-1", "direct": "hub-1", "epic": "hub-1"}
 
 # Knowledge about specific games. status: verified (seen working), unverified (never confirmed), blocked (needs anti-cheat that is not bypassed).
 EA_KNOWN = {
@@ -232,7 +232,7 @@ def running_runtime():
 
 
 def provider_running():
-    pats = {"steam": r"Library\\Steam\\steam\.exe", "ea": r"EADesktop\.exe", "ubisoft": r"UbisoftConnect\.exe|upc\.exe"}
+    pats = {"steam": r"Library\\Steam\\steam\.exe", "ea": r"EADesktop\.exe", "ubisoft": r"UbisoftConnect\.exe|upc\.exe", "epic": r"EpicGamesLauncher\.exe"}
     found = set()
     for _, _, cmd in ps():
         if "x87sidecar" in cmd:
@@ -342,6 +342,16 @@ def ea_client():
     return sorted(cands, key=ver)[-1] if cands else None
 
 
+def epic_client():
+    for p in [
+        PREFIX / "drive_c/Program Files/Epic Games/Launcher/Portal/Binaries/Win64/EpicGamesLauncher.exe",
+        PREFIX / "drive_c/Program Files (x86)/Epic Games/Launcher/Portal/Binaries/Win64/EpicGamesLauncher.exe",
+    ]:
+        if p.is_file():
+            return p
+    return None
+
+
 def prep_steam():
     od = STEAM / "_overlay-disabled"
     od.mkdir(exist_ok=True)
@@ -401,6 +411,14 @@ def start_provider(provider, rt, opts):
         spawn(rt, env, [unix_to_win(exe)], LOGS / f"ubisoft-{stamp()}.log")
         print("starting Ubisoft Connect (unverified); give it a moment to sign in")
         time.sleep(15)
+    elif provider == "epic":
+        exe = epic_client()
+        if not exe:
+            die("Epic Games Launcher not found in the prefix")
+        log = LOGS / f"epic-{stamp()}.log"
+        spawn(rt, env, [unix_to_win(exe), "-OpenGL"], log)
+        print(f"starting Epic Games Launcher on {rt} (log {log})")
+        time.sleep(15)
     STATE.mkdir(parents=True, exist_ok=True)
     (STATE / "session.json").write_text(json.dumps(signature(rt, provider, opts)))
     return env
@@ -459,7 +477,7 @@ def play(args):
         stop_all(cur_rt)
         up = set()
     env = session_env(rt, provider, args)
-    need = provider if provider in ("steam", "ea") else ("ubisoft" if provider == "ubisoft" else None)
+    need = provider if provider in ("steam", "ea", "epic") else ("ubisoft" if provider == "ubisoft" else None)
     if need and need not in provider_running():
         env = start_provider(need, rt, args)
     if provider == "ea" and not ea_booted():
@@ -597,6 +615,7 @@ def cmd_doctor(args):
     chk("registry SteamPath -> Library/Steam", 'SteamPath"="e:/library/steam"' in reg, "run hub start steam once; Steam rewrites it")
     chk("no stale SteamOld references", "steamold" not in reg.lower())
     chk("EA Desktop client", ea_client() is not None)
+    chk("Epic Games Launcher client", epic_client() is not None)
     chk("Steam overlay disabled", not (STEAM / "GameOverlayRenderer.dll").exists())
     for rt in sorted(set(PROVIDER_RUNTIME.values())):
         for api, b in (("dxgi", "dxmt"), ("dxgi", "wined3d"), ("d3d9", "mtld3d")):
@@ -617,7 +636,7 @@ def main():
     p = sub.add_parser("play"); p.add_argument("game"); common(p)
     p.add_argument("--restart", action="store_true"); p.add_argument("--no-wait", action="store_true"); p.add_argument("--force", action="store_true")
     p.set_defaults(f=play)
-    p = sub.add_parser("start"); p.add_argument("provider", choices=["steam", "ea", "ubisoft"]); common(p); p.set_defaults(f=cmd_start)
+    p = sub.add_parser("start"); p.add_argument("provider", choices=["steam", "ea", "ubisoft", "epic"]); common(p); p.set_defaults(f=cmd_start)
     sub.add_parser("status").set_defaults(f=cmd_status)
     p = sub.add_parser("stop"); p.add_argument("game", nargs="?"); p.set_defaults(f=cmd_stop)
     sub.add_parser("doctor").set_defaults(f=cmd_doctor)
