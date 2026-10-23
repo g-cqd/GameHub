@@ -283,6 +283,7 @@ def session_env(rt, provider, opts):
         env["GST_REGISTRY_1_0"], env["GST_REGISTRY_FORK"], env["GST_DEBUG"] = str(TEMP / "gst-registry.bin"), "no", "0"
     if provider == "ea":
         env.update(MTL_HUD_ENABLED="0", WINE_TF_EMULATION="1", WINE_TF_MAX_STEPS="0", WINE_TF_MAX_NS="0",
+                   WINE_RWX_WX_EMULATION="1",
                    WINEDLLOVERRIDES="IGOProxy32.exe=d;winemenubuilder.exe=d")
     if not (rtp / "bin/x87sidecar").exists() and X87_HELPER.exists():
         env["ROSETTA_X87_PATH"] = str(X87_HELPER)
@@ -417,7 +418,7 @@ def start_provider(provider, rt, opts):
         if not exe:
             die("Epic Games Launcher not found in the prefix")
         log = LOGS / f"epic-{stamp()}.log"
-        spawn(rt, env, [unix_to_win(exe), "-OpenGL", "-SkipBuildPatchPrereq"], log)
+        spawn(rt, env, [unix_to_win(exe), "-SkipBuildPatchPrereq"], log)
         print(f"starting Epic Games Launcher on {rt} (log {log})")
         time.sleep(10)
     STATE.mkdir(parents=True, exist_ok=True)
@@ -581,10 +582,6 @@ def cmd_start(args):
     if prov in up:
         print(f"{prov} is already running")
         return
-    other_launchers = up - {prov}
-    if other_launchers:
-        print(f"stopping running launcher ({', '.join(sorted(other_launchers))}) before starting {prov}")
-        stop_all(cur)
     start_provider(prov, rt, args)
 
 
