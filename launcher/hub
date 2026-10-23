@@ -1,0 +1,634 @@
+#!/usr/bin/env python3
+"""hub: one launcher for every game in the GameHub prefix (Steam, EA app, Ubisoft, Epic, standalone).
+
+  hub list                       installed games, which launcher each needs, and how well it is known to work
+  hub play <game> [options]      start the right launcher (if needed) and the game
+  hub start <steam|ea|ubisoft>   start only a launcher
+  hub status                     what is running in the prefix
+  hub stop [game]                stop one game, or everything in the prefix (wineserver -k)
+  hub doctor                     check volume, runtimes, prefix and launcher registrations
+
+<game> is an alias (aoa, bf4, nfs, ...), a Steam app id, or any part of the name.
+Options for play: --restart (stop what runs in the prefix first), --runtime NAME, --metalfx [FACTOR],
+  --dxgi wined3d (AoA backend), --debug SPEC (WINEDEBUG), --no-wait, --force (known-blocked games).
+
+Layout (HUB_ROOT, default /Volumes/ExT2/GameHub): Prefix/ (one prefix), Runtimes/, Library/{Steam,Ubisoft,Epic}, "EA Games"/,
+Hub/{Logs,State,Home,Temp}. This script and launcher/settings live in the repo; nothing else is needed from it on ExT2.
+Only one Wine runtime can serve the prefix at a time (wineserver version mismatch), so switching between runtimes
+(Steam on hub-1, EA on hub-0) stops the launcher that is running.
+"""
+import argparse, glob, json, os, re, shutil, subprocess, sys, time
+from pathlib import Path
+
+ROOT = Path(os.environ.get("HUB_ROOT", "/Volumes/ExT2/GameHub"))
+PREFIX = Path(os.environ.get("HUB_PREFIX", ROOT / "Prefix"))
+RUNTIMES = ROOT / "Runtimes"
+HERE = Path(__file__).resolve().parent
+LOGS, STATE, TEMP, HOME = ROOT / "Hub/Logs", ROOT / "Hub/State", ROOT / "Hub/Temp", ROOT / "Hub/Home/Player"
+STEAM = ROOT / "Library/Steam"
+UBISOFT = ROOT / "Library/Ubisoft"
+EA_GAMES = ROOT / "EA Games"
+X87_HELPER = RUNTIMES / "hub-0-helpers-fpr/x87sidecar"   # external sidecar for runtimes that do not bundle one
+
+# Which runtime each launcher runs on (override with --runtime / HUB_RUNTIME). EA stays on the runtime the EA identity was set up with.
+PROVIDER_RUNTIME = {"steam": "hub-1", "ea": "hub-0-winemacfs-dxmtrtv-noWineVer", "ubisoft": "hub-1", "direct": "hub-1"}
+
+# Knowledge about specific games. status: verified (seen working), unverified (never confirmed), blocked (needs anti-cheat that is not bypassed).
+EA_KNOWN = {
+    "Battlefield 3": dict(offer="70619,71067", status="verified"),
+    "Need for Speed": dict(name="Need for Speed (2015)", offer="1024486", prime="Origin.OFR.50.0000810", status="verified"),
+    "Battlefield 4": dict(offer="1007968", status="unverified"),
+    "F1 24": dict(status="blocked", note="needs EA AntiCheat, not supported on macOS"),
+}
+OTHER_KNOWN = {  # standalone installs under Library/Ubisoft/games and Library/Epic: folder -> exe, status
+    "Assassin's Creed Unity": dict(exe="ACU.exe", status="unverified"),
+    "Far Cry 2": dict(exe="bin/FarCry2.exe", status="unverified"),
+    "Far Cry 3": dict(exe="bin/farcry3_d3d11.exe", status="unverified"),
+    "WATCH_DOGS2": dict(exe="bin/WatchDogs2.exe", status="unverified", note="ships EasyAntiCheat"),
+    "GTAV": dict(exe="GTAV.exe", status="blocked", note="BattlEye, needs the Epic launcher"),
+}
+STEAM_SKIP = {"228980"}  # Steamworks Common Redistributables
+ALIASES = {
+    "aoa": "318020", "ron": "287450", "generals": "2229870", "zh": "2732960", "wd": "243470",
+    "bf3": "Battlefield 3", "bf4": "Battlefield 4", "bf1": "Battlefield 1", "bfv": "Battlefield V",
+    "nfs": "Need for Speed", "nfs2015": "Need for Speed", "c3": "Crysis 3", "f124": "F1 24",
+    "fc2": "Far Cry 2", "fc3": "Far Cry 3", "acu": "Assassin's Creed Unity", "wd2": "WATCH_DOGS2",
+}
+# Per-game settings kept across sessions: (settings file inside the prefix, golden copy in this repo)
+SETTINGS = {"318020": ("drive_c/users/crossover/Saved Games/EugenSystems/ActOfAggression/Option.ini", "settings/ActOfAggression/Option.ini")}
+
+
+class Game:
+    def __init__(self, name, provider, gid, path, installed=True, status="unverified", note="", **extra):
+        self.name, self.provider, self.id, self.path = name, provider, str(gid), Path(path) if path else None
+        self.installed, self.status, self.note, self.extra = installed, status, note, extra
+
+
+def norm(s):
+    return re.sub(r"[^a-z0-9]", "", s.lower())
+
+
+def win_to_unix(p):
+    p = p.strip().replace("\\\\", "\\")
+    m = re.match(r"^([A-Za-z]):[\\/]*(.*)$", p)
+    if not m:
+        return Path(p)
+    d, rest = m.group(1).upper(), m.group(2).replace("\\", "/")
+    base = {"E": ROOT, "C": PREFIX / "drive_c", "Z": Path("/")}.get(d, ROOT)
+    return base / rest
+
+
+def unix_to_win(p):
+    p = Path(p)
+    for pre, d in ((PREFIX / "drive_c", "C"), (ROOT, "E")):
+        try:
+            return d + ":\\" + str(p.relative_to(pre)).replace("/", "\\")
+        except ValueError:
+            pass
+    return "Z:" + str(p).replace("/", "\\")
+
+
+# ---------------------------------------------------------------- discovery
+
+def parse_acf(path):
+    t = path.read_text(errors="replace")
+    return {k: v for k, v in re.findall(r'"(\w+)"\s+"([^"]*)"', t)}
+
+
+def steam_libraries():
+    libs = [STEAM / "steamapps"]
+    vdf = STEAM / "steamapps/libraryfolders.vdf"
+    if vdf.exists():
+        for p in re.findall(r'"path"\s+"([^"]+)"', vdf.read_text(errors="replace")):
+            q = win_to_unix(p) / "steamapps"
+            if q not in libs:
+                libs.append(q)
+    return libs
+
+
+def discover_steam():
+    games, known_dirs = [], set()
+    for lib in steam_libraries():
+        for acf in sorted(lib.glob("appmanifest_*.acf")):
+            m = parse_acf(acf)
+            appid = m.get("appid", acf.stem.split("_")[1])
+            if appid in STEAM_SKIP:
+                continue
+            d = lib / "common" / m.get("installdir", "")
+            known_dirs.add(d)
+            ok = bool(int(m.get("StateFlags", "0")) & 4) and d.is_dir()
+            games.append(Game(re.sub(r"[™®]", "", m.get("name", appid)), "steam", appid, d, ok, "verified" if appid in ("318020",) else "unverified",
+                              "" if ok else "not fully installed", installdir=m.get("installdir", "")))
+        common = lib / "common"
+        if common.is_dir():
+            for d in sorted(common.iterdir()):
+                if d.is_dir() and d not in known_dirs and d.name not in ("Steamworks Shared", "Steam Controller Configs"):
+                    games.append(Game(d.name, "steam", "-", d, False, "unverified",
+                                      "files present, unknown to Steam: install it from Steam into this library to adopt them"))
+    return games
+
+
+def reg_sections(path):
+    """Yield (section name, {key: value}) from a Wine .reg text file."""
+    sec, vals = None, {}
+    with open(path, errors="replace") as f:
+        for line in f:
+            if line.startswith("["):
+                if sec is not None:
+                    yield sec, vals
+                sec, vals = line[1:line.rindex("]")].replace("\\\\", "\\"), {}
+            elif sec is not None and line.startswith('"'):
+                m = re.match(r'"((?:[^"\\]|\\.)*)"="(.*)"\s*$', line)
+                if m:
+                    vals[m.group(1)] = re.sub(r"\\x([0-9a-fA-F]{4})", lambda x: chr(int(x.group(1), 16)), m.group(2)).replace("\\\\", "\\")
+        if sec is not None:
+            yield sec, vals
+
+
+def discover_ea():
+    games = []
+    for sec, v in reg_sections(PREFIX / "system.reg"):
+        m = re.match(r"Software\\Wow6432Node\\(EA Games|Crytek)\\([^\\]+)$", sec)
+        if not m or "Install Dir" not in v:
+            continue
+        title = m.group(2)
+        d = win_to_unix(v["Install Dir"])
+        k = EA_KNOWN.get(title, {})
+        name = k.get("name") or re.sub(r"[™®]", "", v.get("DisplayName", title)).strip()
+        offer = k.get("offer")
+        if not offer:
+            f = d / "__Installer/installerdata.xml"
+            if f.exists():
+                ids = re.findall(r"<contentID>\s*([^<\s]+)", f.read_text(errors="replace"))
+                offer = ids[0] if ids else None
+        games.append(Game(name, "ea", offer or "-", d, d.is_dir(), k.get("status", "unverified"),
+                          k.get("note", "" if offer else "no content id found"), offer=offer, prime=k.get("prime")))
+    seen = {g.path for g in games}
+    for d in sorted(EA_GAMES.iterdir()) if EA_GAMES.is_dir() else []:   # installed in EA's library but not registered in the prefix
+        f = d / "__Installer/installerdata.xml"
+        if d.is_dir() and d not in seen and f.exists():
+            ids = re.findall(r"<contentID>\s*([^<\s]+)", f.read_text(errors="replace"))
+            k = EA_KNOWN.get(d.name, {})
+            games.append(Game(k.get("name", d.name), "ea", ids[0] if ids else "-", d, True, k.get("status", "unverified"),
+                              k.get("note", "not registered in the prefix"), offer=ids[0] if ids else None, prime=k.get("prime")))
+    return games
+
+
+def discover_other():
+    games = []
+    for base, prov in ((UBISOFT / "games", "ubisoft"), (ROOT / "Library/Epic", "epic")):
+        if base.is_dir():
+            for d in sorted(base.iterdir()):
+                if d.is_dir():
+                    k = OTHER_KNOWN.get(d.name, {})
+                    exe = d / k["exe"] if "exe" in k else None
+                    games.append(Game(d.name, prov, "-", d, bool(exe and exe.exists()), k.get("status", "unverified"),
+                                      k.get("note", "" if exe else "main exe unknown"), exe=exe))
+    return games
+
+
+def discover():
+    return discover_steam() + discover_ea() + discover_other()
+
+
+def find_game(games, query):
+    q = ALIASES.get(norm(query), query)
+    inst = [g for g in games if g.installed]
+    for pool in (inst, games):
+        hit = [g for g in pool if g.id == q or g.name == q or norm(g.name) == norm(q)]
+        if not hit:
+            hit = [g for g in pool if norm(q) and norm(q) in norm(g.name)]
+        if len(hit) == 1:
+            return hit[0]
+        if len(hit) > 1:
+            names = ", ".join(f"{g.name} [{g.provider}]" for g in hit)
+            die(f"'{query}' is ambiguous: {names}")
+    die(f"no game matches '{query}' (try: hub list)")
+
+
+# ---------------------------------------------------------------- processes
+
+def die(msg, code=1):
+    print(f"hub: {msg}", file=sys.stderr)
+    sys.exit(code)
+
+
+def ps():
+    out = subprocess.run(["ps", "-axo", "pid=,etime=,command="], capture_output=True, text=True).stdout
+    rows = []
+    for line in out.splitlines():
+        p = line.split(None, 2)
+        if len(p) == 3 and p[0].isdigit():
+            rows.append((int(p[0]), p[1], p[2]))
+    return rows
+
+
+def running_runtime():
+    for _, _, cmd in ps():
+        m = re.search(r"/Runtimes/([^/]+)/.*bin/wineserver", cmd)
+        if m:
+            return m.group(1)
+    return None
+
+
+def provider_running():
+    pats = {"steam": r"Library\\Steam\\steam\.exe", "ea": r"EADesktop\.exe", "ubisoft": r"UbisoftConnect\.exe|upc\.exe"}
+    found = set()
+    for _, _, cmd in ps():
+        if "x87sidecar" in cmd:
+            continue
+        for k, p in pats.items():
+            if re.search(p, cmd):
+                found.add(k)
+    return found
+
+
+def game_procs(g):
+    if not g.path:
+        return []
+    key = ("\\" + g.path.name + "\\").lower()   # \Zero Hour\ must not match "...Generals - Zero Hour\"
+    return [(pid, et, cmd) for pid, et, cmd in ps() if key in cmd.lower() and ".exe" in cmd.lower() and "x87sidecar" not in cmd]
+
+
+def all_running_games(games):
+    return [g for g in games if g.installed and game_procs(g)]
+
+
+# ---------------------------------------------------------------- environment
+
+def backend_ok(rt, api, backend):
+    return (RUNTIMES / rt / "lib/wine" / api / backend).is_dir()
+
+
+def compat_db(rt, gd="dxmt"):
+    rules = [("steam-webhelper", "steamwebhelper.exe", "dxgi", "dxmt"),
+             ("ea-cef", "EACefSubProcess.exe", "dxgi", "wined3d"), ("ea-gep", "EAGEP.exe", "dxgi", "wined3d"),
+             ("aoa", "ActOfAggressionRE.exe", "dxgi", gd), ("aoa2", "ActOfAggression.exe", "dxgi", gd)]
+    lines = ["v=3"] + [f"name={n};exe={e};{a}={b}" for n, e, a, b in rules if backend_ok(rt, a, b)]
+    lines.append("name=default;exe=*;d3d9=mtld3d;dxgi=dxmt")   # total default, always last
+    return "\n".join(lines)
+
+
+def session_env(rt, provider, opts):
+    rtp = RUNTIMES / rt
+    ext = rtp / "lib/external"
+    env = {"PATH": "/usr/bin:/bin:/usr/sbin:/sbin", "LANG": "en_US.UTF-8", "USER": "Player", "HOME": str(HOME), "TMPDIR": str(TEMP),
+           "WINEPREFIX": str(PREFIX), "WINEMSYNC": "1", "WINEDEBUG": opts.debug or ("err+all" if provider == "steam" else "-all"),
+           "WINEDLLOVERRIDES": "mscoree,mshtml=d;winemenubuilder.exe=d", "WINE_COMPATDB": compat_db(rt, opts.dxgi or "dxmt")}
+    if ext.is_dir():
+        env["DYLD_FALLBACK_LIBRARY_PATH"] = f"{ext}:{ext}/media:{ext}/vulkan"
+        env["VK_ICD_FILENAMES"] = f"{ext}/vulkan/MoltenVK_icd.json"
+        env["GST_PLUGIN_SYSTEM_PATH_1_0"] = env["GST_PLUGIN_PATH_1_0"] = f"{ext}/media/plugins"
+        env["GST_REGISTRY_1_0"], env["GST_REGISTRY_FORK"], env["GST_DEBUG"] = str(TEMP / "gst-registry.bin"), "no", "0"
+    if provider == "ea":
+        env.update(MTL_HUD_ENABLED="0", WINE_TF_EMULATION="1", WINE_TF_MAX_STEPS="0", WINE_TF_MAX_NS="0",
+                   WINEDLLOVERRIDES="IGOProxy32.exe=d;winemenubuilder.exe=d")
+    if not (rtp / "bin/x87sidecar").exists() and X87_HELPER.exists():
+        env["ROSETTA_X87_PATH"] = str(X87_HELPER)
+    if opts.metalfx:
+        env["DXMT_METALFX_SPATIAL_SWAPCHAIN"] = "1"
+        env["DXMT_CONFIG"] = f"d3d11.metalSpatialUpscaleFactor={opts.metalfx}"
+    return env
+
+
+def signature(rt, provider, opts):
+    return {"runtime": rt, "provider": provider, "metalfx": opts.metalfx, "dxgi": opts.dxgi or "dxmt", "debug": opts.debug}
+
+
+def spawn(rt, env, args, log, cwd=None):
+    LOGS.mkdir(parents=True, exist_ok=True)
+    f = open(log, "ab")
+    return subprocess.Popen([str(RUNTIMES / rt / "bin/wine")] + args, env=env, cwd=str(cwd or TEMP), stdin=subprocess.DEVNULL,
+                            stdout=f, stderr=subprocess.STDOUT, start_new_session=True)
+
+
+def stamp():
+    return time.strftime("%Y%m%d-%H%M%S")
+
+
+def wait_for(fn, timeout, what, every=2):
+    t0 = time.time()
+    while time.time() - t0 < timeout:
+        r = fn()
+        if r:
+            return r
+        time.sleep(every)
+    print(f"hub: timed out after {timeout}s waiting for {what}", file=sys.stderr)
+    return None
+
+
+def log_tail_from(path, offset):
+    try:
+        with open(path, errors="replace") as f:
+            f.seek(offset)
+            return f.read()
+    except OSError:
+        return ""
+
+
+def size(path):
+    try:
+        return Path(path).stat().st_size
+    except OSError:
+        return 0
+
+
+# ---------------------------------------------------------------- providers
+
+def ea_client():
+    root = PREFIX / "drive_c/Program Files/Electronic Arts/EA Desktop"
+    cands = [p for p in root.glob("[0-9]*/EA Desktop/EADesktop.exe") if p.is_file()]
+    ver = lambda p: [int(x) for x in re.findall(r"\d+", p.parts[-3].split("-")[0])]
+    return sorted(cands, key=ver)[-1] if cands else None
+
+
+def prep_steam():
+    od = STEAM / "_overlay-disabled"
+    od.mkdir(exist_ok=True)
+    for n in ("GameOverlayRenderer.dll", "GameOverlayRenderer64.dll", "gameoverlayui.exe", "gameoverlayui64.exe", "GameOverlayUI.exe"):
+        if (STEAM / n).exists():   # the overlay crashes Act of Aggression right after its intro
+            shutil.move(str(STEAM / n), str(od / n))
+    (STEAM / "steam.cfg").write_bytes(b"BootStrapperInhibitAll=enable\r\nBootStrapperForceSelfUpdate=disable\r\n")
+
+
+def start_provider(provider, rt, opts):
+    env = session_env(rt, provider, opts)
+    if provider == "steam":
+        if not (STEAM / "steam.exe").exists():
+            die(f"Steam not found at {STEAM}")
+        prep_steam()
+        conn = STEAM / "logs/connection_log.txt"
+        off, log = size(conn), LOGS / f"steam-{stamp()}.log"
+        spawn(rt, env, ["E:\\Library\\Steam\\steam.exe", "-noverifyfiles", "-nobootstrapupdate", "-skipinitialbootstrap",
+                        "-inhibitbootstrap", "-no-cef-sandbox"], log)
+        print(f"starting Steam on {rt} (log {log})")
+        ok = wait_for(lambda: "Logged On" in log_tail_from(conn, off), 120, "Steam to log on")
+        if not ok:
+            die("Steam did not log on; see the log above")
+    elif provider == "ea":
+        exe = ea_client()
+        if not exe:
+            die("EA Desktop not found in the prefix")
+        log = LOGS / f"ea-{stamp()}.log"
+        ealog = PREFIX / "drive_c/ProgramData/EA Desktop/Logs/EADesktop.log"
+        off = size(ealog)
+        spawn(rt, env, [unix_to_win(exe), "--in-process-gpu"], log)
+        print(f"starting EA Desktop on {rt} (log {log})")
+
+        waiting = {}
+
+        def booted():
+            t = log_tail_from(log, 0) + log_tail_from(ealog, off)
+            if "SPA load success" in t:
+                return True
+            states = re.findall(r"state changed: \w+ -> (\w+)", t)
+            if states and states[-1] == "awaitingAuthentication":   # a normal passing state; only a lasting one means "sign in"
+                waiting.setdefault("since", time.time())
+                if time.time() - waiting["since"] > 25 and not waiting.get("told"):
+                    waiting["told"] = True
+                    print("hub: EA is waiting for you to sign in; do it in the EA window", file=sys.stderr)
+            else:
+                waiting.pop("since", None)
+            return False
+        if not wait_for(booted, 150, "EA Desktop to finish booting"):
+            die("EA Desktop did not finish booting (not signed in?)")
+        STATE.mkdir(parents=True, exist_ok=True)
+        (STATE / "ea-log").write_text(str(log))
+    elif provider == "ubisoft":
+        exe = UBISOFT / "UbisoftConnect.exe"
+        if not exe.exists():
+            die("Ubisoft Connect not found")
+        spawn(rt, env, [unix_to_win(exe)], LOGS / f"ubisoft-{stamp()}.log")
+        print("starting Ubisoft Connect (unverified); give it a moment to sign in")
+        time.sleep(15)
+    STATE.mkdir(parents=True, exist_ok=True)
+    (STATE / "session.json").write_text(json.dumps(signature(rt, provider, opts)))
+    return env
+
+
+def ea_booted():
+    t = log_tail_from(PREFIX / "drive_c/ProgramData/EA Desktop/Logs/EADesktop.log", 0)
+    t = t[t.rfind("[STARTUP]"):]   # the log accumulates sessions: only the current one counts
+    return "SPA load success" in t
+
+
+def stop_all(rt=None):
+    rt = rt or running_runtime()
+    if not rt:
+        print("nothing is running in the prefix")
+        return
+    env = {"PATH": "/usr/bin:/bin:/usr/sbin:/sbin", "WINEPREFIX": str(PREFIX), "WINEMSYNC": "1"}
+    ws = str(RUNTIMES / rt / "bin/wineserver")
+    subprocess.run([ws, "-k"], env=env, capture_output=True)
+    subprocess.run([ws, "-w"], env=env, capture_output=True, timeout=90)
+    time.sleep(1)
+    left = [c for _, _, c in ps() if "/Runtimes/" in c and re.search(r"wineserver|x87sidecar", c) or "C:\\windows" in c]
+    print("stopped everything in the prefix" if not left else f"{len(left)} process(es) still exiting")
+
+
+# ---------------------------------------------------------------- play
+
+def play(args):
+    games = discover()
+    g = find_game(games, args.game)
+    if not g.installed:
+        die(f"{g.name} is not usable: {g.note or 'not installed'}")
+    if g.status == "blocked" and not args.force:
+        die(f"{g.name} is known not to work: {g.note}. (--force to try anyway)")
+    provider = g.provider
+    rt = args.runtime or os.environ.get("HUB_RUNTIME") or PROVIDER_RUNTIME.get(provider if provider in PROVIDER_RUNTIME else "direct")
+    if not (RUNTIMES / rt / "bin/wine").exists():
+        die(f"runtime {rt} not found (ExT2 mounted?)")
+    cur_rt, up = running_runtime(), provider_running()
+    try:
+        session = json.loads((STATE / "session.json").read_text())
+    except (OSError, ValueError):
+        session = {}
+    # launcher environment (runtime, MetalFX, backend) is fixed when the launcher starts: an explicit different option needs a restart
+    changed = provider in up and any(getattr(args, k) is not None and getattr(args, k) != session.get(k) for k in ("metalfx", "dxgi"))
+    other_launchers = up - {provider}
+    needs_restart = bool(cur_rt) and (cur_rt != rt or changed or bool(other_launchers))
+    if needs_restart:
+        busy = all_running_games(games)
+        if busy and not args.restart:
+            die("another game is running in the prefix: " + ", ".join(b.name for b in busy) + ". Close it, or use --restart")
+        print(f"restarting the prefix session ({cur_rt} -> {rt}, {sorted(up) or 'no launcher'})")
+        stop_all(cur_rt)
+        up = set()
+    elif args.restart:
+        stop_all(cur_rt)
+        up = set()
+    env = session_env(rt, provider, args)
+    need = provider if provider in ("steam", "ea") else ("ubisoft" if provider == "ubisoft" else None)
+    if need and need not in provider_running():
+        env = start_provider(need, rt, args)
+    if provider == "ea" and not ea_booted():
+        if not wait_for(ea_booted, 120, "EA Desktop to finish booting (sign in if it asks)"):
+            die("EA Desktop is not ready")
+    if g.status != "verified":
+        print(f"note: {g.name} has not been confirmed working here ({g.note or 'unverified'})")
+    # per-game settings
+    if g.id in SETTINGS:
+        rel, golden = SETTINGS[g.id]
+        live, keep = PREFIX / rel, STATE / g.name.replace(" ", "") / Path(rel).name
+        live.parent.mkdir(parents=True, exist_ok=True)
+        keep.parent.mkdir(parents=True, exist_ok=True)
+        if not live.exists():
+            shutil.copy2(keep if keep.exists() else HERE / golden, live)
+    offsets = {"console": size(STEAM / "logs/console_log.txt")}
+    plog = LOGS / f"play-{norm(g.name)}-{stamp()}.log"
+    if provider == "steam":
+        spawn(rt, env, ["E:\\Library\\Steam\\steam.exe", f"steam://rungameid/{g.id}"], plog)
+    elif provider == "ea":
+        launcher = unix_to_win(ea_client().parent / "EALauncher.exe")
+        def fire(offer):
+            subprocess.run([str(RUNTIMES / rt / "bin/wine"), launcher, f"origin2://game/launch/?offerIds={offer}"], env=env,
+                           cwd=str(TEMP), stdin=subprocess.DEVNULL, stdout=open(plog, "ab"), stderr=subprocess.STDOUT, timeout=120)
+        if g.extra.get("prime"):   # NFS 2015: prime EA's catalog cache with the public offer id first, or the launch is dropped
+            fire(g.extra["prime"])
+            time.sleep(15)
+        fire(g.extra["offer"])
+    else:
+        exe = g.extra.get("exe")
+        spawn(rt, env, [unix_to_win(exe)], plog, cwd=exe.parent)
+    print(f"launching {g.name} via {provider} (log {plog})")
+    if args.no_wait:
+        return
+
+    def started():
+        if provider == "steam":
+            t = log_tail_from(STEAM / "logs/console_log.txt", offsets["console"])
+            m = re.search(r"LaunchApp failed with (\w+)", t)
+            if m:
+                die(f"Steam could not launch {g.name} ({m.group(1)}). If it was updating (check Library/Steam/logs/content_log.txt, "
+                    "for example 'Steamworks Shared' after folder changes) wait for the update and run the command again")
+        return game_procs(g)
+    procs = wait_for(started, 300 if provider == "steam" else 180, f"{g.name} to start", every=3)
+    if procs:
+        print(f"{g.name} is running (pid {procs[0][0]})")
+        if g.id in SETTINGS:   # copy the settings the game saved once it exits
+            subprocess.Popen([sys.executable, str(Path(__file__).resolve()), "_keep", g.id], start_new_session=True,
+                             stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    else:
+        sys.exit(1)
+
+
+def keep_settings(gid):
+    games = [g for g in discover() if g.id == gid]
+    if not games:
+        return
+    g = games[0]
+    rel, _ = SETTINGS[gid]
+    live, keep = PREFIX / rel, STATE / g.name.replace(" ", "") / Path(rel).name
+    while game_procs(g):
+        time.sleep(5)
+    if live.exists():
+        keep.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(live, keep)
+
+
+# ---------------------------------------------------------------- commands
+
+def cmd_list(args):
+    games = discover()
+    rows = [("GAME", "LAUNCHER", "ID", "STATE", "NOTES")]
+    for g in games:
+        if not g.installed and not args.all and g.id != "-":
+            continue
+        state = "blocked" if g.status == "blocked" else ("running" if g.installed and game_procs(g) else ("ready" if g.installed else "-"))
+        notes = {"verified": "works", "unverified": "unverified"}.get(g.status, "") if g.installed else ""
+        rows.append((g.name, g.provider, g.id, state, "; ".join(x for x in (notes, g.note) if x)))
+    w = [max(len(r[i]) for r in rows) for i in range(4)]
+    for r in rows:
+        print("  ".join(r[i].ljust(w[i]) for i in range(4)) + "  " + r[4])
+
+
+def cmd_status(args):
+    rt, up = running_runtime(), provider_running()
+    print(f"runtime: {rt or 'none running'}   launchers: {', '.join(sorted(up)) or 'none'}")
+    for g in discover():
+        if g.installed:
+            for pid, et, cmd in game_procs(g)[:1]:
+                print(f"running: {g.name} (pid {pid}, {et})")
+
+
+def cmd_start(args):
+    prov = args.provider
+    rt = args.runtime or PROVIDER_RUNTIME[prov]
+    cur = running_runtime()
+    if cur and cur != rt:
+        die(f"{cur} is serving the prefix; run 'hub stop' first (a prefix can use one runtime at a time)")
+    up = provider_running()
+    if prov in up:
+        print(f"{prov} is already running")
+        return
+    other_launchers = up - {prov}
+    if other_launchers:
+        print(f"stopping running launcher ({', '.join(sorted(other_launchers))}) before starting {prov}")
+        stop_all(cur)
+    start_provider(prov, rt, args)
+
+
+def cmd_stop(args):
+    if args.game:
+        g = find_game(discover(), args.game)
+        procs = game_procs(g)
+        if not procs:
+            print(f"{g.name} is not running")
+        for pid, _, _ in procs:
+            os.kill(pid, 15)
+        return
+    stop_all()
+
+
+def cmd_doctor(args):
+    ok = True
+
+    def chk(label, cond, hint=""):
+        nonlocal ok
+        ok &= bool(cond)
+        print(f"[{'ok' if cond else 'FAIL'}] {label}" + (f"  -> {hint}" if not cond and hint else ""))
+    chk(f"volume {ROOT}", ROOT.is_dir(), "plug in and mount ExT2")
+    chk(f"prefix {PREFIX}", (PREFIX / "system.reg").exists())
+    for rt in sorted(set(PROVIDER_RUNTIME.values())):
+        chk(f"runtime {rt}", (RUNTIMES / rt / "bin/wine").exists())
+    chk("Steam client", (STEAM / "steam.exe").exists())
+    reg = (PREFIX / "user.reg").read_text(errors="replace") if (PREFIX / "user.reg").exists() else ""
+    chk("registry SteamPath -> Library/Steam", 'SteamPath"="e:/library/steam"' in reg, "run hub start steam once; Steam rewrites it")
+    chk("no stale SteamOld references", "steamold" not in reg.lower())
+    chk("EA Desktop client", ea_client() is not None)
+    chk("Steam overlay disabled", not (STEAM / "GameOverlayRenderer.dll").exists())
+    for rt in sorted(set(PROVIDER_RUNTIME.values())):
+        for api, b in (("dxgi", "dxmt"), ("dxgi", "wined3d"), ("d3d9", "mtld3d")):
+            chk(f"{rt}: {api}/{b} backend", backend_ok(rt, api, b))
+    rt = running_runtime()
+    print(f"running runtime: {rt or 'none'}; launchers: {sorted(provider_running()) or 'none'}")
+    sys.exit(0 if ok else 1)
+
+
+def main():
+    ap = argparse.ArgumentParser(prog="hub", description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    sub = ap.add_subparsers(dest="cmd", required=True)
+
+    def common(p):
+        p.add_argument("--runtime"), p.add_argument("--debug"), p.add_argument("--dxgi", choices=["dxmt", "wined3d"])
+        p.add_argument("--metalfx", nargs="?", const="1.40625", metavar="FACTOR")
+    p = sub.add_parser("list"); p.add_argument("--all", action="store_true"); p.set_defaults(f=cmd_list)
+    p = sub.add_parser("play"); p.add_argument("game"); common(p)
+    p.add_argument("--restart", action="store_true"); p.add_argument("--no-wait", action="store_true"); p.add_argument("--force", action="store_true")
+    p.set_defaults(f=play)
+    p = sub.add_parser("start"); p.add_argument("provider", choices=["steam", "ea", "ubisoft"]); common(p); p.set_defaults(f=cmd_start)
+    sub.add_parser("status").set_defaults(f=cmd_status)
+    p = sub.add_parser("stop"); p.add_argument("game", nargs="?"); p.set_defaults(f=cmd_stop)
+    sub.add_parser("doctor").set_defaults(f=cmd_doctor)
+    p = sub.add_parser("_keep"); p.add_argument("gid"); p.set_defaults(f=lambda a: keep_settings(a.gid))
+    args = ap.parse_args()
+    if args.cmd not in ("_keep",) and not ROOT.is_dir():
+        die(f"{ROOT} is not mounted (plug in ExT2)")
+    for d in (LOGS, STATE, TEMP, HOME):
+        d.mkdir(parents=True, exist_ok=True)
+    args.f(args)
+
+
+if __name__ == "__main__":
+    main()
