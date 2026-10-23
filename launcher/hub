@@ -263,6 +263,7 @@ def backend_ok(rt, api, backend):
 def compat_db(rt, gd="dxmt"):
     rules = [("steam-webhelper", "steamwebhelper.exe", "dxgi", "dxmt"),
              ("ea-cef", "EACefSubProcess.exe", "dxgi", "wined3d"), ("ea-gep", "EAGEP.exe", "dxgi", "wined3d"),
+             ("epic-cef", "EpicWebHelper.exe", "dxgi", "wined3d"),
              ("aoa", "ActOfAggressionRE.exe", "dxgi", gd), ("aoa2", "ActOfAggression.exe", "dxgi", gd)]
     lines = ["v=3"] + [f"name={n};exe={e};{a}={b}" for n, e, a, b in rules if backend_ok(rt, a, b)]
     lines.append("name=default;exe=*;d3d9=mtld3d;dxgi=dxmt")   # total default, always last
@@ -416,9 +417,9 @@ def start_provider(provider, rt, opts):
         if not exe:
             die("Epic Games Launcher not found in the prefix")
         log = LOGS / f"epic-{stamp()}.log"
-        spawn(rt, env, [unix_to_win(exe), "-OpenGL"], log)
+        spawn(rt, env, [unix_to_win(exe), "-OpenGL", "-SkipBuildPatchPrereq"], log)
         print(f"starting Epic Games Launcher on {rt} (log {log})")
-        time.sleep(15)
+        time.sleep(10)
     STATE.mkdir(parents=True, exist_ok=True)
     (STATE / "session.json").write_text(json.dumps(signature(rt, provider, opts)))
     return env
