@@ -28,7 +28,6 @@ LOGS, STATE, TEMP, HOME = ROOT / "Hub/Logs", ROOT / "Hub/State", ROOT / "Hub/Tem
 STEAM = ROOT / "Library/Steam"
 UBISOFT = ROOT / "Library/Ubisoft"
 EA_GAMES = ROOT / "EA Games"
-X87_HELPER = RUNTIMES / "hub-0-helpers-fpr/x87sidecar"   # external sidecar for runtimes that do not bundle one
 
 # Which runtime each launcher runs on (override with --runtime / HUB_RUNTIME). Every launcher now defaults to hub-1.
 PROVIDER_RUNTIME = {"steam": "hub-1", "ea": "hub-1", "ubisoft": "hub-1", "direct": "hub-1", "epic": "hub-1"}
@@ -287,8 +286,6 @@ def session_env(rt, provider, opts):
     if provider == "ea":
         env.update(MTL_HUD_ENABLED="0", WINE_TF_EMULATION="1", WINE_TF_MAX_STEPS="0", WINE_TF_MAX_NS="0",
                    WINEDLLOVERRIDES="IGOProxy32.exe=d;winemenubuilder.exe=d")
-    if not (rtp / "bin/x87sidecar").exists() and X87_HELPER.exists():
-        env["ROSETTA_X87_PATH"] = str(X87_HELPER)
     if opts.metalfx:
         env["DXMT_METALFX_SPATIAL_SWAPCHAIN"] = "1"
         env["DXMT_CONFIG"] = f"d3d11.metalSpatialUpscaleFactor={opts.metalfx}"
