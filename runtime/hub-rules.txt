@@ -4,6 +4,7 @@
 #   name=...;exe=...;key=value              a compatdb rule (keys: dxgi, d3d9, dll_overrides, env, arguments, ...)
 #   when pred[;pred...] => key=value;...    applies the settings to the starting executable when every predicate holds
 #                                           predicates: exe=<name>, machine=i386|amd64, section=<name>, imports=<dll>[,<dll>]
+#                                           runtime capability (not passed to compatdb): gate_selector_fixup=true
 # Order: compatdb built-ins < this file < WINE_COMPATDB from the launcher (the launcher wins).
 
 # Chromium-based store clients: DXMT for Steam's webhelper, wined3d for the EA and Epic helpers
@@ -16,6 +17,11 @@ name=epic-cef;exe=EpicWebHelper.exe;dxgi=wined3d
 # it wined3d, but wined3d's Vulkan renderer offers no D3D11 feature level on MoltenVK and the launcher exits with code 1
 # ("Unable to launch game"). wined3d on OpenGL provides the device.
 name=rockstar-launcher;exe=Launcher.exe;company=Rockstar Games;dxgi=wined3d;env=WINE_D3D_CONFIG=renderer=gl
+
+# Ubisoft's packer (.ubx sections: upc.exe, UplayService.exe, UbisoftExtension.exe, UplayCrashReporter.exe) far-jumps
+# to Windows' 64-bit code selector 0x33, which Rosetta rejects ("invalid gdt selector index 6"); ntdll rewrites those
+# jumps to this process's 64-bit selector before the image runs
+when machine=i386;section=.ubx2 => gate_selector_fixup=true
 
 # Defaults for every process: mtld3d for D3D8/9, DXMT for D3D10/11
 name=default;exe=*;d3d9=mtld3d;dxgi=dxmt
