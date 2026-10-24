@@ -1,7 +1,7 @@
 # launcher: one `hub` command for every game in the GameHub prefix
 
 Scripts and settings only. All runtime data lives on the ExT2 volume (`HUB_ROOT`, default `/Volumes/ExT2/GameHub`); nothing is stored on the internal drive.
-Background, decisions and troubleshooting: `docs/steam-light-aoa.md`.
+Background, decisions and troubleshooting: `docs/hub/steam-light-aoa.md`.
 
 | What | Where |
 |---|---|
@@ -19,6 +19,7 @@ runtime and launcher each needs, starts it, and starts the game.
 - `hub list` games, their launcher, and whether each is known to work; `hub play <game>` (alias, Steam app id or part of the name, e.g. `hub play aoa`, `hub play bf4`).
 - `hub start steam|ea|ubisoft`, `hub status`, `hub stop [game]`, `hub doctor`.
 - Options: `--restart`, `--runtime NAME`, `--metalfx [FACTOR]`, `--dxgi wined3d`, `--debug SPEC`, `--no-wait`, `--force`.
+- `--metalfx` turns on DXMT's MetalFX spatial upscaler (factor above 1.0, at most 2.0; the game's output is its resolution times the factor). It applies to the whole session, except for Epic, where it is scoped to `GTA5.exe` so the launcher itself keeps its normal swapchain.
 - All launchers (Steam, EA, Ubisoft, Epic) run on the unified `hub-1` runtime. Switching launchers cleanly stops the other one (refused while a game runs, unless `--restart`).
 
 ## What makes it work (do not remove)
