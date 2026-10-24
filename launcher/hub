@@ -291,6 +291,8 @@ def game_env(provider, fx):
         conf = HERE / "settings" / folder / "dxmt.conf"
         if conf.is_file():
             env.append(f"DXMT_CONFIG_FILE={conf}")   # a unix path: DXMT cannot open the same file given as Z:\\...
+        if os.environ.get("HUB_DXMT_HUD"):   # debug: Apple's Metal HUD with DXMT's lines (for example "MetalFX: Spatial", "Scale: 1920x1200->3600x2250")
+            env.append("MTL_HUD_ENABLED=1")
         if fx:
             env += ["DXMT_METALFX_SPATIAL_SWAPCHAIN=1", f"DXMT_CONFIG=d3d11.metalSpatialUpscaleFactor={fx}"]
         out[exe] = env
