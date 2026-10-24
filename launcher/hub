@@ -6,6 +6,7 @@
   hub start <steam|ea|ubisoft>   start only a launcher
   hub status                     what is running in the prefix
   hub stop [game]                stop one game, or everything in the prefix (wineserver -k)
+  hub trim epic                  stop the Epic launcher's processes while a game runs, to free memory (the game keeps running)
   hub doctor                     check volume, runtimes, prefix and launcher registrations
 
 <game> is an alias (aoa, bf4, nfs, ...), a Steam app id, or any part of the name.
@@ -783,6 +784,23 @@ def cmd_stop(args):
     stop_all()
 
 
+# Processes of a store launcher that a running game does not need: closing them returns their memory (the Epic stack held
+# about 5 GB, mostly compressed, while GTA V ran, and the Mac swapped 50-400 MB/s)
+TRIM_PATTERNS = {"epic": r"EpicGamesLauncher\.exe|EpicWebHelper\.exe|EpicOnlineServices|EOSOverlayRenderer|EpicGamesUpdater\.exe"}
+
+
+def cmd_trim(args):
+    """Stop the launcher processes of `args.provider` and leave the game, the other launchers and the wineserver running."""
+    pat = re.compile(TRIM_PATTERNS[args.provider])
+    victims = [(pid, cmd) for pid, _, cmd in ps() if pat.search(cmd) and "x87sidecar" not in cmd and "launcher/hub" not in cmd]
+    for pid, cmd in victims:
+        try:
+            os.kill(pid, 15)
+        except OSError as e:
+            print(f"hub: cannot stop {pid}: {e}", file=sys.stderr)
+    print(f"stopped {len(victims)} {args.provider} launcher process(es); the game and the Wine server keep running")
+
+
 def cmd_doctor(args):
     ok = True
 
@@ -822,6 +840,7 @@ def main():
     p.set_defaults(f=play)
     p = sub.add_parser("start"); p.add_argument("provider", choices=["steam", "ea", "ubisoft", "epic"]); common(p); p.set_defaults(f=cmd_start)
     sub.add_parser("status").set_defaults(f=cmd_status)
+    p = sub.add_parser("trim", help="stop a store launcher while its game runs, to free memory"); p.add_argument("provider", choices=sorted(TRIM_PATTERNS)); p.set_defaults(f=cmd_trim)
     p = sub.add_parser("stop"); p.add_argument("game", nargs="?"); p.set_defaults(f=cmd_stop)
     sub.add_parser("doctor").set_defaults(f=cmd_doctor)
     p = sub.add_parser("_keep"); p.add_argument("gid"); p.set_defaults(f=lambda a: keep_settings(a.gid))

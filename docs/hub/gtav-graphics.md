@@ -64,6 +64,19 @@ textures arrive. The system log has no GPU error for that run (`IOGPU`/AGX searc
   about 330 % of a 10-core CPU), and DXMT's upload path. The watcher now logs the volume's disk MB/s and page-in, swap-in and
   swap-out MB/s every 30 s; a `sample` of the game process while driving shows where its threads spend time.
 
+## Run of 2026-10-21:58 (NaN-to-zero only, flags 1, no memory cap)
+
+- **Artifacts:** no black textures, no magenta or white artifacts, no `Failed to create PSO`; one white flash in about five minutes
+  (with both options on it was frequent). `defuseFma` is off for good; `sampleNaNToZero` stays on.
+- **Late textures: it is memory, not the disk.** Every 30 s the watcher logged: the external volume with the game read only 8-45 MB/s
+  (the drive can do 1.46 GB/s), while the internal disk moved 100-600 MB/s: that is paging. Page-ins ran at 50-400 MB/s, swap grew to
+  11 GB, and the game's resident size stayed at 100-670 MB. The streaming is waiting for memory.
+- **Where the memory goes** (`top`, after the game had stopped): the Epic launcher stack about 5.4 GB (Epic launcher, six web helper
+  and overlay processes; about 4 GB of it compressed), the eight pi sessions about 2.9 GB, two swift builds about 1.5 GB,
+  WindowServer 1 GB. The game's own Metal memory is wired, about 6 GB. A 16 GB Mac has no room for all of it.
+- **Test in progress:** `launcher/hub trim epic` stops the Epic stack after the game has started; check that the game survives
+  and that the page-in rate falls.
+
 ## What the first DXMT log showed (2026-10-24, `Hub/Logs/dxmt-gtav/GTA5_d3d11.log`)
 
 | Log line | Meaning | Likely effect |
