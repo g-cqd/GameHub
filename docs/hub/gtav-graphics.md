@@ -47,6 +47,23 @@ on). The DXMT and Epic logs of that run have **no `Failed to create PSO` line**,
 So those two options remove the compile failures. Swap still grew to 11.3 GB in the same run, so the memory problem is not
 solved; `dxgi.maxDeviceMemory = 4096` is on for the next run.
 
+## Second report: white flashes, and textures that arrive late
+
+After the run with flags 3 the owner reported: no black textures, no magenta or white artifacts, **but the whole screen flashed
+white now and then**, and **textures struggle to load**: driving along a road, the map is visible through buildings before their
+textures arrive. The system log has no GPU error for that run (`IOGPU`/AGX search, 21:41-21:47).
+
+- **White flashes.** Suspects are the two options that were on. `sampleNaNToZero` is the likelier fix for the compile failures
+  (it changes the sample coordinate, so the projective pattern disappears); `defuseFma` changes the arithmetic of the lighting and
+  exposure passes and could produce a very bright value. Test: flags 1 (NaN only) and see whether the flashes stop and the
+  compile failures stay away.
+- **Late textures.** The disk is not the limit: measured on the external NVMe (Kingston SNV2S1000G, 97 % full) with the OS cache
+  bypassed, sequential reads of a game archive ran at 1.46 GB/s, random 64 KiB reads at 310 MB/s with a 0.25 ms median
+  latency. Remaining suspects: the memory budget (swap reached 11 GB; `dxgi.maxDeviceMemory` lowers the budget the game
+  streams to, so it is off for this test), the CPU cost of streaming and decompression under Rosetta (the game process used
+  about 330 % of a 10-core CPU), and DXMT's upload path. The watcher now logs the volume's disk MB/s and page-in, swap-in and
+  swap-out MB/s every 30 s; a `sample` of the game process while driving shows where its threads spend time.
+
 ## What the first DXMT log showed (2026-10-24, `Hub/Logs/dxmt-gtav/GTA5_d3d11.log`)
 
 | Log line | Meaning | Likely effect |

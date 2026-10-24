@@ -9,7 +9,8 @@ It records, once per distinct message:
   * new `err:`/`warn:` lines (DXMT) and Wine `err:` lines in the newest Hub/Logs/<launcher>-*.log;
   * new lines of the game's DXMT log (`Hub/Logs/dxmt-<game>/`) and mtld3d log (`Library/Epic/<game>/mtld3d-logs/`);
   * new crash reports in ~/Library/Logs/DiagnosticReports that mention the game or Wine;
-and every 30 s a status line: game RSS and CPU, swap used, free memory percentage, counts of the noisy messages.
+and every 30 s a status line: game RSS and CPU, swap used, free memory percentage, disk MB/s of the external volume (disk16)
+and the internal one (disk0), page-in/swap-in/swap-out MB/s, and the count of noisy messages.
 Polls with plain file reads (no subprocess per poll except `ps`/`sysctl`), so it costs almost no CPU.
 It exits when the game has been gone `--idle-exit` minutes (default 10), when it never started within 60 minutes, or after
 `--max-hours` (default 6). Stop it early with `kill $(cat <log dir>/<exe>.pid)`.
@@ -99,6 +100,28 @@ def swap_used_mb() -> str:
     return m.group(1) if m else "?"
 
 
+def disk_totals(*disks: str) -> dict[str, float]:
+    """Return total MB transferred since boot (reads plus writes) for each of `disks`, e.g. disk16."""
+    lines = run("iostat", "-Id", *disks).splitlines()
+    names = lines[0].split() if lines else []
+    values = lines[2].split() if len(lines) > 2 else []
+    totals = {}
+    for i, name in enumerate(names):
+        if len(values) >= 3 * (i + 1):
+            totals[name] = float(values[3 * i + 2])
+    return totals
+
+
+def vm_counters() -> dict[str, int]:
+    """Return the vm_stat counters (Pageins, Swapins, Swapouts, ...) as integers."""
+    out = {}
+    for line in run("vm_stat").splitlines():
+        m = re.match(r'"?([A-Za-z ]+?)"?:\s+(\d+)\.', line)
+        if m:
+            out[m.group(1)] = int(m.group(2))
+    return out
+
+
 def free_memory_percent() -> str:
     m = re.search(r"free percentage: (\d+)%", run("memory_pressure"))
     return m.group(1) if m else "?"
@@ -133,6 +156,8 @@ def main() -> int:
     seen_reports = {p.name for p in REPORTS.glob("*.ips")} if REPORTS.is_dir() else set()
     started = time.time()
     last_status = 0.0
+    prev_io: dict[str, float] = {}
+    prev_vm: dict[str, int] = {}
     last_seen_running = None
     was_running = False
     emit(f"watching {args.exe}; log {log_path}")
@@ -178,9 +203,17 @@ def main() -> int:
                         emit(f"[crash-report] {p.name}")
 
             if now - last_status >= 30:
+                io, vm = disk_totals("disk16", "disk0"), vm_counters()
+                span = now - last_status if last_status else 0
+                rates = ""
+                if span and prev_io and prev_vm:
+                    mb = {d: (io.get(d, 0) - prev_io.get(d, 0)) / span for d in io}
+                    pages = {k: (vm.get(k, 0) - prev_vm.get(k, 0)) * 16 / 1024 / span for k in ("Pageins", "Swapins", "Swapouts")}
+                    rates = f" | disk16 {mb.get('disk16', 0):.0f} MB/s disk0 {mb.get('disk0', 0):.0f} MB/s | pagein {pages['Pageins']:.0f} swapin {pages['Swapins']:.0f} swapout {pages['Swapouts']:.0f} MB/s"
+                prev_io, prev_vm = io, vm
                 last_status = now
                 if proc:
-                    emit(f"status pid {proc[0]} up {proc[1]} rss {proc[2]} MB cpu {proc[3]:.0f}% | swap {swap_used_mb()} MB | free mem {free_memory_percent()}% | noise {sum(noisy.values())}")
+                    emit(f"status pid {proc[0]} up {proc[1]} rss {proc[2]} MB cpu {proc[3]:.0f}% | swap {swap_used_mb()} MB | free mem {free_memory_percent()}%{rates} | noise {sum(noisy.values())}")
                 else:
                     emit(f"status game not running | swap {swap_used_mb()} MB | free mem {free_memory_percent()}%")
             gone_for = now - last_seen_running if last_seen_running else None
