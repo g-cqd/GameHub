@@ -276,13 +276,16 @@ def metalfx_factor(value):
 def game_env(provider, fx):
     """Return {exe: ["NAME=value", ...]} for the game processes of `provider` (see GAME_PROCS).
 
-    Each process gets DXMT's warning log in Hub/Logs/dxmt-<game>/, its settings file when launcher/settings/<game>/dxmt.conf
+    Each process gets DXMT's info log in Hub/Logs/dxmt-<game>/, its settings file when launcher/settings/<game>/dxmt.conf
     exists, and the MetalFX swapchain when `fx` (a factor from metalfx_factor) is set."""
     out = {}
     for exe, folder in GAME_PROCS.get(provider, {}).items():
         logs = LOGS / f"dxmt-{folder.lower()}"
         logs.mkdir(parents=True, exist_ok=True)
-        env = ["DXMT_LOG_LEVEL=warn", f"DXMT_LOG_PATH={logs}"]
+        env = ["DXMT_LOG_LEVEL=info", f"DXMT_LOG_PATH={logs}"]
+        if os.environ.get("HUB_DXMT_DUMP"):   # debug: write every shader's DXBC to Hub/Logs/dxmt-<game>/shaders/ (needs the gtav-precise-divide DXMT build)
+            (logs / "shaders").mkdir(exist_ok=True)
+            env.append(f"DXMT_DUMP_SHADERS={logs / 'shaders'}")
         conf = HERE / "settings" / folder / "dxmt.conf"
         if conf.is_file():
             env.append(f"DXMT_CONFIG_FILE={unix_to_win(conf)}")
