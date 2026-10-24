@@ -46,6 +46,8 @@ OTHER_KNOWN = {  # standalone installs under Library/Ubisoft/games and Library/E
     "WATCH_DOGS2": dict(exe="bin/WatchDogs2.exe", status="unverified", note="ships EasyAntiCheat"),
     "GTAV": dict(exe="PlayGTAV.exe", status="unverified", note="starts via the Epic launcher and Rockstar Launcher; args.txt carries -nobattleye -noBE"),
 }
+# Providers whose launcher must not get MetalFX (a spatial swapchain there broke the Epic launcher): --metalfx applies only to these processes
+METALFX_EXES = {"epic": ("GTA5.exe",)}
 STEAM_SKIP = {"228980"}  # Steamworks Common Redistributables
 ALIASES = {
     "aoa": "318020", "ron": "287450", "generals": "2229870", "zh": "2732960", "wd": "243470",
@@ -259,23 +261,39 @@ def backend_ok(rt, api, backend):
     return (RUNTIMES / rt / "lib/wine" / api / backend).is_dir()
 
 
-def compat_db(rt, gd="dxmt"):
+def metalfx_factor(value):
+    """Return `value` as a DXMT spatial upscale factor string; exit when it is not a number in (1.0, 2.0]."""
+    try:
+        f = float(value)
+    except ValueError:
+        f = 0.0
+    if not 1.0 < f <= 2.0:
+        die(f"--metalfx factor must be a number above 1.0 and at most 2.0, got {value!r}")
+    return repr(f)
+
+
+def compat_db(rt, gd="dxmt", metalfx=None, metalfx_exes=()):
     rules = [("steam-webhelper", "steamwebhelper.exe", "dxgi", "dxmt"),
              ("ea-cef", "EACefSubProcess.exe", "dxgi", "wined3d"),
              ("ea-gep", "EAGEP.exe", "dxgi", "wined3d"),
              ("epic-cef", "EpicWebHelper.exe", "dxgi", "wined3d"),
              ("aoa", "ActOfAggressionRE.exe", "dxgi", gd), ("aoa2", "ActOfAggression.exe", "dxgi", gd)]
     lines = ["v=3"] + [f"name={n};exe={e};{a}={b}" for n, e, a, b in rules if backend_ok(rt, a, b)]
+    if metalfx and backend_ok(rt, "dxgi", "dxmt"):   # env= fields reach only the named process, not the launcher or Wine services
+        lines += [f"name=metalfx-{i};exe={e};dxgi=dxmt;env=DXMT_METALFX_SPATIAL_SWAPCHAIN=1;env=DXMT_CONFIG=d3d11.metalSpatialUpscaleFactor={metalfx}"
+                  for i, e in enumerate(metalfx_exes)]
     lines.append("name=default;exe=*;d3d9=mtld3d;dxgi=dxmt")   # total default, always last
     return "\n".join(lines)
 
 
 def session_env(rt, provider, opts):
     rtp = RUNTIMES / rt
+    fx = metalfx_factor(opts.metalfx) if opts.metalfx else None
+    scoped_fx = fx if provider in METALFX_EXES else None
     ext = rtp / "lib/external"
     env = {"PATH": "/usr/bin:/bin:/usr/sbin:/sbin", "LANG": "en_US.UTF-8", "USER": "Player", "HOME": str(HOME), "TMPDIR": str(TEMP),
            "WINEPREFIX": str(PREFIX), "WINEMSYNC": "1", "WINEDEBUG": opts.debug or ("err+all" if provider == "steam" else "-all"),
-           "WINEDLLOVERRIDES": "mscoree,mshtml=d;winemenubuilder.exe=d", "WINE_COMPATDB": compat_db(rt, opts.dxgi or "dxmt")}
+           "WINEDLLOVERRIDES": "mscoree,mshtml=d;winemenubuilder.exe=d", "WINE_COMPATDB": compat_db(rt, opts.dxgi or "dxmt", scoped_fx, METALFX_EXES.get(provider, ()))}
     if ext.is_dir():
         env["DYLD_FALLBACK_LIBRARY_PATH"] = f"{ext}:{ext}/media:{ext}/vulkan"
         env["VK_ICD_FILENAMES"] = f"{ext}/vulkan/MoltenVK_icd.json"
@@ -286,9 +304,9 @@ def session_env(rt, provider, opts):
     if provider == "ea":
         env.update(MTL_HUD_ENABLED="0", WINE_TF_EMULATION="1", WINE_TF_MAX_STEPS="0", WINE_TF_MAX_NS="0",
                    WINEDLLOVERRIDES="IGOProxy32.exe=d;winemenubuilder.exe=d")
-    if opts.metalfx:
+    if fx and not scoped_fx:
         env["DXMT_METALFX_SPATIAL_SWAPCHAIN"] = "1"
-        env["DXMT_CONFIG"] = f"d3d11.metalSpatialUpscaleFactor={opts.metalfx}"
+        env["DXMT_CONFIG"] = f"d3d11.metalSpatialUpscaleFactor={fx}"
     return env
 
 
