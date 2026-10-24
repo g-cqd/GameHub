@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Watch a game running under the hub and append what matters to one log file, so a session can read it later.
 
-usage: scripts/watch_game.py EXE [--interval SECONDS] [--idle-exit MINUTES] [--max-hours HOURS]
+usage: scripts/watch_game.py EXE [--interval SECONDS] [--idle-exit MINUTES] [--max-hours HOURS] [--shots SECONDS]
 
 Writes `$HUB_ROOT/Hub/Logs/watch/<exe>-<date>.log` and points `<exe>-latest.log` at it. Each line starts with a time.
 It records, once per distinct message:
@@ -12,6 +12,8 @@ It records, once per distinct message:
 and every 30 s a status line: game RSS and CPU, swap used, free memory percentage, disk MB/s of the external volume (disk16)
 and the internal one (disk0), page-in/swap-in/swap-out MB/s, and the count of noisy messages.
 Polls with plain file reads (no subprocess per poll except `ps`/`sysctl`), so it costs almost no CPU.
+With `--shots N` it also saves a downscaled screenshot every N seconds to `watch/shots/` (newest 150 kept) and logs a
+`[screen]` line, with a copy in `shots/events/`, when more than 0.2 % of the pixels are magenta or more than 60 % are near white.
 It exits when the game has been gone `--idle-exit` minutes (default 10), when it never started within 60 minutes, or after
 `--max-hours` (default 6). Stop it early with `kill $(cat <log dir>/<exe>.pid)`.
 """
@@ -122,6 +124,53 @@ def vm_counters() -> dict[str, int]:
     return out
 
 
+def read_bmp_fractions(path: Path) -> tuple[float, float]:
+    """Return (magenta fraction, near-white fraction) of an uncompressed 24- or 32-bit BMP, sampling every 2nd pixel."""
+    data = path.read_bytes()
+    offset = int.from_bytes(data[10:14], "little")
+    width = int.from_bytes(data[18:22], "little", signed=True)
+    height = abs(int.from_bytes(data[22:26], "little", signed=True))
+    bytes_per_pixel = int.from_bytes(data[28:30], "little") // 8
+    if bytes_per_pixel not in (3, 4) or width <= 0:
+        return 0.0, 0.0
+    stride = (width * bytes_per_pixel + 3) & ~3
+    magenta = white = total = 0
+    for y in range(0, height, 2):
+        row = data[offset + y * stride: offset + y * stride + width * bytes_per_pixel]
+        for x in range(0, width * bytes_per_pixel - 2, 2 * bytes_per_pixel):
+            b, g, r = row[x], row[x + 1], row[x + 2]
+            total += 1
+            if r > 170 and b > 170 and g < 90:
+                magenta += 1
+            elif r > 235 and g > 235 and b > 235:
+                white += 1
+    return (magenta / total, white / total) if total else (0.0, 0.0)
+
+
+def take_shot(shots: Path, keep: int, emit) -> None:
+    """Save a downscaled screenshot to `shots`, keep the newest `keep`, and keep a copy in `shots/events` when it shows magenta or a white screen."""
+    name = f"{time.strftime('%H%M%S')}.jpg"
+    full, small, bmp = shots / "full.png", shots / name, shots / "probe.bmp"
+    if subprocess.run(["screencapture", "-x", "-t", "png", str(full)], capture_output=True).returncode != 0 or not full.exists():
+        return
+    run("sips", "-Z", "1280", "-s", "format", "jpeg", "-s", "formatOptions", "60", str(full), "--out", str(small))
+    run("sips", "-Z", "480", "-s", "format", "bmp", str(full), "--out", str(bmp))
+    full.unlink(missing_ok=True)
+    try:
+        magenta, white = read_bmp_fractions(bmp)
+    except (OSError, ValueError, IndexError):
+        magenta = white = 0.0
+    bmp.unlink(missing_ok=True)
+    if magenta > 0.002 or white > 0.6:
+        (shots / "events").mkdir(exist_ok=True)
+        if small.exists():
+            (shots / "events" / name).write_bytes(small.read_bytes())
+        emit(f"[screen] {name}: magenta {magenta * 100:.2f}% white {white * 100:.0f}% of pixels (copy in shots/events/)")
+    old = sorted(p for p in shots.glob("*.jpg"))[:-keep]
+    for p in old:
+        p.unlink(missing_ok=True)
+
+
 def free_memory_percent() -> str:
     m = re.search(r"free percentage: (\d+)%", run("memory_pressure"))
     return m.group(1) if m else "?"
@@ -133,6 +182,7 @@ def main() -> int:
     ap.add_argument("--interval", type=float, default=5.0)
     ap.add_argument("--idle-exit", type=float, default=10.0)
     ap.add_argument("--max-hours", type=float, default=6.0)
+    ap.add_argument("--shots", type=float, default=0.0, help="seconds between screenshots while the game runs (0 = off)")
     args = ap.parse_args()
     exe_stem = args.exe.removesuffix(".exe")
     game = exe_stem.lower()
@@ -156,6 +206,9 @@ def main() -> int:
     seen_reports = {p.name for p in REPORTS.glob("*.ips")} if REPORTS.is_dir() else set()
     started = time.time()
     last_status = 0.0
+    last_shot = 0.0
+    shots_dir = out_dir / "shots"
+    shots_dir.mkdir(exist_ok=True)
     prev_io: dict[str, float] = {}
     prev_vm: dict[str, int] = {}
     last_seen_running = None
@@ -188,6 +241,10 @@ def main() -> int:
             was_running = proc is not None
             if proc:
                 last_seen_running = now
+
+            if proc and args.shots and now - last_shot >= args.shots:
+                last_shot = now
+                take_shot(shots_dir, 150, emit)
 
             digest("epic", sources["epic"].new_lines(newest(LOGS, "epic-*.log"), from_start=False))
             digest("dxmt", sources["dxmt"].new_lines(newest_glob(LOGS, f"dxmt-*/{exe_stem}_d3d11.log"), from_start=True, marker=b"---- log opened ----"))
