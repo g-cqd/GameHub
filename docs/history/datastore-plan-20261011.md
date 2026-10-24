@@ -2,7 +2,7 @@
 
 ## 1. Summary and status
 
-Status: Approved by the user (plan v3). Executed step by step with `gamehub-cli datastore apply`; see STATUS-20261011.md for the outcome.
+Status: Approved by the user (plan v3). Executed step by step with `gamehub-cli datastore apply`; see docs/history/STATUS-20261011.md for the outcome.
 
 This document records the reorganisation of `/Volumes/ExT2/GameHub` into a data store with fixed locations for Hub state, the shared Wine prefix, launcher libraries, backups and app build output. It covers the target layout, the decisions behind it, the executable manifest and how to run it, each of the 12 steps, what is deliberately not moved, the Hub code location, rollback, and the checks the user has to make.
 
@@ -12,7 +12,7 @@ Sources: the manifest `/Volumes/ExT2/GameHub/docs/datastore-plan-20261011.json`,
 
 ## 1.1 Update: EA library consolidation completed 2026-10-11
 
-The EA library consolidation (see `docs/ea-library-consolidation-20261011.md`) has been applied. The EA library root is now `E:\EA Games` (physical `/Volumes/ExT2/GameHub/EA Games`), in a flat structure with five games: Battlefield 3, Battlefield 4, Crysis 3, F1 24, Need for Speed. The decision D-EA (keep the EA library physical) remains valid; the `Library/EA -> ../EA Games` symlink target is unchanged and valid. Any references in this document to `EA Games/BF4` nesting, BF3 inside `drive_c/Program Files`, or the NFS mirror are superseded; consult § Result in the consolidation plan for the applied mapping and backups.
+The EA library consolidation (see `docs/history/ea-library-consolidation-20261011.md`) has been applied. The EA library root is now `E:\EA Games` (physical `/Volumes/ExT2/GameHub/EA Games`), in a flat structure with five games: Battlefield 3, Battlefield 4, Crysis 3, F1 24, Need for Speed. The decision D-EA (keep the EA library physical) remains valid; the `Library/EA -> ../EA Games` symlink target is unchanged and valid. Any references in this document to `EA Games/BF4` nesting, BF3 inside `drive_c/Program Files`, or the NFS mirror are superseded; consult § Result in the consolidation plan for the applied mapping and backups.
 
 ## 2. Target tree
 

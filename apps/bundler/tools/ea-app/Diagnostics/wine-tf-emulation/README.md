@@ -9,7 +9,7 @@ This source bundle tests whether Wine can deliver execution breakpoints through 
 The base is a Wine 11 / CrossOver 26.3-derived source tree with an earlier Rosetta debug-register state-retention change. `source-hashes.json` identifies the exact six base and resulting source files. Reproduce those files in this order:
 
 1. Use [g-cqd/wine revision f064add996bbf4819acf49f48bab263735279800](https://github.com/g-cqd/wine/tree/f064add996bbf4819acf49f48bab263735279800).
-2. Apply the published [rosetta-debug-state-experimental.patch](https://github.com/g-cqd/nfs-macos/blob/b8ba68b4938da7bccc5e382f6880ae06f46a6c93/tools/ea-app/Diagnostics/rosetta-debug-state-experimental.patch), SHA-256 `0911cd9f04c62236c2e789e7bde41765c3f7164aa752627587f9672212ac5123`.
+2. Apply the published [rosetta-debug-state-experimental.patch](../rosetta-debug-state-experimental.patch), SHA-256 `0911cd9f04c62236c2e789e7bde41765c3f7164aa752627587f9672212ac5123`.
 3. Apply the bundled `frozen-base-comment.patch`. It restores one `server/mach.c` comment to the frozen test snapshot; it changes no behavior. The published prerequisite alone matches five of the six base hashes. This normalization makes all six match exactly.
 4. Verify all six `base` hashes, apply `tf-emulation-v6.patch`, then verify all six `candidate` hashes. Apply each patch with `patch -p1` from the Wine source root.
 

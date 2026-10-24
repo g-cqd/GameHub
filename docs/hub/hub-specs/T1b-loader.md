@@ -12,7 +12,7 @@ A4 `RuntimeManifest.helpers` paths are relative to the Runtimes directory (e.g. 
 
 ## Package
 In Package.swift change the HubCore target to `.target(name: "HubCore", dependencies: ["LauncherCore"], resources: [.copy("Knowledge")])` and create
-`Sources/HubCore/Knowledge/` containing ONLY a placeholder `README.md` (one line: "Hub knowledge base: see docs/hub-shared-prefix-design-20261011.md")
+`Sources/HubCore/Knowledge/` containing ONLY a placeholder `README.md` (one line: "Hub knowledge base: see docs/history/hub-shared-prefix-design-20261011.md")
 and empty folders kept with `.gitkeep`: `runtimes`, `fixes`, `recipes/providers`, `recipes/games`, `rules`, `assets`; plus minimal valid
 `capabilities.json` = `[]`, `knobs.json` = `[]`, `prerequisites.json` = `[]`, `patches.json` = `[]` (T2 fills them; your loader must accept these).
 `package static var bundledDirectory: URL? { Bundle.module.url(forResource: "Knowledge", withExtension: nil) }`.

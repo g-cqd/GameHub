@@ -21,7 +21,7 @@ and the scripts used to control compilation and installation. We provide it thre
 3. **On request.** Anyone who has received one of these apps may ask for the corresponding source at
    any time within **three years** after our last distribution of that version (and for as long as we
    provide support or spare parts for it). Ask by opening an issue at
-   https://github.com/g-cqd/nfs-macos/issues. We will send the source on a download link, or on
+   https://github.com/g-cqd/GameHub/issues. We will send the source on a download link, or on
    physical media for no more than the cost of performing the distribution. *(The contact point and
    the term are open decisions for the owner, see [LICENSING.md](LICENSING.md).)*
 

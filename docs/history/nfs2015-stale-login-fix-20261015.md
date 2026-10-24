@@ -65,7 +65,7 @@ available to them), so the game never reached gameplay from this path.
 This is **not new** — it is the exact same signature already on record for a
 different, legitimately-entitled title:
 
-> `STATUS-20261011.md:7`: "BF4 after that fix: BFLauncher.exe runs, then
+> `docs/history/STATUS-20261011.md:7`: "BF4 after that fix: BFLauncher.exe runs, then
 > spawns Core\ActivationUI.exe, EALauncher.exe, EALaunchHelper.exe (EA's
 > activation chain, the 'visuals' screen) and no bf4.exe appears. Pattern = EA
 > licence layer not given an auth code by the EA app (same pattern recorded
@@ -73,13 +73,13 @@ different, legitimately-entitled title:
 
 So the failure mode is general to the shared EA Desktop launch pipeline, not
 NFS-specific, and not caused by anything particular to NFS's registry-import
-installation (`docs/nfs-ea-import-plan-20261011.md`).
+installation (`docs/history/nfs-ea-import-plan-20261011.md`).
 
 ### 2.3 Launching it correctly (through EALauncher) does not reproduce it — when the EA Desktop session is "warm"
 
 Driving `NFS16.exe` through the same `origin2://game/launch/?offerIds=...`
 mechanism EA Desktop's own UI uses (`EALauncher.exe "origin2://game/launch/?offerIds={id}"`,
-confirmed from `docs/hub-shared-prefix-design-20261011.md:110`) reaches full,
+confirmed from `docs/history/hub-shared-prefix-design-20261011.md:110`) reaches full,
 playable gameplay with **no** stale dialog — confirmed with screenshots at
 multiple points (loading screen, intro cutscene, open-world driving, a
 circuit-race checkpoint objective) and no `ActivationUI.exe` in the process
@@ -164,7 +164,7 @@ readiness), not (a) or (c):
   `GamePreLaunchError`/`ActivationUI.exe` signature) whether the catalog-sync
   race is hit or avoided — S1 state does not change the outcome either way,
   and the same signature is independently on record for BF4
-  (`STATUS-20261011.md:7`), a title installed before S1 existed, under the
+  (`docs/history/STATUS-20261011.md:7`), a title installed before S1 existed, under the
   non-S1-affected part of the prefix.
 
 ## 4. Fix
@@ -179,7 +179,7 @@ handshake.
 `bin/start-ea.sh` now accepts an optional `[game]` shortcut argument
 (following the same per-game-launch-trick pattern already used for F1 24,
 see `docs/eaac/EAAC-macOS-full-game-handoff-20261014.md:54` and
-`docs/hub-shared-prefix-design-20261011.md:110`). `start-ea.sh nfs2015` (also
+`docs/history/hub-shared-prefix-design-20261011.md:110`). `start-ea.sh nfs2015` (also
 `nfs-2015`, `needforspeed`) starts EA Desktop exactly as before, then in the
 background:
 
@@ -215,7 +215,7 @@ hand (the same sequence now encoded in the script):
 - Battlefield 4: not relaunched during this session (the live NFS session was
   left running for the user rather than torn down to free the prefix for a
   second game test); BF4's own prior-known-good state
-  (`STATUS-20261011.md:7`) was not touched by this fix, since the fix only
+  (`docs/history/STATUS-20261011.md:7`) was not touched by this fix, since the fix only
   changes `start-ea.sh`'s optional post-boot auto-launch path, which BF4 does
   not use.
 
@@ -225,10 +225,10 @@ hand (the same sequence now encoded in the script):
   moving games through prefixes (e.g. the NFS import, or the earlier BF3
   `e:` addition) can invalidate `.dlf` licence files, which bind to a machine
   fingerprint beyond just `machash`
-  (`docs/nfs-ea-import-plan-20261011.md` D5: BF3's `70619.dlf` failed with
+  (`docs/history/nfs-ea-import-plan-20261011.md` D5: BF3's `70619.dlf` failed with
   `Mismatched machine hash in license` after `e:` was added, storage count
   2→3, while `machash` itself stayed constant —
-  `STATUS-20261011.md:23`). This is a separate concern from the launch-order
+  `docs/history/STATUS-20261011.md:23`). This is a separate concern from the launch-order
   race fixed here and was not investigated or fixed in this session; it
   deserves its own audit of which installed titles' licence files predate
   which prefix-shape changes.

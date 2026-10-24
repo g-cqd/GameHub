@@ -37,7 +37,7 @@ Method: read-only scouts. Sizes from `du -sk`; records from grep of registry and
 | `src` | 9.0 GB | `wine` 1.45 GB, `wine-arm64` 7.57 GB, `dxmt-v0.80` |
 | `toolchains` | 6.2 GB | `cargo`, `rustup` 1.40 GB, `llvm-mingw` 0.76 GB, `wine-sdk-cx-26.3.0-5` 1.16 GB, `xwin` 1.03 GB, `xwin-cache` 1.24 GB, `downloads` 0.37 GB, `provision.sh`, `mt-env` |
 | `work` | 36.0 GB | See section 3 |
-| `STATUS-20261010.md`, `STATUS-20261011.md` | | Status notes |
+| `docs/history/STATUS-20261010.md`, `docs/history/STATUS-20261011.md` | | Status notes |
 
 No `Hub/` directory and no `hub.json` exist.
 
@@ -83,7 +83,7 @@ Provider: EA app inside the shared prefix, at `P/drive_c/Program Files/Electroni
 Other EA files:
 - `ProgramData/EA Desktop/machine.ini`, `backgroundservice.ini` and `InstallData/*` contain no `E:` or `EA Games` strings.
 - `installerdata.xml` launchers resolve via `[HKEY_LOCAL_MACHINE\SOFTWARE\EA Games\Battlefield 4\Install Dir]` and `{installLocation}` (no literal path).
-- Licences in `P/drive_c/ProgramData/Electronic Arts/EA Services/License`: `1007968.dlf`, `70619.dlf`, `70619.dlf.stale-machine-hash-20261011`, `71503.dlf`. `STATUS-20261011.md` records that the BF3 licence failed with "Mismatched machine hash" since the `E:` mapping was added; BF4 and Crysis 3 licences were created after it.
+- Licences in `P/drive_c/ProgramData/Electronic Arts/EA Services/License`: `1007968.dlf`, `70619.dlf`, `70619.dlf.stale-machine-hash-20261011`, `71503.dlf`. `docs/history/STATUS-20261011.md` records that the BF3 licence failed with "Mismatched machine hash" since the `E:` mapping was added; BF4 and Crysis 3 licences were created after it.
 - Not inspected: EA `.db` files, CEF caches.
 
 **What breaks if it moves**

@@ -72,7 +72,7 @@ All local paths below are on the current developer Mac; another developer must c
 | Purpose | Location |
 | --- | --- |
 | Native starters, session helpers, tests, bundler, documentation | `~/Games/NFSMW-tools/macos-app` |
-| Bundler GitHub repository | `https://github.com/g-cqd/nfs-macos` |
+| Bundler GitHub repository | `https://github.com/g-cqd/GameHub` (this package is `apps/bundler`) |
 | Current bundler branch | `refresh-runtimes-cod4-bundle` |
 | mtld3d source | `~/Developer/mtld3d` |
 | mtld3d fork / upstream | `https://github.com/g-cqd/mtld3d` / `https://github.com/athei/mtld3d` |

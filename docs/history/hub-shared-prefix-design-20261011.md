@@ -207,4 +207,4 @@ EA activation on any identity change (mitigated: identical runtime bytes, gated 
 
 - D5 is done: the prefix is at `/Volumes/ExT2/GameHub/Prefix` and `Hub/hub.json` is written.
 - D4 paths are now Steam `Z:\Volumes\ExT2\GameHub\Library\Steam\steam.exe` and Ubisoft `Z:\Volumes\ExT2\GameHub\Library\Ubisoft\UbisoftConnect.exe`. The old `Z:\Volumes\ExT2\...` paths still resolve through links; launch from the new ones. Epic GTAV is at `Library/Epic/GTAV`.
-- §2 runtime: installed as `~/Applications/GameHub Runtime hub-0.app` (`Contents/SharedSupport/Wine` + `Contents/Helpers/x87sidecar`), located through the Hub settings (data store root + runtime app; Mac-local `settings.json`). See `docs/datastore-plan-20261011.md`.
+- §2 runtime: installed as `~/Applications/GameHub Runtime hub-0.app` (`Contents/SharedSupport/Wine` + `Contents/Helpers/x87sidecar`), located through the Hub settings (data store root + runtime app; Mac-local `settings.json`). See `docs/history/datastore-plan-20261011.md`.

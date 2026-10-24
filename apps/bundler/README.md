@@ -54,7 +54,7 @@ The current size reduction preserves every original game asset: the full candida
 
 ## Game Hub: code, app, data store and runtime
 
-**Code.** The Game Hub's code lives only in this repository (`~/Developer/nfs-macos`): `Sources/HubCore` (library), `Sources/HubApp` (the SwiftUI app) and `Sources/HubCLI` (`gamehub-cli`). Nothing else holds a copy.
+**Code.** The Game Hub's code lives only in this package (`apps/bundler` of the GameHub repository): `Sources/HubCore` (library), `Sources/HubApp` (the SwiftUI app) and `Sources/HubCLI` (`gamehub-cli`). Nothing else holds a copy.
 
 **App.** Build it with one command:
 

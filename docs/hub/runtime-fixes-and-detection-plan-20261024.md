@@ -39,7 +39,7 @@ Where: the Wine fork's ntdll, at the existing per-process decision point (`prelo
 for children), which already decides the x87sidecar and applies compatdb rules before the process image runs.
 
 Why there and not in `hub`: children started by launchers (EALauncher -> EADesktop -> NFS16.exe, Steam -> game) never pass through `hub`,
-and the decision must hold for every process. Why not by extending `compatdb.so`: it has no licence (see `docs/compatdb-provenance.md`),
+and the decision must hold for every process. Why not by extending `compatdb.so`: it has no licence (see `docs/hub/compatdb-provenance.md`),
 so its source cannot be changed or vendored; our layer runs first and stays independent of it.
 
 Inputs, read from the PE file only (no game content stored): machine (i386/AMD64), imports (d3d8/9/10/11, dxgi, dsound, xinput,

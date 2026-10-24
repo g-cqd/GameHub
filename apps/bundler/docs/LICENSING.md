@@ -20,7 +20,7 @@ Status of 2026-10-08. The inventory is [THIRD_PARTY.md](../THIRD_PARTY.md), the 
    necessity), the permissively licensed code we copy (mtld3d is zlib, x87sidecar MIT), and whether the
    packaging scripts should match `rosetta3` (MIT).
 2. **Who answers a source request, and for how long.** The draft offer names the issue tracker of
-   `g-cqd/nfs-macos` and a three-year term. Confirm both, or give an address, and decide how physical
+   `g-cqd/GameHub` and a three-year term. Confirm both, or give an address, and decide how physical
    media would be handled.
 3. **Source of the Wine in the Call of Duty 4 and Far Cry 2 apps.** The runtime profile `cod4-tested`
    has different `bin/wine`, `bin/wineserver`, `ntdll.so` and `ntdll.dll` hashes from the Most Wanted
