@@ -261,20 +261,12 @@ def backend_ok(rt, api, backend):
 
 
 def compat_db(rt, gd="dxmt"):
-    lines = ["v=3"]
-    if backend_ok(rt, "dxgi", "dxmt"):
-        lines.append("name=steam-webhelper;exe=steamwebhelper.exe;dxgi=dxmt")
-    if backend_ok(rt, "dxgi", "wined3d") and backend_ok(rt, "d3d9", "wined3d"):
-        lines.append("name=ea-cef;exe=EACefSubProcess.exe;d3d9=wined3d;dxgi=wined3d")
-        lines.append("name=ea-gep;exe=EAGEP.exe;d3d9=wined3d;dxgi=wined3d")
-        lines.append("name=epic-cef;exe=EpicWebHelper.exe;d3d9=wined3d;dxgi=wined3d")
-    elif backend_ok(rt, "dxgi", "wined3d"):
-        lines.append("name=ea-cef;exe=EACefSubProcess.exe;dxgi=wined3d")
-        lines.append("name=ea-gep;exe=EAGEP.exe;dxgi=wined3d")
-        lines.append("name=epic-cef;exe=EpicWebHelper.exe;dxgi=wined3d")
-    if backend_ok(rt, "dxgi", gd):
-        lines.append(f"name=aoa;exe=ActOfAggressionRE.exe;dxgi={gd}")
-        lines.append(f"name=aoa2;exe=ActOfAggression.exe;dxgi={gd}")
+    rules = [("steam-webhelper", "steamwebhelper.exe", "dxgi", "dxmt"),
+             ("ea-cef", "EACefSubProcess.exe", "dxgi", "wined3d"),
+             ("ea-gep", "EAGEP.exe", "dxgi", "wined3d"),
+             ("epic-cef", "EpicWebHelper.exe", "dxgi", "wined3d"),
+             ("aoa", "ActOfAggressionRE.exe", "dxgi", gd), ("aoa2", "ActOfAggression.exe", "dxgi", gd)]
+    lines = ["v=3"] + [f"name={n};exe={e};{a}={b}" for n, e, a, b in rules if backend_ok(rt, a, b)]
     lines.append("name=default;exe=*;d3d9=mtld3d;dxgi=dxmt")   # total default, always last
     return "\n".join(lines)
 
@@ -294,7 +286,6 @@ def session_env(rt, provider, opts):
         env["WINEDLLOVERRIDES"] = "mshtml=d;winemenubuilder.exe=d"
     if provider == "ea":
         env.update(MTL_HUD_ENABLED="0", WINE_TF_EMULATION="1", WINE_TF_MAX_STEPS="0", WINE_TF_MAX_NS="0",
-                   WINE_RWX_WX_EMULATION="1",
                    WINEDLLOVERRIDES="IGOProxy32.exe=d;winemenubuilder.exe=d")
     if not (rtp / "bin/x87sidecar").exists() and X87_HELPER.exists():
         env["ROSETTA_X87_PATH"] = str(X87_HELPER)
