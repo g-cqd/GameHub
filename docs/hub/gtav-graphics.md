@@ -77,6 +77,16 @@ textures arrive. The system log has no GPU error for that run (`IOGPU`/AGX searc
 - **Test in progress:** `launcher/hub trim epic` stops the Epic stack after the game has started; check that the game survives
   and that the page-in rate falls.
 
+## Run of 2026-10-24 22:19 (flags 1): magenta and white lattices, and the Epic trim
+
+- **New artifact.** Screenshots 22:21:43 and 22:22:16 show thin axis-aligned lines forming a lattice, magenta on the exhaust smoke
+  behind a car and white on the driver's hands (a similar magenta lattice was in the 20:56 DirectX 11 run). They are the pixels that
+  were black outlines before the NaN option: a lighting or particle pass computes garbage there. DirectX 10.1 never showed them,
+  so the cause is in a DirectX 11-only (probably compute or MSAA) path. DXMT sets the fast-math flags `contract`, `reassoc` and
+  `arcp` on pixel and compute shaders; the new option `d3d11.strictMath` removes all three. It is on for the next run.
+- **Trim.** `launcher/hub trim epic` stopped 17 Epic processes 360 s into the run; the game kept running and swap fell from
+  12.4 GB to 9.4 GB within a minute. Swap rose again later (14.8 GB at 22:28); the late-texture symptom has not been rechecked.
+
 ## What the first DXMT log showed (2026-10-24, `Hub/Logs/dxmt-gtav/GTA5_d3d11.log`)
 
 | Log line | Meaning | Likely effect |
