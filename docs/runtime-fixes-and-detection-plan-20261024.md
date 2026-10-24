@@ -1,13 +1,16 @@
 # Per-program fixes: inventory, move into the runtime, and a pre-launch detection layer
 
-Status: proposal, 2026-10-24. Nothing below is built yet unless the row says "in runtime".
+Status: 2026-10-24. Phase 1 (detection layer, rules file) and the Epic/Rockstar fixes are built and installed in hub-1; the rest is proposed.
 Builds on `docs/bundler-plan/BUNDLER-DESIGN.md` §5 (knowledge rules) and `OVERRIDES-MATRIX.md` (91 recorded overrides).
 
 ## 1. Inventory: where each per-program fix lives today
 
 | Fix | Programs | Lives in | Target home |
 |---|---|---|---|
-| Backend per exe: `steamwebhelper.exe` dxgi=dxmt; `EACefSubProcess.exe`, `EAGEP.exe`, `EpicWebHelper.exe` dxgi=wined3d; AoA dxgi=dxmt/wined3d | Steam, EA, Epic, AoA | `launcher/hub` `compat_db()` (WINE_COMPATDB string) | runtime rules file |
+| Backend per exe: `steamwebhelper.exe` dxgi=dxmt; `EACefSubProcess.exe`, `EAGEP.exe`, `EpicWebHelper.exe` dxgi=wined3d | Steam, EA, Epic | `runtime/hub-rules.txt` (also still sent by `launcher/hub` `compat_db()`) | in runtime |
+| Rockstar Games Launcher: dxgi=wined3d with `WINE_D3D_CONFIG=renderer=gl` (DXMT lacks D3D10.1: black window; wined3d on Vulkan has no D3D11 feature level on MoltenVK: exit code 1) | GTA V via Epic | `runtime/hub-rules.txt` | in runtime |
+| Persisted ECDSA/ECDH keys in ncrypt (Epic EOS DPoP key; without it every EOS login failed) | Epic, EOS games | Wine fork `f1c654cc68e` (x86_64 PE only so far) | in runtime |
+| AoA dxgi=dxmt/wined3d (`--dxgi` option) | AoA | `launcher/hub` | stays in the launcher (user option) |
 | `dxgi/gptk -> dxmt` alias (compatdb built-in `steam-web-helper` rule asks for gptk) | steamwebhelper | runtime dir, created by `scripts/assemble_runtime.sh` | in runtime |
 | Default `d3d9=mtld3d;dxgi=dxmt` | all | `launcher/hub` | runtime rules file |
 | `WINEDLLOVERRIDES=mscoree,mshtml=d` (all) / mscoree kept for Epic (EOS MSI .NET custom actions) / `IGOProxy32.exe=d` (EA) | all, Epic, EA | `launcher/hub` `session_env()` | runtime rules file (`dll_overrides` per exe) |
@@ -40,6 +43,10 @@ so its source cannot be changed or vendored; our layer runs first and stays inde
 
 Inputs, read from the PE file only (no game content stored): machine (i386/AMD64), imports (d3d8/9/10/11, dxgi, dsound, xinput,
 steam_api, EA/Origin DLLs), section names and entropy (`.ubx*`, `.bind`, UPX, "protected"), company/product version strings, exe name.
+
+Built: Wine fork `22cb1a334d8` (`dlls/ntdll/unix/hubrules.c`), rules source `runtime/hub-rules.txt`, installed by `scripts/assemble_runtime.sh`.
+Checked: a test rule `when machine=amd64;exe=envp.exe;imports=kernel32;section=.text => env=HUBRULES_TEST=yes` reached the program, and rules with
+a wrong machine, a missing section or a missing import did not apply.
 
 Rules: one file in the runtime (`share/wine/hub-rules.txt`), same `name=;exe=;key=value` syntax as WINE_COMPATDB, plus predicate keys
 (`machine=`, `imports=`, `section=`, `company=`). Keys it can set: `dxgi`, `d3d9`, `dll_overrides`, `env`, `arguments`, `x87_sidecar`,

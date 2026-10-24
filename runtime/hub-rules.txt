@@ -1,0 +1,21 @@
+# GameHub runtime rules, installed as <runtime>/share/wine/hub-rules.txt by scripts/assemble_runtime.sh.
+# Read by the Wine fork's ntdll (dlls/ntdll/unix/hubrules.c) before compatdb.so, in every process.
+# Two kinds of lines:
+#   name=...;exe=...;key=value              a compatdb rule (keys: dxgi, d3d9, dll_overrides, env, arguments, ...)
+#   when pred[;pred...] => key=value;...    applies the settings to the starting executable when every predicate holds
+#                                           predicates: exe=<name>, machine=i386|amd64, section=<name>, imports=<dll>[,<dll>]
+# Order: compatdb built-ins < this file < WINE_COMPATDB from the launcher (the launcher wins).
+
+# Chromium-based store clients: DXMT for Steam's webhelper, wined3d for the EA and Epic helpers
+name=steam-webhelper;exe=steamwebhelper.exe;dxgi=dxmt
+name=ea-cef;exe=EACefSubProcess.exe;dxgi=wined3d
+name=ea-gep;exe=EAGEP.exe;dxgi=wined3d
+name=epic-cef;exe=EpicWebHelper.exe;dxgi=wined3d
+
+# Rockstar Games Launcher: it needs a D3D10.1 device, which DXMT lacks (black window). compatdb's built-in rule gives
+# it wined3d, but wined3d's Vulkan renderer offers no D3D11 feature level on MoltenVK and the launcher exits with code 1
+# ("Unable to launch game"). wined3d on OpenGL provides the device.
+name=rockstar-launcher;exe=Launcher.exe;company=Rockstar Games;dxgi=wined3d;env=WINE_D3D_CONFIG=renderer=gl
+
+# Defaults for every process: mtld3d for D3D8/9, DXMT for D3D10/11
+name=default;exe=*;d3d9=mtld3d;dxgi=dxmt
