@@ -4,7 +4,7 @@ Start with the table; each folder holds its own README or index where it needs o
 
 | Folder | What it holds |
 |---|---|
-| `hub/` | How the hub works today: Steam/Act of Aggression setup, restarting the Wine session, `compatdb.so` provenance, the per-program fix plan, and `hub-specs/` |
+| `hub/` | How the hub works today: Steam/Act of Aggression setup, restarting the Wine session, GTA V graphics investigation, `compatdb.so` provenance, the per-program fix plan, and `hub-specs/` |
 | `knowledge/` | Developer handoffs and synthesis: `games.md` (game bundles), `mtld3d-x87.md` (renderer and x87 sidecar), `wine-sdks.md`, and `Mac-Gaming-Knowledge-Synthesis-20261014.md` |
 | `eaac/` | The EA anti-cheat (EAAC) investigation; `history/` has superseded reports and `evidence/` the text-only evidence |
 | `bundler-plan/` | Design and inventory notes for the bundler in `../apps/bundler` |

@@ -46,8 +46,9 @@ OTHER_KNOWN = {  # standalone installs under Library/Ubisoft/games and Library/E
     "WATCH_DOGS2": dict(exe="bin/WatchDogs2.exe", status="unverified", note="ships EasyAntiCheat"),
     "GTAV": dict(exe="PlayGTAV.exe", status="unverified", note="starts via the Epic launcher and Rockstar Launcher; args.txt carries -nobattleye -noBE"),
 }
-# Providers whose launcher must not get MetalFX (a spatial swapchain there broke the Epic launcher): --metalfx applies only to these processes
-METALFX_EXES = {"epic": ("GTA5.exe",)}
+# Providers whose launcher must not get per-game DXMT settings (a MetalFX swapchain there broke the Epic launcher): their game
+# processes get them as env= fields of a compat rule instead. exe -> folder of launcher/settings/ with the game's dxmt.conf
+GAME_PROCS = {"epic": {"GTA5.exe": "GTAV"}}
 STEAM_SKIP = {"228980"}  # Steamworks Common Redistributables
 ALIASES = {
     "aoa": "318020", "ron": "287450", "generals": "2229870", "zh": "2732960", "wd": "243470",
@@ -272,16 +273,34 @@ def metalfx_factor(value):
     return repr(f)
 
 
-def compat_db(rt, gd="dxmt", metalfx=None, metalfx_exes=()):
+def game_env(provider, fx):
+    """Return {exe: ["NAME=value", ...]} for the game processes of `provider` (see GAME_PROCS).
+
+    Each process gets DXMT's warning log in Hub/Logs/dxmt-<game>/, its settings file when launcher/settings/<game>/dxmt.conf
+    exists, and the MetalFX swapchain when `fx` (a factor from metalfx_factor) is set."""
+    out = {}
+    for exe, folder in GAME_PROCS.get(provider, {}).items():
+        logs = LOGS / f"dxmt-{folder.lower()}"
+        logs.mkdir(parents=True, exist_ok=True)
+        env = ["DXMT_LOG_LEVEL=warn", f"DXMT_LOG_PATH={logs}"]
+        conf = HERE / "settings" / folder / "dxmt.conf"
+        if conf.is_file():
+            env.append(f"DXMT_CONFIG_FILE={unix_to_win(conf)}")
+        if fx:
+            env += ["DXMT_METALFX_SPATIAL_SWAPCHAIN=1", f"DXMT_CONFIG=d3d11.metalSpatialUpscaleFactor={fx}"]
+        out[exe] = env
+    return out
+
+
+def compat_db(rt, gd="dxmt", exe_env=None):
     rules = [("steam-webhelper", "steamwebhelper.exe", "dxgi", "dxmt"),
              ("ea-cef", "EACefSubProcess.exe", "dxgi", "wined3d"),
              ("ea-gep", "EAGEP.exe", "dxgi", "wined3d"),
              ("epic-cef", "EpicWebHelper.exe", "dxgi", "wined3d"),
              ("aoa", "ActOfAggressionRE.exe", "dxgi", gd), ("aoa2", "ActOfAggression.exe", "dxgi", gd)]
     lines = ["v=3"] + [f"name={n};exe={e};{a}={b}" for n, e, a, b in rules if backend_ok(rt, a, b)]
-    if metalfx and backend_ok(rt, "dxgi", "dxmt"):   # env= fields reach only the named process, not the launcher or Wine services
-        lines += [f"name=metalfx-{i};exe={e};dxgi=dxmt;env=DXMT_METALFX_SPATIAL_SWAPCHAIN=1;env=DXMT_CONFIG=d3d11.metalSpatialUpscaleFactor={metalfx}"
-                  for i, e in enumerate(metalfx_exes)]
+    if backend_ok(rt, "dxgi", "dxmt"):   # env= fields reach only the named process, not the launcher or Wine services
+        lines += [f"name=game-{i};exe={e};dxgi=dxmt;" + ";".join(f"env={v}" for v in env) for i, (e, env) in enumerate((exe_env or {}).items())]
     lines.append("name=default;exe=*;d3d9=mtld3d;dxgi=dxmt")   # total default, always last
     return "\n".join(lines)
 
@@ -289,11 +308,11 @@ def compat_db(rt, gd="dxmt", metalfx=None, metalfx_exes=()):
 def session_env(rt, provider, opts):
     rtp = RUNTIMES / rt
     fx = metalfx_factor(opts.metalfx) if opts.metalfx else None
-    scoped_fx = fx if provider in METALFX_EXES else None
+    scoped = provider in GAME_PROCS
     ext = rtp / "lib/external"
     env = {"PATH": "/usr/bin:/bin:/usr/sbin:/sbin", "LANG": "en_US.UTF-8", "USER": "Player", "HOME": str(HOME), "TMPDIR": str(TEMP),
            "WINEPREFIX": str(PREFIX), "WINEMSYNC": "1", "WINEDEBUG": opts.debug or ("err+all" if provider == "steam" else "-all"),
-           "WINEDLLOVERRIDES": "mscoree,mshtml=d;winemenubuilder.exe=d", "WINE_COMPATDB": compat_db(rt, opts.dxgi or "dxmt", scoped_fx, METALFX_EXES.get(provider, ()))}
+           "WINEDLLOVERRIDES": "mscoree,mshtml=d;winemenubuilder.exe=d", "WINE_COMPATDB": compat_db(rt, opts.dxgi or "dxmt", game_env(provider, fx))}
     if ext.is_dir():
         env["DYLD_FALLBACK_LIBRARY_PATH"] = f"{ext}:{ext}/media:{ext}/vulkan"
         env["VK_ICD_FILENAMES"] = f"{ext}/vulkan/MoltenVK_icd.json"
@@ -304,7 +323,7 @@ def session_env(rt, provider, opts):
     if provider == "ea":
         env.update(MTL_HUD_ENABLED="0", WINE_TF_EMULATION="1", WINE_TF_MAX_STEPS="0", WINE_TF_MAX_NS="0",
                    WINEDLLOVERRIDES="IGOProxy32.exe=d;winemenubuilder.exe=d")
-    if fx and not scoped_fx:
+    if fx and not scoped:
         env["DXMT_METALFX_SPATIAL_SWAPCHAIN"] = "1"
         env["DXMT_CONFIG"] = f"d3d11.metalSpatialUpscaleFactor={fx}"
     return env
