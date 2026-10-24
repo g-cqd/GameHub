@@ -1,0 +1,195 @@
+{
+  "schemaVersion": 1,
+  "sources": {
+    "mtld3d": {
+      "input": "mtld3dSource",
+      "revision": "7d108a4a7bf983cb0f993ffae2aa39ca159f2c6f",
+      "url": "https://github.com/g-cqd/mtld3d"
+    },
+    "x87sidecar": {
+      "input": "x87Source",
+      "revision": "c3969379750531fb124859ae742ab4f727f54f9c",
+      "url": "https://github.com/g-cqd/x87sidecar"
+    }
+  },
+  "sidecarSHA256": "3ca9cc724b2e4685c271ed6af187f73f147b38ae3e4521793b978c9f09d3a628",
+  "sidecarBuild": "Rebuilt 2026-10-08 from a clean clone detached at c3969379750531fb124859ae742ab4f727f54f9c with cmake -DCMAKE_BUILD_TYPE=Release, target x87sidecar (Apple clang 21.0.0, clang-2100.3.34.2), in a separate build folder. The result is byte-identical to the independent in-tree build kept in wine-rebuild/ab/sidecar/bin/c396937, so two builds on this toolchain agree. It replaces the earlier pin 160e06be2c8ef21ac40cfddcbf408494cc08ae517997c10240aa450b5498bae5: that binary no longer exists, so the two were never compared. The only comparison made (wine-rebuild/ab/README-AB.md section 7) was a rebuild of revision 12afdc2 against an old 8aa4d30 build, which differ in 81 bytes, all in LC_UUID, the linker version field and the ad-hoc signature; that the same holds for c396937 is inferred, not verified.",
+  "rendererFiles": {
+    "d3d9/mtld3d/i386-windows/d3d8.dll": "e2ad939867789ef0563c4898040743a2dbf024199b60a2d3763adce52afd4344",
+    "d3d9/mtld3d/i386-windows/d3d9.dll": "5f0c974cb0c7cef41d0eb8d01e866a6ae067fd4f264c77ea8f89a74893570abf",
+    "d3d9/mtld3d/i386-windows/mtld3d.dll": "396e7bb27d4a1f83b1fd602c652409976a063f47be28b2859e19a902618823f0",
+    "d3d9/mtld3d/x86_64-unix/mtld3d.so": "2d8e2cc50bbe9f359fb9d14a69c9dc0ad4355dc1159af50145f9ed97c51b6d26",
+    "i386-windows/d3d8.dll": "2ec14095b7619f0767646bd65e663b0f98f2ed42feddb648833cf5f3adbf1afa",
+    "i386-windows/d3d9.dll": "2ae214f21f38ed09fbdcaf1ac6444b506da3fcd762a2ddc7f04113f4883673d5",
+    "i386-windows/mtld3d.dll": "82280e97fc178a0fc54167827902a933065cd93b2fb3d81850c441749f1056e1"
+  },
+  "rendererSourceManifestSHA256": "fd47420c1ba3c0c51b9b9c2fcb6c4f5efcf94c9acf6894bc6df3ef1683fd445f",
+  "rendererVerification": "1004 passed, 0 failed, 11 ignored per Windows architecture, plus 2563 host unit tests; all 631 source hashes match pinned commit",
+  "runtimeProfiles": {
+    "nfsmw-cursor": {
+      "description": "CX26.3 / Wine11.0 with cooperative x87 handshake and NFS cursor recovery",
+      "files": {
+        "bin/wine": "506df923dcda29df4aa4bbfd07e7642212ced0892befdebe0d0534e86f84f4ea",
+        "bin/wineserver": "6c03bbb8bcfcc5567650f2b236ff772b0b805a4bfc52719af07d48844d54c94f",
+        "lib/wine/x86_64-unix/ntdll.so": "f4626247a9442abb90a78f5be134c6a2fbfa788012a2f4b9f44dad9d66ff6ee1",
+        "lib/wine/x86_64-unix/wine": "7bb37fddaa852201d6b70b891c5f63ea601b4e8f914e41d158e551414f1d1939",
+        "lib/wine/i386-windows/ntdll.dll": "6444a002d8b68ec67dff69d1afad7a293564b96e36d0f8eb959d815f25df3c4d"
+      },
+      "capabilities": [
+        "x87Sidecar"
+      ]
+    },
+    "cod4-tested": {
+      "description": "CX26.3 / Wine11.0 with cooperative x87 handshake",
+      "files": {
+        "bin/wine": "7202d5f87ba9542f915b8a886ef7707fd0213200972e4cf61504c514b5e301c4",
+        "bin/wineserver": "c686a25a3dc893941ba8aaa0eb85075877be227bc00cda827d3ff8b2b94f8e97",
+        "lib/wine/x86_64-unix/ntdll.so": "3bc4baa14ae578036896e1cee462871e52a3815a7624bc35ed8292a5bc7508ba",
+        "lib/wine/x86_64-unix/wine": "344f95e27553263de37640eba6e138f4ec8f4c821c631b9e1d228dccca12f611",
+        "lib/wine/i386-windows/ntdll.dll": "5eaa28ca4c65d21f22ed9a5fcbeb37bde3a7fe0822b62fbe31c4847eb57fbfe4"
+      },
+      "capabilities": [
+        "x87Sidecar"
+      ]
+    },
+    "nfs2015-tf-cx11": {
+      "description": "CX26.3 / Wine11.0 with x86 hardware execution-breakpoint delivery and the dxmt Metal Direct3D 11 backend",
+      "capabilities": [
+        "trapFlagEmulation",
+        "dxmtDXGI",
+        "x87Sidecar"
+      ],
+      "toolchainNote": "PE builtins were built with Homebrew mingw-w64 GCC 16.1.0 rather than llvm-mingw clang; a known parity gap with CI that was not rebuilt for",
+      "files": {
+        "bin/wine": "03985ed96db1781bb38fe7428392929284dce1f37a9b020ba2ce09eb110ff360",
+        "bin/wineserver": "e4aacddb055b0c0a805cf44a0d5c2348048396ad96a66cd65daaaa32b1fed8bc",
+        "lib/wine/x86_64-unix/ntdll.so": "171e363dc8ff69755ebc1ecbeadaad37cf9c06901fa8c2272216d9acc1235270",
+        "lib/wine/x86_64-unix/wine": "86283fa89482996e3865a8bc75d8fe4f8ac535699fe5bde0b781e18c2b0a5a1f",
+        "lib/wine/i386-windows/ntdll.dll": "e64165eba13e581c10dc69ab27e9b316d638e8988fae8c19f7a0ecb0fa27bd86"
+      }
+    },
+    "nfs2015-tf-cx11-rebuild-20261008": {
+      "description": "CX26.3 / Wine11.0 (athei/wine cx-26-patched 1a7b0c76 plus four patches) rebuilt on 2026-10-07/08 with x86 hardware execution-breakpoint delivery and the dxmt Metal Direct3D 11 backend",
+      "capabilities": [
+        "trapFlagEmulation",
+        "dxmtDXGI",
+        "x87Sidecar"
+      ],
+      "toolchainNote": "Rebuilt 2026-10-07/08 from the patched source tree at HEAD 1e98e299 (base 1a7b0c76 plus four patches). PE builtins were built with Homebrew mingw-w64 GCC 16.1.0 (ntdll.dll reports GCC: (GNU) 16.1.0) rather than llvm-mingw clang, a known parity gap with CI that was not rebuilt for; the Mach-O binaries with Apple clang 21.0.0 (Xcode). Not bit-identical to profile nfs2015-tf-cx11: bin/wine and lib/wine/x86_64-unix/wine match it, bin/wineserver, lib/wine/x86_64-unix/ntdll.so and lib/wine/i386-windows/ntdll.dll differ. The PE ntdll.dll embeds the build folder and a link time, so it cannot match; the cause for the other two is not isolated. Behaviour was checked only by the execution-breakpoint fixture (2 failures with WINE_TF_EMULATION unset, 0 with it set), wine cmd /c ver and the compatibility selection, never with NFS16.exe or the EA client.",
+      "files": {
+        "bin/wine": "03985ed96db1781bb38fe7428392929284dce1f37a9b020ba2ce09eb110ff360",
+        "bin/wineserver": "11a0d304e25a5a7b185d49db7331119f3e2b4a8535a55dcc3f0dd7257b5f0529",
+        "lib/wine/x86_64-unix/ntdll.so": "82cf3d480ffe07ba327eef11e096644bf830c919d4244277acbafc39836f7689",
+        "lib/wine/x86_64-unix/wine": "86283fa89482996e3865a8bc75d8fe4f8ac535699fe5bde0b781e18c2b0a5a1f",
+        "lib/wine/i386-windows/ntdll.dll": "10b33abc5834a630fb9de6a7a33c1abd64ccefbd210fcac4350765bfea456978"
+      }
+    },
+    "nfs2015-tf-cx11-rebuild-0005-20261008": {
+      "description": "CX26.3 / Wine11.0 (athei/wine cx-26-patched 1a7b0c76 plus five patches): the rebuild of 2026-10-07/08 plus patch 0005, which prints a register and memory snapshot (a wine-crash block) from kernelbase when a program faults; x86 hardware execution-breakpoint delivery and the dxmt Metal Direct3D 11 backend as before",
+      "capabilities": [
+        "trapFlagEmulation",
+        "dxmtDXGI",
+        "x87Sidecar",
+        "crashContextBlock"
+      ],
+      "toolchainNote": "The runtime of profile nfs2015-tf-cx11-rebuild-20261008 with exactly one change: patch 0005 (kernelbase crash-context snapshot, source HEAD ce7b8eaa) and, as its only effect on the binaries, the two kernelbase.dll files; the other 1790 files of the runtime are byte-identical to that rebuild (compared by the build session's manifest). Same toolchain as that profile: PE builtins by Homebrew mingw-w64 GCC 16.1.0 rather than llvm-mingw clang, Mach-O by Apple clang 21.0.0. Behaviour was checked only on test programs (the execution-breakpoint fixture: 2 failures with WINE_TF_EMULATION unset, 0 with it set; the wine-crash block appears on a faulting test program), never with NFS16.exe or the EA client.",
+      "files": {
+        "bin/wine": "03985ed96db1781bb38fe7428392929284dce1f37a9b020ba2ce09eb110ff360",
+        "bin/wineserver": "11a0d304e25a5a7b185d49db7331119f3e2b4a8535a55dcc3f0dd7257b5f0529",
+        "lib/wine/x86_64-unix/ntdll.so": "82cf3d480ffe07ba327eef11e096644bf830c919d4244277acbafc39836f7689",
+        "lib/wine/x86_64-unix/wine": "86283fa89482996e3865a8bc75d8fe4f8ac535699fe5bde0b781e18c2b0a5a1f",
+        "lib/wine/i386-windows/ntdll.dll": "10b33abc5834a630fb9de6a7a33c1abd64ccefbd210fcac4350765bfea456978",
+        "lib/wine/x86_64-windows/kernelbase.dll": "14e82c52ff0494287f3b2e921647a45254d20b7a2cf2b730f17df5f8092356e5",
+        "lib/wine/i386-windows/kernelbase.dll": "09ce21ffa620c7195dd400f1aa10e10e5451fdcc765ff2b9c651c5dc1d289c2c"
+      }
+    },
+    "nfs2015-tf-cx11-rebuild-0007-20261008": {
+      "description": "CX26.3 / Wine11.0 (athei/wine cx-26-patched 1a7b0c76 plus seven patches): the runtime of profile nfs2015-tf-cx11-rebuild-0005-20261008 plus patch 0006 (page history, checksum, code windows and return addresses in the wine-crash block) and patch 0007 (opt-in executable-page experiments and a page trace, off unless an environment variable is set)",
+      "capabilities": [
+        "trapFlagEmulation",
+        "dxmtDXGI",
+        "x87Sidecar",
+        "crashContextBlock",
+        "crashContextCodeWindows",
+        "rosettaPageExperiments"
+      ],
+      "toolchainNote": "The runtime of profile nfs2015-tf-cx11-rebuild-0005-20261008 with two more patches (source HEAD c2afb959): patch 0006 changes both kernelbase.dll files, patch 0007 changes lib/wine/x86_64-unix/ntdll.so (virtual.c and signal_x86_64.c); the other 1788 files are byte-identical to that profile's runtime (compared by this build's own sha256 of both trees). Same toolchain as that profile: PE builtins by Homebrew mingw-w64 GCC 16.1.0 rather than llvm-mingw clang, Mach-O by Apple clang 21.0.0. The switches of patch 0007 (WINE_ROSETTA_FLUSH_TOGGLE, WINE_ROSETTA_PROTECT_TOGGLE, WINE_TRACE_PAGE) are all off unless set. Behaviour was checked only on test programs (the execution-breakpoint fixture, the crash-context fixture, a toy executable-page probe that could not reproduce stale execution), never with NFS16.exe or the EA client.",
+      "files": {
+        "bin/wine": "03985ed96db1781bb38fe7428392929284dce1f37a9b020ba2ce09eb110ff360",
+        "bin/wineserver": "11a0d304e25a5a7b185d49db7331119f3e2b4a8535a55dcc3f0dd7257b5f0529",
+        "lib/wine/x86_64-unix/ntdll.so": "b1bddee45bbc61a74486464e842c739f68b489d0da29ef458210985ca6340de4",
+        "lib/wine/x86_64-unix/wine": "86283fa89482996e3865a8bc75d8fe4f8ac535699fe5bde0b781e18c2b0a5a1f",
+        "lib/wine/i386-windows/ntdll.dll": "10b33abc5834a630fb9de6a7a33c1abd64ccefbd210fcac4350765bfea456978",
+        "lib/wine/x86_64-windows/kernelbase.dll": "ec494aca12cac61e4236c27692fc467ce12a24dd4943a6035b873563e5882f66",
+        "lib/wine/i386-windows/kernelbase.dll": "15c1001c859753a3f70a1c54292b04ace79a404dfbb8195ac4b959917b52b4a3"
+      }
+    },
+    "nfs2015-tf-cx11-rebuild-0008-20261008": {
+      "description": "CX26.3 / Wine11.0 (athei/wine cx-26-patched 1a7b0c76 plus eight patches): the runtime of profile nfs2015-tf-cx11-rebuild-0007-20261008 plus patch 0008, an opt-in emulation of write-xor-execute for private read-write-execute pages that works around a Rosetta 2 defect (resuming one byte late after code built by two stores right ahead of the instruction pointer); off unless WINE_RWX_WX_EMULATION=1",
+      "capabilities": [
+        "trapFlagEmulation",
+        "dxmtDXGI",
+        "x87Sidecar",
+        "crashContextBlock",
+        "crashContextCodeWindows",
+        "rosettaPageExperiments",
+        "rosettaRwxWxEmulation"
+      ],
+      "toolchainNote": "The runtime of profile nfs2015-tf-cx11-rebuild-0007-20261008 with one more patch (source HEAD dae832f4): patch 0008 changes lib/wine/x86_64-unix/ntdll.so only; the other 1790 files are byte-identical to that profile's runtime (compared by this build's own sha256 of both trees, ignoring a Finder .DS_Store the packager removes). Same toolchain as that profile: PE builtins by Homebrew mingw-w64 GCC 16.1.0 rather than llvm-mingw clang, Mach-O by Apple clang 21.0.0. The switch of patch 0008 (WINE_RWX_WX_EMULATION=1, optional WINE_RWX_WX_HOT_LIMIT) is off unless set and applies to x86-64 processes only. Behaviour was checked only on test programs (a reproducer of the Rosetta defect that failed in every round with the switch off and in none with it on, twelve trap tests, the execution-breakpoint fixture), never with NFS16.exe or the EA client.",
+      "files": {
+        "bin/wine": "03985ed96db1781bb38fe7428392929284dce1f37a9b020ba2ce09eb110ff360",
+        "bin/wineserver": "11a0d304e25a5a7b185d49db7331119f3e2b4a8535a55dcc3f0dd7257b5f0529",
+        "lib/wine/x86_64-unix/ntdll.so": "8f593e2880e8e56f99f6d0589c791fbc3517fb051d1eb3dc921e3f6065899d35",
+        "lib/wine/x86_64-unix/wine": "86283fa89482996e3865a8bc75d8fe4f8ac535699fe5bde0b781e18c2b0a5a1f",
+        "lib/wine/i386-windows/ntdll.dll": "10b33abc5834a630fb9de6a7a33c1abd64ccefbd210fcac4350765bfea456978",
+        "lib/wine/x86_64-windows/kernelbase.dll": "ec494aca12cac61e4236c27692fc467ce12a24dd4943a6035b873563e5882f66",
+        "lib/wine/i386-windows/kernelbase.dll": "15c1001c859753a3f70a1c54292b04ace79a404dfbb8195ac4b959917b52b4a3"
+      }
+    },
+    "nfs2015-tf-cx11-rebuild-0009-20261008": {
+      "description": "CX26.3 / Wine11.0 (athei/wine cx-26-patched 1a7b0c76 plus nine patches): the runtime of profile nfs2015-tf-cx11-rebuild-0008-20261008 plus patch 0009, which fixes four faults of the opt-in write-xor-execute emulation for private read-write-execute pages (a leaked trap flag, contexts captured with the trap flag set, stores that straddle two pages, and a busy-page limit that released a page that was only being filled); the emulation is still off unless WINE_RWX_WX_EMULATION=1",
+      "capabilities": [
+        "trapFlagEmulation",
+        "dxmtDXGI",
+        "x87Sidecar",
+        "crashContextBlock",
+        "crashContextCodeWindows",
+        "rosettaPageExperiments",
+        "rosettaRwxWxEmulation"
+      ],
+      "toolchainNote": "The runtime of profile nfs2015-tf-cx11-rebuild-0008-20261008 with one more patch (source HEAD b5ac45cf): patch 0009 changes lib/wine/x86_64-unix/ntdll.so only; the other 1790 files are byte-identical to that profile's runtime (compared by this build's own sha256 of both trees, ignoring a Finder .DS_Store the packager removes). Same toolchain as that profile: PE builtins by Homebrew mingw-w64 GCC 16.1.0 rather than llvm-mingw clang, Mach-O by Apple clang 21.0.0. The switch (WINE_RWX_WX_EMULATION=1, optional WINE_RWX_WX_HOT_LIMIT, now defaulting to 4096 stores per second) is read by the runtime only when set; the app sets it by default from this profile on. Behaviour was checked only on test programs (a stress of worker threads with suspend/context storms, the reproducer of the Rosetta defect, trap tests, the execution-breakpoint fixture), never with NFS16.exe or the EA client.",
+      "files": {
+        "bin/wine": "03985ed96db1781bb38fe7428392929284dce1f37a9b020ba2ce09eb110ff360",
+        "bin/wineserver": "11a0d304e25a5a7b185d49db7331119f3e2b4a8535a55dcc3f0dd7257b5f0529",
+        "lib/wine/x86_64-unix/ntdll.so": "610ecca6846a0e09acf16eb96aca16f8e4334b6e83bf6f2794c790cef96d0bfe",
+        "lib/wine/x86_64-unix/wine": "86283fa89482996e3865a8bc75d8fe4f8ac535699fe5bde0b781e18c2b0a5a1f",
+        "lib/wine/i386-windows/ntdll.dll": "10b33abc5834a630fb9de6a7a33c1abd64ccefbd210fcac4350765bfea456978",
+        "lib/wine/x86_64-windows/kernelbase.dll": "ec494aca12cac61e4236c27692fc467ce12a24dd4943a6035b873563e5882f66",
+        "lib/wine/i386-windows/kernelbase.dll": "15c1001c859753a3f70a1c54292b04ace79a404dfbb8195ac4b959917b52b4a3"
+      }
+    },
+    "nfs2015-tf-cx11-rebuild-0010-20261008": {
+      "description": "CX26.3 / Wine11.0 (athei/wine cx-26-patched 1a7b0c76 plus ten patches): the runtime of profile nfs2015-tf-cx11-rebuild-0009-20261008 plus patch 0010, which fixes three faults of the opt-in write-xor-execute emulation (a page that patches its own code was released as busy before its code ran; a released page was never emulated again after a protection change or a decommit; a page touched by a thread under the trap-flag emulation was released for good) and adds a per-page log (WINE_RWX_WX_LOG); the emulation is still off unless WINE_RWX_WX_EMULATION=1",
+      "capabilities": [
+        "trapFlagEmulation",
+        "dxmtDXGI",
+        "x87Sidecar",
+        "crashContextBlock",
+        "crashContextCodeWindows",
+        "rosettaPageExperiments",
+        "rosettaRwxWxEmulation",
+        "rosettaRwxWxPageLog"
+      ],
+      "toolchainNote": "The runtime of profile nfs2015-tf-cx11-rebuild-0009-20261008 with one more patch (source HEAD be47ba54): patch 0010 changes lib/wine/x86_64-unix/ntdll.so only; the other 1790 files are byte-identical to that profile's runtime (compared by this build's own sha256 of both trees, ignoring a Finder .DS_Store the packager removes). Same toolchain as that profile: PE builtins by Homebrew mingw-w64 GCC 16.1.0 rather than llvm-mingw clang, Mach-O by Apple clang 21.0.0. The switches (WINE_RWX_WX_EMULATION=1, WINE_RWX_WX_LOG=<window>|all, optional WINE_RWX_WX_HOT_LIMIT, WINE_RWX_WX_NEAR_LIMIT and WINE_RWX_WX_TF_RELEASE=1) are read by the runtime only when set; the app sets the first two by default from this profile on. Behaviour was checked only on test programs (reproducers of the three faults, the stub's loop, a debug-register thread, allocation paths, a stress of worker threads, the execution-breakpoint fixture), never with NFS16.exe or the EA client.",
+      "files": {
+        "bin/wine": "03985ed96db1781bb38fe7428392929284dce1f37a9b020ba2ce09eb110ff360",
+        "bin/wineserver": "11a0d304e25a5a7b185d49db7331119f3e2b4a8535a55dcc3f0dd7257b5f0529",
+        "lib/wine/x86_64-unix/ntdll.so": "7bf60bdda4a330abe97a4ece0e1cf67b4ba75259383b76cdb1683b93ca542b78",
+        "lib/wine/x86_64-unix/wine": "86283fa89482996e3865a8bc75d8fe4f8ac535699fe5bde0b781e18c2b0a5a1f",
+        "lib/wine/i386-windows/ntdll.dll": "10b33abc5834a630fb9de6a7a33c1abd64ccefbd210fcac4350765bfea456978",
+        "lib/wine/x86_64-windows/kernelbase.dll": "ec494aca12cac61e4236c27692fc467ce12a24dd4943a6035b873563e5882f66",
+        "lib/wine/i386-windows/kernelbase.dll": "15c1001c859753a3f70a1c54292b04ace79a404dfbb8195ac4b959917b52b4a3"
+      }
+    }
+  }
+}

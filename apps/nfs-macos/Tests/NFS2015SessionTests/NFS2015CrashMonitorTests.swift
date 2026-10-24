@@ -1,0 +1,353 @@
+import Foundation
+import LauncherCore
+import NFS2015Core
+import Testing
+
+@testable import NFS2015Session
+
+struct NFS2015CrashMonitorTests {
+  static let fault =
+    "wine: Unhandled page fault on read access to 0000000000000000 at address 0000000000000000 (thread 057c), starting debugger...\n"
+  static let secret = "info:  authCode=A1b2C3d4E5f6G7h8I9j0K1l2M3n4 sessionId=77\n"
+
+  private struct Fixture {
+    let root: URL
+    let log: URL
+    let reports: URL
+
+    init() throws {
+      root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+      reports = root.appendingPathComponent("Logs")
+      try FileManager.default.createDirectory(at: reports, withIntermediateDirectories: true)
+      log = root.appendingPathComponent("session-1.log")
+      try Data().write(to: log)
+    }
+
+    func append(_ text: String) throws {
+      let handle = try FileHandle(forWritingTo: log)
+      try handle.seekToEnd()
+      try handle.write(contentsOf: Data(text.utf8))
+      try handle.close()
+    }
+
+    func reportFiles() -> [String] {
+      ((try? FileManager.default.contentsOfDirectory(atPath: reports.path)) ?? [])
+        .filter { $0.hasPrefix("crash-report-") }.sorted()
+    }
+
+    func remove() {
+      chmod(reports.path, 0o755)
+      try? FileManager.default.removeItem(at: root)
+    }
+  }
+
+  private struct FixedHost: NFS2015HostQuerying {
+    func host() -> NFS2015HostFacts {
+      NFS2015HostFacts(
+        model: "Mac0,0", chip: "Apple M0", memoryBytes: 8_589_934_592, osVersion: "27.0",
+        cpuCount: 4)
+    }
+    func load() -> NFS2015LoadSample {
+      NFS2015LoadSample(loadAverages: [1, 1, 1], swapUsed: nil, swapTotal: nil)
+    }
+  }
+
+  private func context(expectsBlock: Bool = false) -> NFS2015CrashContext {
+    var pins = NFS2015BuildPins()
+    if expectsBlock { pins.runtimeCapabilities = ["crashContextBlock"] }
+    return NFS2015CrashContext(
+      pins: pins, host: FixedHost().host(), display: nil,
+      displayPlan: NFS2015DisplaySafety.plan(
+        facts: nil, hasOptionsFile: nil, preference: .standard),
+      seed: nil, metalFX: .off, diagnostics: .standard, diagnosticLog: false,
+      settings: NFS2015Settings(), tuning: [:], experiment: NFS2015ExperimentOverrides())
+  }
+
+  private func monitor(
+    _ fixture: Fixture, expectsBlock: Bool = false,
+    debugFiles: @escaping @Sendable () -> [URL] = { [] }
+  ) -> NFS2015CrashMonitor {
+    NFS2015CrashMonitor(
+      log: fixture.log, store: NFS2015CrashReportStore(folder: fixture.reports),
+      context: context(expectsBlock: expectsBlock),
+      host: FixedHost(), debugFiles: debugFiles, now: { Date(timeIntervalSince1970: 1_791_000_000) }
+    )
+  }
+
+  @Test
+  func `writes nothing while the log shows no fault`() throws {
+    let fixture = try Fixture()
+    defer { fixture.remove() }
+    let sut = monitor(fixture)
+    try fixture.append("compatdb: NFS16.exe [x86_64]\ninfo:  Setting display mode: 1920x1200@60\n")
+    #expect(sut.scan() == nil && sut.notice == nil)
+    #expect(fixture.reportFiles().isEmpty)
+  }
+
+  @Test
+  func `writes a report when a fault appears, and tells the starter where it is`() throws {
+    let fixture = try Fixture()
+    defer { fixture.remove() }
+    let sut = monitor(fixture)
+    try fixture.append("compatdb: NFS16.exe [x86_64]\n" + Self.fault)
+    let notice = try #require(sut.scan())
+    #expect(fixture.reportFiles() == ["crash-report-20261003T040000Z.txt"])
+    #expect(notice.path.hasSuffix("/Logs/crash-report-20261003T040000Z.txt"))
+    #expect(
+      notice.headline
+        == "1 fault in 1 game launch; first at 0x0, outside nfs16 (0x140000000-0x1488F2000)")
+    #expect(sut.notice == notice)
+    let text = try String(contentsOfFile: notice.path, encoding: .utf8)
+    #expect(text.contains("call or jump through a null function pointer"))
+  }
+
+  @Test
+  func `reports each fault once, and again only when new ones appear`() throws {
+    let fixture = try Fixture()
+    defer { fixture.remove() }
+    let sut = monitor(fixture)
+    try fixture.append(Self.fault)
+    #expect(sut.scan() != nil)
+    #expect(sut.scan() == nil)
+    try fixture.append("info:  more output\n")
+    #expect(sut.scan() == nil)
+    try fixture.append(Self.fault)
+    let second = try #require(sut.scan())
+    #expect(fixture.reportFiles().count == 2)
+    #expect(second.headline.hasPrefix("2 faults"))
+  }
+
+  @Test
+  func `writes at most five reports in a session`() throws {
+    let fixture = try Fixture()
+    defer { fixture.remove() }
+    let sut = monitor(fixture)
+    for _ in 0..<(NFS2015CrashMonitor.reportLimit + 3) {
+      try fixture.append(Self.fault)
+      sut.scan()
+    }
+    #expect(fixture.reportFiles().count == NFS2015CrashMonitor.reportLimit)
+  }
+
+  @Test
+  func `reads a fault line that arrives in two pieces`() throws {
+    let fixture = try Fixture()
+    defer { fixture.remove() }
+    let sut = monitor(fixture)
+    let cut = Self.fault.index(Self.fault.startIndex, offsetBy: 40)
+    try fixture.append(String(Self.fault[..<cut]))
+    #expect(sut.scan() == nil)
+    try fixture.append(String(Self.fault[cut...]))
+    #expect(sut.scan() != nil)
+  }
+
+  /// The fault line and `wine-crash:` block the real patched runtime printed for its own test
+  /// program (the same text as `CrashBlockFixtures` in the core tests, which this target cannot see).
+  private static let realLines = """
+    wine: Unhandled page fault on write access to 85BC35850173FF31 at address 000000014000166F (thread 016c), starting debugger...
+    wine-crash: begin pid=0168 tid=016c code=c0000005 flags=00000000 address=000000014000166F
+    wine-crash: access=1 target=85BC35850173FF31
+    wine-crash: rip=000000014000166F rsp=000000000031FC60 rbp=0000000000000002 eflags=00000246 mxcsr=00001f80
+    wine-crash: rax=1111111111111111 rbx=2222222222222222 rcx=85BC35850173FF31 rdx=3333333333333333
+    wine-crash: rsi=4444444444444444 rdi=5555555555555555 r8=0808080808080808 r9=0909090909090909
+    wine-crash: r10=1010101010101010 r11=1111000011110000 r12=1212121212121212 r13=1313131313131313
+    wine-crash: r14=1414141414141414 r15=1515151515151515 cs=002b ss=0023 ds=0023 es=0023 fs=0000 gs=0023
+    wine-crash: pc 000000014000166F state=1000 protect=20 type=1000000 region=0000000140001000+0000000000002000 module=crash-context.exe
+    wine-crash: pc-bytes[16]=48 89 01 ff 15 28 6c 00 00 89 c2 48 8d 0d 90 29 
+    wine-crash: target 85BC35850173FF31 not queryable (non-canonical or outside the address space)
+    wine-crash: stack[000000000031FC60]: 0000000000000000 0000000000000000 0000000000000000 0000000000000000 000000000031FCF0 0000000000000000 000000000003BD98 0000000000000000
+    wine-crash: tf state=0 guest_flags=0 steps=0
+    wine-crash: end
+    """.split(separator: "\n").map(String.init)
+  private static let blockLines = realLines.joined(separator: "\n") + "\n"
+
+  @Test
+  func
+    `a runtime with the crash block gets the block in the report, with no wait when it is whole`()
+    throws
+  {
+    let fixture = try Fixture()
+    defer { fixture.remove() }
+    let sut = monitor(fixture, expectsBlock: true)
+    try fixture.append("compatdb: NFS16.exe [x86_64]\n" + Self.blockLines)
+    let notice = try #require(sut.scan())
+    let text = try String(contentsOfFile: notice.path, encoding: .utf8)
+    #expect(text.contains("block 1 of 1: process 0168 thread 016c"))
+    #expect(text.contains("  target page: not queryable"))
+  }
+
+  @Test
+  func `waits one scan for a block that is split from its fault line, then writes once with it`()
+    throws
+  {
+    let fixture = try Fixture()
+    defer { fixture.remove() }
+    let sut = monitor(fixture, expectsBlock: true)
+    let lines = Self.realLines
+    try fixture.append(lines.prefix(4).joined(separator: "\n") + "\n")
+    #expect(sut.scan() == nil)
+    try fixture.append(lines.dropFirst(4).joined(separator: "\n") + "\n")
+    let notice = try #require(sut.scan())
+    #expect(fixture.reportFiles().count == 1)
+    let text = try String(contentsOfFile: notice.path, encoding: .utf8)
+    #expect(text.contains("block 1 of 1") && text.contains("trap-flag emulation: state 0"))
+    #expect(sut.scan() == nil)
+  }
+
+  @Test
+  func `waits one scan for a block that never comes, then reports without it and says so`() throws {
+    let fixture = try Fixture()
+    defer { fixture.remove() }
+    let sut = monitor(fixture, expectsBlock: true)
+    try fixture.append(Self.fault)
+    #expect(sut.scan() == nil)
+    let notice = try #require(sut.scan())
+    let text = try String(contentsOfFile: notice.path, encoding: .utf8)
+    #expect(text.contains("none was found in the log"))
+    #expect(fixture.reportFiles().count == 1)
+  }
+
+  @Test
+  func `stopping does not wait for a block`() throws {
+    let fixture = try Fixture()
+    defer { fixture.remove() }
+    let sut = monitor(fixture, expectsBlock: true)
+    try fixture.append(Self.fault)
+    #expect(sut.stop() != nil && fixture.reportFiles().count == 1)
+  }
+
+  @Test
+  func `a runtime without the crash block is never made to wait`() throws {
+    let fixture = try Fixture()
+    defer { fixture.remove() }
+    let sut = monitor(fixture, expectsBlock: false)
+    try fixture.append(Self.fault)
+    let notice = try #require(sut.scan())
+    let text = try String(contentsOfFile: notice.path, encoding: .utf8)
+    #expect(!text.contains("Crash context") && !text.contains("wine-crash"))
+  }
+
+  @Test
+  func `summarizes the wine-rwx lines for the session log, and says nothing without them`() throws {
+    let fixture = try Fixture()
+    defer { fixture.remove() }
+    let sut = monitor(fixture)
+    #expect(sut.rwxSummary == nil)
+    try fixture.append("compatdb: NFS16.exe [x86_64]\ninfo:  Setting display mode: 1920x1200@60\n")
+    sut.scan()
+    #expect(sut.rwxSummary == nil)
+    try fixture.append(
+      "wine-rwx: active pid=80026 first page 0x1B30000\n"
+        + "wine-rwx: pid=80026 stores=750 released(host=1 carrier=0 hot=0)\n")
+    sut.scan()
+    #expect(
+      sut.rwxSummary
+        == "RWX W^X emulation: 1 process reported active, 1 reported counters: 750 stores through, 1 pages released."
+    )
+    #expect(fixture.reportFiles().isEmpty)
+  }
+
+  @Test
+  func `keeps credentials out of the report`() throws {
+    let fixture = try Fixture()
+    defer { fixture.remove() }
+    let sut = monitor(fixture)
+    try fixture.append(Self.secret + Self.fault)
+    let notice = try #require(sut.scan())
+    let text = try String(contentsOfFile: notice.path, encoding: .utf8)
+    for secret in ["A1b2C3d4E5f6G7h8I9j0K1l2M3n4", "sessionId", "authCode"] {
+      #expect(!text.contains(secret), "\(secret)")
+    }
+  }
+
+  @Test
+  func `adds the exception trace of a diagnostic launch from its debug file`() throws {
+    let fixture = try Fixture()
+    defer { fixture.remove() }
+    let debug = fixture.root.appendingPathComponent("wine-debug-X-001.log")
+    try Data("0001:trace:seh:dispatch_exception code=c0000005\n".utf8).write(to: debug)
+    let sut = monitor(fixture, debugFiles: { [debug] })
+    try fixture.append(Self.fault)
+    let notice = try #require(sut.scan())
+    #expect(
+      try String(contentsOfFile: notice.path, encoding: .utf8).contains(
+        "dispatch_exception code=c0000005"))
+  }
+
+  @Test
+  func `survives a folder it cannot write, and does not try the same faults again`() throws {
+    let fixture = try Fixture()
+    defer { fixture.remove() }
+    let sut = monitor(fixture)
+    chmod(fixture.reports.path, 0o500)
+    try fixture.append(Self.fault)
+    #expect(sut.scan() == nil && sut.notice == nil)
+    chmod(fixture.reports.path, 0o755)
+    // The fault was counted as reported, so the folder being fixed does not write it late.
+    #expect(sut.scan() == nil)
+    #expect(fixture.reportFiles().isEmpty)
+    try fixture.append(Self.fault)
+    #expect(sut.scan() != nil)
+    #expect(fixture.reportFiles().count == 1)
+  }
+
+  @Test
+  func `stopping without starting returns at once, and stopping makes a last scan`() throws {
+    let fixture = try Fixture()
+    defer { fixture.remove() }
+    let sut = monitor(fixture)
+    try fixture.append(Self.fault)
+    let notice = sut.stop()
+    #expect(notice != nil && fixture.reportFiles().count == 1)
+  }
+
+  @Test
+  func `the background scan catches a fault without being asked`() throws {
+    let fixture = try Fixture()
+    defer { fixture.remove() }
+    let reported = Reported()
+    let sut = NFS2015CrashMonitor(
+      log: fixture.log, store: NFS2015CrashReportStore(folder: fixture.reports), context: context(),
+      host: FixedHost(), now: { Date(timeIntervalSince1970: 1_791_000_000) }, interval: 0.01,
+      onReport: { reported.set($0) })
+    sut.start()
+    try fixture.append(Self.fault)
+    // Only the background thread can have written this: nothing else scans before stop().
+    let notice = try #require(reported.wait(seconds: 30))
+    #expect(fixture.reportFiles().count == 1 && notice == sut.notice)
+    #expect(sut.stop() == notice)
+    #expect(fixture.reportFiles().count == 1)
+  }
+
+  @Test
+  func `reads a fault line the log ended without a line feed when it stops`() throws {
+    let fixture = try Fixture()
+    defer { fixture.remove() }
+    let sut = monitor(fixture)
+    try fixture.append(String(Self.fault.dropLast()))
+    #expect(sut.scan() == nil)
+    #expect(sut.stop() != nil)
+    #expect(fixture.reportFiles().count == 1)
+  }
+}
+
+/// Hands the report a background thread wrote to the test, without a sleep.
+private final class Reported: @unchecked Sendable {
+  private let condition = NSCondition()
+  private var notice: NFS2015CrashNotice?
+
+  func set(_ value: NFS2015CrashNotice) {
+    condition.lock()
+    notice = value
+    condition.broadcast()
+    condition.unlock()
+  }
+
+  func wait(seconds: TimeInterval) -> NFS2015CrashNotice? {
+    let deadline = Date(timeIntervalSinceNow: seconds)
+    condition.lock()
+    defer { condition.unlock() }
+    while notice == nil, condition.wait(until: deadline) {}
+    return notice
+  }
+}
