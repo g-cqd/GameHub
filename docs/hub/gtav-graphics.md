@@ -87,6 +87,17 @@ textures arrive. The system log has no GPU error for that run (`IOGPU`/AGX searc
 - **Trim.** `launcher/hub trim epic` stopped 17 Epic processes 360 s into the run; the game kept running and swap fell from
   12.4 GB to 9.4 GB within a minute. Swap rose again later (14.8 GB at 22:28); the late-texture symptom has not been rechecked.
 
+## Run of 2026-10-24 22:37 (flags 9: NaN-to-zero and strict math)
+
+`d3d11.strictMath` did **not** remove the lattices: screenshots 22:40:08 (magenta on exhaust smoke) and 22:40:55 (white on the
+driver's hands and forearms) look the same as before. It is off again. The run lasted 5.5 minutes, so the Epic trim (360 s) fired
+after the game had stopped and tested nothing. The owner could not turn MSAA off from the in-game menu, so `settings.xml` was edited
+with the game closed: `MSAA` and `ReflectionMSAA` are 0 (FXAA stays on); the previous file is `settings.xml.msaa4-lattice-20261024`.
+Test: do the lattices disappear without MSAA? If they stay, the next suspects are the particle quality setting and DXMT's handling of
+compute-shader output that a later pass reads (a missing barrier would give tile-shaped garbage).
+
+If the DirectX 11 artifacts cannot be fixed, DirectX 10.1 remains the clean way to play (see above).
+
 ## What the first DXMT log showed (2026-10-24, `Hub/Logs/dxmt-gtav/GTA5_d3d11.log`)
 
 | Log line | Meaning | Likely effect |
