@@ -40,6 +40,13 @@ Keep `DX_Version` = `1` until the DX11 failures below are fixed. The DX11 failur
 - **Test now:** `d3d11.preciseDivide = True` is on again in `launcher/settings/GTAV/dxmt.conf`. A run should log
   `global shader flags: 7` and no `Failed to create PSO`.
 
+## Result of the first run with the settings file loaded (DirectX 11, 21:41-21:46)
+
+`global shader flags: 3` (NaN-to-zero and FMA split on; `preciseDivide` was off because the run started before it was turned
+on). The DXMT and Epic logs of that run have **no `Failed to create PSO` line**, where every earlier DirectX 11 run had two or three.
+So those two options remove the compile failures. Swap still grew to 11.3 GB in the same run, so the memory problem is not
+solved; `dxgi.maxDeviceMemory = 4096` is on for the next run.
+
 ## What the first DXMT log showed (2026-10-24, `Hub/Logs/dxmt-gtav/GTA5_d3d11.log`)
 
 | Log line | Meaning | Likely effect |
