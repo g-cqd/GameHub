@@ -98,6 +98,18 @@ compute-shader output that a later pass reads (a missing barrier would give tile
 
 If the DirectX 11 artifacts cannot be fixed, DirectX 10.1 remains the clean way to play (see above).
 
+## Result: MSAA off removes the lattices (run of 2026-10-24 22:51, DirectX 11)
+
+With `MSAA=0` and `ReflectionMSAA=0` (FXAA on), NaN-to-zero on and strict math off, the owner saw **no more magenta or white
+artifacts**. So the lattices come from DXMT's handling of GTA V's multisampled deferred path, not from fast-math. The working
+combination is saved as `launcher/settings/GTAV/settings.xml` (a reference copy; the game owns the live file, edit it only with
+the game closed). Fixing 4x MSAA itself is not done; it is not needed to play.
+
+The Epic trim fired at 22:57:43 (6 min 15 s into the run, 17 processes) and the game kept running to its end at 23:00. Before the
+trim swap was 10.9 GB and page-ins 25-80 MB/s; after it swap was 7.4 GB and page-ins 4-18 MB/s. `launcher/hub play gtav` now stops the
+launcher 90 s after the game process appears (`--keep-launcher` to prevent that); when starting from the Epic window yourself, run
+`launcher/hub trim epic` once the game is on screen.
+
 ## What the first DXMT log showed (2026-10-24, `Hub/Logs/dxmt-gtav/GTA5_d3d11.log`)
 
 | Log line | Meaning | Likely effect |

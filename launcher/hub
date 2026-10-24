@@ -11,7 +11,8 @@
 
 <game> is an alias (aoa, bf4, nfs, ...), a Steam app id, or any part of the name.
 Options for play: --restart (stop what runs in the prefix first), --runtime NAME, --metalfx [FACTOR],
-  --dxgi wined3d (AoA backend), --debug SPEC (WINEDEBUG), --no-wait, --force (known-blocked games).
+  --dxgi wined3d (AoA backend), --debug SPEC (WINEDEBUG), --no-wait, --force (known-blocked games),
+  --keep-launcher (do not stop the Epic launcher 90 s after an Epic game started; see `hub trim`).
 
 Layout (HUB_ROOT, default /Volumes/ExT2/GameHub): Prefix/ (one prefix), Runtimes/, Library/{Steam,Ubisoft,Epic}, "EA Games"/,
 Hub/{Logs,State,Home,Temp}. This script and launcher/settings live in the repo; nothing else is needed from it on ExT2.
@@ -713,6 +714,10 @@ def play(args):
     procs = wait_for(started, 300 if provider == "steam" else 180, f"{g.name} to start", every=3)
     if procs:
         print(f"{g.name} is running (pid {procs[0][0]})")
+        if provider in TRIM_PATTERNS and not args.keep_launcher:   # free the launcher's memory once the game has had time to start up
+            subprocess.Popen([sys.executable, str(Path(__file__).resolve()), "_trim_later", provider, str(TRIM_DELAY)], start_new_session=True,
+                             stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            print(f"the {provider} launcher will be stopped in {TRIM_DELAY} s to free memory (--keep-launcher to prevent)")
         if g.id in SETTINGS:   # copy the settings the game saved once it exits
             subprocess.Popen([sys.executable, str(Path(__file__).resolve()), "_keep", g.id], start_new_session=True,
                              stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
@@ -801,6 +806,16 @@ def cmd_trim(args):
     print(f"stopped {len(victims)} {args.provider} launcher process(es); the game and the Wine server keep running")
 
 
+TRIM_DELAY = 90   # seconds after the game's process appeared
+
+
+def trim_later(provider, delay):
+    """Stop the launcher processes after `delay` seconds, unless the game is already gone."""
+    time.sleep(float(delay))
+    if running_runtime():
+        cmd_trim(argparse.Namespace(provider=provider))
+
+
 def cmd_doctor(args):
     ok = True
 
@@ -836,7 +851,7 @@ def main():
         p.add_argument("--metalfx", nargs="?", const="1.40625", metavar="FACTOR")
     p = sub.add_parser("list"); p.add_argument("--all", action="store_true"); p.set_defaults(f=cmd_list)
     p = sub.add_parser("play"); p.add_argument("game"); common(p)
-    p.add_argument("--restart", action="store_true"); p.add_argument("--no-wait", action="store_true"); p.add_argument("--force", action="store_true")
+    p.add_argument("--restart", action="store_true"); p.add_argument("--no-wait", action="store_true"); p.add_argument("--force", action="store_true"); p.add_argument("--keep-launcher", action="store_true")
     p.set_defaults(f=play)
     p = sub.add_parser("start"); p.add_argument("provider", choices=["steam", "ea", "ubisoft", "epic"]); common(p); p.set_defaults(f=cmd_start)
     sub.add_parser("status").set_defaults(f=cmd_status)
@@ -844,8 +859,9 @@ def main():
     p = sub.add_parser("stop"); p.add_argument("game", nargs="?"); p.set_defaults(f=cmd_stop)
     sub.add_parser("doctor").set_defaults(f=cmd_doctor)
     p = sub.add_parser("_keep"); p.add_argument("gid"); p.set_defaults(f=lambda a: keep_settings(a.gid))
+    p = sub.add_parser("_trim_later"); p.add_argument("provider"); p.add_argument("delay"); p.set_defaults(f=lambda a: trim_later(a.provider, a.delay))
     args = ap.parse_args()
-    if args.cmd not in ("_keep",) and not ROOT.is_dir():
+    if args.cmd not in ("_keep", "_trim_later") and not ROOT.is_dir():
         die(f"{ROOT} is not mounted (plug in ExT2)")
     for d in (LOGS, STATE, TEMP, HOME):
         d.mkdir(parents=True, exist_ok=True)
