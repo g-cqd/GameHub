@@ -1,6 +1,6 @@
 # GTA V (Legacy, Epic) graphics: black outlines, dark textures, texture reloading
 
-Status: **investigation. The dropped-draw failure (`itrproj`) is still open; MSAA 8x is a known crash.** Symptoms reported on this Mac (MacBook Pro, M2 Pro, 16 GB): black
+Status: **GTA V runs cleanly on DirectX 10.1. The DirectX 11 failure (`itrproj`) is still open; MSAA 8x is a known crash.** Symptoms reported on this Mac (MacBook Pro, M2 Pro, 16 GB): black
 strokes around shapes and polygons, textures that load, unload and load again, and effects and textures that look very dark
 or black.
 
@@ -14,6 +14,17 @@ or black.
 | Heavy settings | Tessellation very high, SSAO high, shadows high with soft shadows 2, textures High | same file |
 | Memory the game sees | `DedicatedVideoMemory` = half of Metal's recommended working set = **6.36 GB**, `SharedSystemMemory` = 0, budget 12.7 GB | DXMT `src/dxgi/dxgi_adapter.cpp` (`FIXME: use a more appropriate value`); working set 12.71 GB measured on this Mac with `MTLDevice.recommendedMaxWorkingSetSize` |
 | Anti-cheat | `GTA5.exe` is started by the Rockstar Launcher with `-nobattleye -noBE` | `Library/Epic/GTAV/args.txt` |
+
+## Workaround that works: DirectX 10.1
+
+Set the game's DirectX version to **10.1** (`DX_Version` = `1` in `settings.xml`, or Graphics > DirectX Version in game). The owner
+played about 28 minutes that way (watch log 20:58-21:27, game pid 85332) with no black effects, no black foliage and no texture
+reloading, and `watch_game.py` recorded no error in that run. The DX11 path is what hits the `itrproj` compile failures and the
+emulated tessellation; DirectX 10.1 has no tessellation (the game then stores `Tessellation` = 0). The cost is the DirectX 11 only
+features: tessellation and a few effects.
+
+Keep `DX_Version` = `1` until the DX11 failures below are fixed. The DX11 failures are **not** fixed yet; the changes installed in
+`hub-1` since (shader dump, shader-flags log line, `dxgi.maxDeviceMemory`) are tools for finding the cause, not fixes.
 
 ## What the first DXMT log showed (2026-10-24, `Hub/Logs/dxmt-gtav/GTA5_d3d11.log`)
 
