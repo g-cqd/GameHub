@@ -290,6 +290,8 @@ def session_env(rt, provider, opts):
         env["VK_ICD_FILENAMES"] = f"{ext}/vulkan/MoltenVK_icd.json"
         env["GST_PLUGIN_SYSTEM_PATH_1_0"] = env["GST_PLUGIN_PATH_1_0"] = f"{ext}/media/plugins"
         env["GST_REGISTRY_1_0"], env["GST_REGISTRY_FORK"], env["GST_DEBUG"] = str(TEMP / "gst-registry.bin"), "no", "0"
+    if provider == "epic":   # the Epic Online Services MSI runs .NET custom actions; without mscoree it rolls back (EOS-ERR-1603)
+        env["WINEDLLOVERRIDES"] = "mshtml=d;winemenubuilder.exe=d"
     if provider == "ea":
         env.update(MTL_HUD_ENABLED="0", WINE_TF_EMULATION="1", WINE_TF_MAX_STEPS="0", WINE_TF_MAX_NS="0",
                    WINE_RWX_WX_EMULATION="1",
