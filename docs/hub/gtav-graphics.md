@@ -1,6 +1,6 @@
 # GTA V (Legacy, Epic) graphics: black outlines, dark textures, texture reloading
 
-Status: **investigation. The fix for the dropped draws is built and installed but not yet confirmed in game.** Symptoms reported on this Mac (MacBook Pro, M2 Pro, 16 GB): black
+Status: **investigation. The dropped-draw failure (`itrproj`) is still open; MSAA 8x is a known crash.** Symptoms reported on this Mac (MacBook Pro, M2 Pro, 16 GB): black
 strokes around shapes and polygons, textures that load, unload and load again, and effects and textures that look very dark
 or black.
 
@@ -26,7 +26,22 @@ or black.
 
 No line mentions the texture reloading, so that stays a memory-budget hypothesis (below).
 
-The fix for the first row is a new DXMT option, `d3d11.preciseDivide` (branch `gtav-precise-divide` in the DXMT fork, installed
+**Result of the first fix attempt (same day, from the `Hub/Logs/epic-*.log` of the session, which also holds DXMT's output):** with
+`d3d11.preciseDivide` on, the same two shaders failed again and a third one (`ps_673de1c7`) joined them. So the `arcp` theory is
+wrong or incomplete; the option is off again in `dxmt.conf`. The failing pattern is probably Apple's compiler rewriting a
+projective texture lookup (it is an AGX backend error on macOS 27.2 beta 26B5112a), not something DXMT's fast-math flags
+cause. Next step: dump the DXBC of those three shaders and see which sample they use.
+
+**MSAA 8x crashes the game.** After the in-game graphics settings were raised, `settings.xml` had `MSAA=8` and `ReflectionMSAA=8`;
+the log then shows `CreateMTLTextureDescriptorInternal: sample count 8 is not supported` and the game dies with an access
+violation in `GTA5.exe` (mtld3d log: `fault outside d3d9.dll: code=0xc0000005`). Metal on this GPU has no 8-sample textures, and the
+game offers 8x anyway. Keep both at 4 or lower. The file was reset to 4 and the broken one is saved next to it as
+`settings.xml.msaa8-crash-20261024`.
+
+DXMT's own log file (`Hub/Logs/dxmt-gtav/GTA5_*.log`) was truncated at every launch and written only at exit; it now appends and
+flushes each line (DXMT branch `gtav-precise-divide`).
+
+The fix for the first row was a new DXMT option, `d3d11.preciseDivide` (branch `gtav-precise-divide` in the DXMT fork, installed
 in `hub-1`; the previous `d3d11.dll` and `winemetal.so` are in `Backups/hub-1-dxmt-before-precise-divide-20261024/`). It is on for
 `GTA5.exe` in `launcher/settings/GTAV/dxmt.conf`. Check after a restart of the game that `GTA5_d3d11.log` no longer has the
 `Failed to create PSO` lines. If it still has them, send the new log.
