@@ -110,6 +110,18 @@ trim swap was 10.9 GB and page-ins 25-80 MB/s; after it swap was 7.4 GB and page
 launcher 90 s after the game process appears (`--keep-launcher` to prevent that); when starting from the Epic window yourself, run
 `launcher/hub trim epic` once the game is on screen.
 
+## Fixing MSAA: where the lattices come from (work in progress)
+
+Facts from the dumped shaders (5,047 converted with `airconv -S`): 330 pixel shaders run per sample (`air.sample_id`), 243 of them read
+the multisampled stencil, and the lighting shaders that first failed to compile (`dc953feb`, `636d2c37`, `673de1c7`) are per-sample light-volume
+passes: they read the multisampled G-buffer with the sample index, read stencil bit `0x08` as a material flag, and take the screen
+position from a sample-rate interpolant. The lattices appear on skin and exhaust smoke only, and only with MSAA.
+
+Bisect: `debug.skipPixelShaders` (new DXMT option) drops all draws of the three shaders above for the next run with MSAA 4. If the
+lattices disappear, they come from those passes; if not, the cause is elsewhere in the multisampled path (stencil view of the
+multisampled depth, a missing barrier, or the resolve). Other tests to run one at a time: MSAA 2, and the stencil channel
+(`.y` in the shader against Metal's stencil view returning red).
+
 ## What the first DXMT log showed (2026-10-24, `Hub/Logs/dxmt-gtav/GTA5_d3d11.log`)
 
 | Log line | Meaning | Likely effect |
