@@ -1,6 +1,6 @@
 # GTA V (Legacy, Epic) graphics: black outlines, dark textures, texture reloading
 
-Status: **investigation, nothing here is verified yet.** Symptoms reported on this Mac (MacBook Pro, M2 Pro, 16 GB): black
+Status: **investigation. The fix for the dropped draws is built and installed but not yet confirmed in game.** Symptoms reported on this Mac (MacBook Pro, M2 Pro, 16 GB): black
 strokes around shapes and polygons, textures that load, unload and load again, and effects and textures that look very dark
 or black.
 
@@ -15,9 +15,25 @@ or black.
 | Memory the game sees | `DedicatedVideoMemory` = half of Metal's recommended working set = **6.36 GB**, `SharedSystemMemory` = 0, budget 12.7 GB | DXMT `src/dxgi/dxgi_adapter.cpp` (`FIXME: use a more appropriate value`); working set 12.71 GB measured on this Mac with `MTLDevice.recommendedMaxWorkingSetSize` |
 | Anti-cheat | `GTA5.exe` is started by the Rockstar Launcher with `-nobattleye -noBE` | `Library/Epic/GTAV/args.txt` |
 
+## What the first DXMT log showed (2026-10-24, `Hub/Logs/dxmt-gtav/GTA5_d3d11.log`)
+
+| Log line | Meaning | Likely effect |
+|---|---|---|
+| `Failed to create PSO ... Undefined symbols: llvm.agx2.sample.itrproj.1xf` for pixel shaders `ps_636d2c37...` and `ps_dc953feb...`, then `Skipping draws whose render pipeline failed to compile` | Apple's GPU compiler (AGX, M2 Pro) turned a divide of two interpolants into a projective texture sample it cannot link. DXMT sets the fast-math `arcp` (allow reciprocal) flag on pixel and compute shaders, which permits that rewrite. Every draw with those shaders is dropped | **Missing effects and surfaces that stay black or very dark.** This is the strongest lead |
+| `maxtessfactor(15) is too large for a mesh pipeline. Clamping to 8` (25 times) | DXMT emulates tessellation with mesh shaders and caps the factor at 8, the game asks for 15 | Less tessellated terrain and props; not a source of black pixels |
+| `Unsupported border color (1, 0, 0, 0)` | Metal has three border colors; DXMT falls back to opaque white, so a single-channel depth lookup still reads 1 | Probably harmless for shadow maps; wrong for a colour texture |
+| `Unknown interface query ...`, `MakeWindowAssociation: Ignoring flags 1` | Queries for interfaces DXMT does not implement | None seen |
+
+No line mentions the texture reloading, so that stays a memory-budget hypothesis (below).
+
+The fix for the first row is a new DXMT option, `d3d11.preciseDivide` (branch `gtav-precise-divide` in the DXMT fork, installed
+in `hub-1`; the previous `d3d11.dll` and `winemetal.so` are in `Backups/hub-1-dxmt-before-precise-divide-20261024/`). It is on for
+`GTA5.exe` in `launcher/settings/GTAV/dxmt.conf`. Check after a restart of the game that `GTA5_d3d11.log` no longer has the
+`Failed to create PSO` lines. If it still has them, send the new log.
+
 ## Hypotheses, in the order to test them
 
-1. **Black outlines and black effects: NaN or infinity in a shader.** On Apple GPUs a NaN in a texture coordinate or a fused
+1. **Black outlines and black effects (also after the fix above): NaN or infinity in a shader.** On Apple GPUs a NaN in a texture coordinate or a fused
    multiply-add gives black pixels, typically at geometry edges and in post-processing. DXMT has two switches for it,
    `d3d11.sampleNaNToZero` and `d3d11.defuseFma`; the BF3 tuning in this project turns both on. They are now on for
    `GTA5.exe` in `launcher/settings/GTAV/dxmt.conf`. Test: play with them on, then set both to `False` and compare.
