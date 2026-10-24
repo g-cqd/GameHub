@@ -1,6 +1,6 @@
 # Per-program fixes: inventory, move into the runtime, and a pre-launch detection layer
 
-Status: 2026-10-24. Phase 1 (detection layer, rules file) and the Epic/Rockstar fixes are built and installed in hub-1; the rest is proposed.
+Status: 2026-10-24. Phases 1–4 are built and installed in hub-1.
 Builds on `docs/bundler-plan/BUNDLER-DESIGN.md` §5 (knowledge rules) and `OVERRIDES-MATRIX.md` (91 recorded overrides).
 
 ## 1. Inventory: where each per-program fix lives today
@@ -17,17 +17,18 @@ Builds on `docs/bundler-plan/BUNDLER-DESIGN.md` §5 (knowledge rules) and `OVERR
 | `WINE_TF_EMULATION=1`, `WINE_TF_MAX_*=0`, `MTL_HUD_ENABLED=0`, `WINE_RWX_WX_EMULATION=1` (uncommitted removal pending) | EA | `launcher/hub` | runtime rules file (`env` per exe) |
 | `--in-process-gpu` for EADesktop | EA | `launcher/hub` | runtime rules file (`arguments`) |
 | x87sidecar on every i386 process | all 32-bit | Wine fork `ntdll/unix/loader.c`, `process.c` (attach unless compatdb.so says no; our compatdb.so has no query, so always) | in runtime |
-| BOOLEAN syscall arguments read from the low byte (EA 13.813 hang) | all (2 syscalls so far) | Wine fork `51430b514f7` | in runtime; extend to all BOOLEAN syscalls |
+|BOOLEAN syscall arguments read from the low byte (EA 13.813 hang) | all (36 syscalls) | Wine fork `51430b514f7`, `1e06100ec1b` | in runtime |
 | Raw Windows syscalls from native code (SIGSYS path) | protectors, EAAC | Wine fork `winsyscall.c` | in runtime |
 | EAAC Zw stub patching, TF emulation | EA games | Wine fork | in runtime |
 | CrossOver hacks keyed on exe name (177 `CW HACK` sites; exe checks for upc.exe, UplayWebCore.exe, EpicGamesLauncher.exe, Fallout4.exe, Diablo IV.exe, ...) | various | Wine fork (inherited) | in runtime |
 | Steam overlay DLLs moved aside, `steam.cfg` bootstrap block | Steam | `launcher/hub` `prep_steam()` | stays in the launcher (store-client setup, not per process) |
 | NFS 2015: prime the catalog with the public offer id before the content id | NFS 2015 | `launcher/hub` `EA_KNOWN.prime` | stays in the launcher (EA client protocol) |
-| Licence `.dlf` bound to an old machine hash: move aside so EA fetches a new one | EA games | manual (2026-10-24) | launcher check (detect `ActivationUI.exe` after launch, or machine-hash change) |
+| Licence `.dlf` bound to an old machine hash: move aside so EA fetches a new one | EA games | `launcher/hub` `play()` (detects `ActivationUI.exe` after launch, moves `.dlf` aside and relaunches) | in launcher |
 | Epic installs registered from `.egstore` | Epic games | `launcher/hub` `adopt_epic_installs()` | stays in the launcher |
 | AoA `Option.ini` kept across sessions | AoA | `launcher/hub` `SETTINGS` | stays in the launcher |
-| Heaven's-gate selector 0x33 (Rosetta has no GDT index 6) | upc.exe (Ubisoft packer `.ubx2`), likely other protected i386 programs | not fixed: proven by patching `push imm32; ljmp 0x33:imm32` to selector 0x2B in a copy | runtime (see §3) |
-| ARPL instruction in 32-bit protected code | upc.exe | not fixed: x87sidecar aborts ("stock has no ARPL implementation") | x87sidecar |
+| Heaven's-gate selector 0x33 (Rosetta has no GDT index 6) | upc.exe, UplayService.exe, UbisoftExtension.exe, UplayCrashReporter.exe (`.ubx2`) | Wine fork `73516bb0c6a` (`gate_selector_fixup=true` in `runtime/hub-rules.txt`) | in runtime |
+| ARPL instruction in 32-bit protected code in blocks containing FBLD/FBSTP | upc.exe | x87sidecar `dbda79a` (never hand ARPL to stock, even in BCD/stock-listed blocks) | in runtime |
+| Ubisoft Connect CEF cross-process swapchain | upc.exe | `runtime/hub-rules.txt` + `launcher/hub` (`--in-process-gpu` on `upc.exe`, Wine `b3ae132b6be` syncs PEB/WoW64 env) | in runtime + launcher |
 
 Rule of thumb: what changes how a **process** runs (backend, DLL overrides, env, arguments, sidecar, CPU-level emulation) belongs in the
 runtime; what drives a **store client** (sign-in, catalog priming, install registration, settings files) stays in the launcher.

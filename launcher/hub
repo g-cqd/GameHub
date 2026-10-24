@@ -631,13 +631,38 @@ def play(args):
     if args.no_wait:
         return
 
+    repaired_dlf = False
+
     def started():
+        nonlocal repaired_dlf
         if provider == "steam":
             t = log_tail_from(STEAM / "logs/console_log.txt", offsets["console"])
             m = re.search(r"LaunchApp failed with (\w+)", t)
             if m:
                 die(f"Steam could not launch {g.name} ({m.group(1)}). If it was updating (check Library/Steam/logs/content_log.txt, "
                     "for example 'Steamworks Shared' after folder changes) wait for the update and run the command again")
+        elif provider == "ea" and not repaired_dlf:
+            act = [pid for pid, _, cmd in ps() if "activationui.exe" in cmd.lower() and "x87sidecar" not in cmd]
+            if act:
+                repaired_dlf = True
+                lic_dir = PREFIX / "drive_c/ProgramData/Electronic Arts/EA Services/License"
+                moved = []
+                for cid in str(g.extra.get("offer", "")).split(","):
+                    dlf = lic_dir / f"{cid.strip()}.dlf"
+                    if dlf.is_file():
+                        bak = lic_dir / f"{dlf.name}.stale-machine-hash-{stamp()}"
+                        dlf.rename(bak)
+                        moved.append(dlf.name)
+                if moved:
+                    print(f"hub: stale EA licence ({', '.join(moved)}) triggered ActivationUI; moving aside and relaunching {g.name}")
+                    for pid in act + [p for p, _, _ in game_procs(g)]:
+                        try:
+                            os.kill(pid, 15)
+                        except OSError:
+                            pass
+                    time.sleep(3)
+                    fire(g.extra["offer"])
+                    return []
         return game_procs(g)
     procs = wait_for(started, 300 if provider == "steam" else 180, f"{g.name} to start", every=3)
     if procs:
