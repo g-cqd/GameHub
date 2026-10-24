@@ -288,7 +288,7 @@ def game_env(provider, fx):
             env.append(f"DXMT_DUMP_SHADERS={logs / 'shaders'}")
         conf = HERE / "settings" / folder / "dxmt.conf"
         if conf.is_file():
-            env.append(f"DXMT_CONFIG_FILE={unix_to_win(conf)}")
+            env.append(f"DXMT_CONFIG_FILE={conf}")   # a unix path: DXMT cannot open the same file given as Z:\\...
         if fx:
             env += ["DXMT_METALFX_SPATIAL_SWAPCHAIN=1", f"DXMT_CONFIG=d3d11.metalSpatialUpscaleFactor={fx}"]
         out[exe] = env

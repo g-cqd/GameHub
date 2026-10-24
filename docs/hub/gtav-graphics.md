@@ -26,6 +26,20 @@ features: tessellation and a few effects.
 Keep `DX_Version` = `1` until the DX11 failures below are fixed. The DX11 failures are **not** fixed yet; the changes installed in
 `hub-1` since (shader dump, shader-flags log line, `dxgi.maxDeviceMemory`) are tools for finding the cause, not fixes.
 
+## Found on 2026-10-24 (second session): the settings file was never read, and what the failing shaders are
+
+- **`dxmt.conf` was not applied.** The log line `global shader flags: 0` appeared although the file turns on three options, and
+  `Found config file` never appeared. DXMT cannot open a file named with a Windows path (`Z:\Users\...`); the same file given
+  as a unix path (`/Users/gc/...`) is found (checked with a small test program under the hub's Wine). `launcher/hub` now passes
+  the unix path. So the earlier "`preciseDivide` does not help" result is void, and the NaN and FMA options were never tested.
+- **The three failing pixel shaders** (`ps_dc953feb`, `ps_636d2c37`, `ps_673de1c7`; DXBC dumped with `HUB_DXMT_DUMP=1` and
+  converted with the build's `airconv -S`) are the deferred lighting passes: each reads the multisampled G-buffer
+  (`read_texture_2d_ms`) and samples one texture at `fragment_input.xy / fragment_input.w`, where the input is interpolated
+  per sample (`air.sample`). That divide-then-sample pattern is the projective lookup the AGX compiler cannot link
+  (`llvm.agx2.sample.itrproj`). The divide carries the fast-math `arcp` flag.
+- **Test now:** `d3d11.preciseDivide = True` is on again in `launcher/settings/GTAV/dxmt.conf`. A run should log
+  `global shader flags: 7` and no `Failed to create PSO`.
+
 ## What the first DXMT log showed (2026-10-24, `Hub/Logs/dxmt-gtav/GTA5_d3d11.log`)
 
 | Log line | Meaning | Likely effect |
