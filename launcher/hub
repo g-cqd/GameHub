@@ -17,7 +17,7 @@ Hub/{Logs,State,Home,Temp}. This script and launcher/settings live in the repo; 
 Only one Wine runtime can serve the prefix at a time (wineserver version mismatch), so switching between launchers
 stops the launcher that is running.
 """
-import argparse, glob, json, os, re, shutil, subprocess, sys, time
+import argparse, glob, json, os, re, shutil, struct, subprocess, sys, time, zlib
 from pathlib import Path
 
 ROOT = Path(os.environ.get("HUB_ROOT", "/Volumes/ExT2/GameHub"))
@@ -363,6 +363,108 @@ def epic_client():
     return None
 
 
+def epic_manifest_meta(path):
+    """Return (build version, launch exe, launch command) from an Epic binary manifest, or None if it is not one.
+
+    Reads only the header and the first 4 KB of the compressed body, where the meta section is."""
+    with open(path, "rb") as f:
+        head = f.read(41)
+        if len(head) < 41 or struct.unpack_from("<I", head)[0] != 0x44BEC00C:
+            return None
+        hsize, _, csize = struct.unpack_from("<III", head, 4)
+        f.seek(hsize)
+        body = f.read(min(csize, 1 << 16))
+    try:
+        data = zlib.decompressobj().decompress(body, 4096) if head[36] & 1 else body[:4096]
+        o = 14   # meta size u32, data version u8, feature level u32, is-file-data u8, app id u32
+        out = []
+        for _ in range(4):   # app name, build version, launch exe, launch command
+            n = struct.unpack_from("<i", data, o)[0]
+            o += 4
+            size = -2 * n if n < 0 else n
+            if size > len(data) - o:
+                return None
+            out.append(data[o:o + size].decode("utf-16-le" if n < 0 else "utf-8").rstrip("\0"))
+            o += size
+    except (zlib.error, struct.error, UnicodeDecodeError):
+        return None
+    return out[1], out[2], out[3]
+
+
+def adopt_epic_installs():
+    """Register in the Epic launcher each Library/Epic/<game> install that carries its .egstore and is not listed yet.
+
+    Writes Data/Manifests/<guid>.item and the LauncherInstalled.dat entry, the two files the launcher reads at start.
+    Call only while the launcher is stopped: it rewrites LauncherInstalled.dat when it exits."""
+    lib = ROOT / "Library/Epic"
+    data = PREFIX / "drive_c/ProgramData/Epic"
+    listing = data / "UnrealEngineLauncher/LauncherInstalled.dat"
+    try:
+        installed = json.loads(listing.read_text()) if listing.exists() else {"InstallationList": []}
+    except ValueError:
+        print(f"hub: {listing} is not valid JSON; not adopting Epic installs", file=sys.stderr)
+        return
+    known = {e.get("InstallLocation", "").lower() for e in installed.get("InstallationList", [])}
+    if known:   # a listing entry without its .item shows as broken: only complete pairs count as registered
+        items = set()
+        for f in (data / "EpicGamesLauncher/Data/Manifests").glob("*.item"):
+            try:
+                items.add(json.loads(f.read_text()).get("InstallLocation", "").lower())
+            except (ValueError, OSError) as e:
+                print(f"hub: unreadable Epic manifest {f}: {e}", file=sys.stderr)
+        known &= items
+    added = []
+    for game in sorted(lib.iterdir()) if lib.is_dir() else []:
+        loc = unix_to_win(game)
+        if loc.lower() in known:
+            continue
+        # the launcher looks for <InstallationGuid>.manifest in .egstore: reuse the newest recorded guid
+        for cpn in sorted((game / ".egstore").glob("*.mancpn"), key=lambda f: f.stat().st_mtime, reverse=True):
+            try:
+                ids = json.loads(cpn.read_text())
+                ns, item, app = ids["CatalogNamespace"], ids["CatalogItemId"], ids["AppName"]
+            except (ValueError, KeyError, OSError) as e:
+                print(f"hub: skipping {cpn}: {e}", file=sys.stderr)
+                continue
+            meta = epic_manifest_meta(cpn.with_suffix(".manifest")) if cpn.with_suffix(".manifest").exists() else None
+            if not meta:
+                print(f"hub: skipping {game.name}: no readable manifest next to {cpn.name}", file=sys.stderr)
+                continue
+            version, exe, cmd = meta
+            guid = cpn.stem.upper()
+            record = {
+                "FormatVersion": 0, "bIsIncompleteInstall": False, "LaunchCommand": cmd, "LaunchExecutable": exe,
+                "ManifestLocation": loc + "/.egstore", "bIsApplication": True, "bIsExecutable": True, "bIsManaged": False,
+                "bNeedsValidation": False, "bRequiresAuth": True, "bAllowMultipleInstances": False, "bCanRunOffline": False,
+                "bAllowUriCmdArgs": False, "BaseURLs": [], "BuildLabel": "Live", "AppCategories": ["public", "games", "applications"],
+                "ChunkDbs": [], "CompatibleApps": [], "DisplayName": game.name, "InstallationGuid": guid, "InstallLocation": loc,
+                "InstallSessionId": "", "InstallTags": [], "InstallComponents": [], "HostInstallationGuid": "0" * 32,
+                "PrereqIds": [], "StagingLocation": loc + "/.egstore/bps", "TechnicalType": "", "VaultThumbnailUrl": "",
+                "VaultTitleText": "", "InstallSize": 0, "MainWindowProcessName": "", "ProcessNames": [],
+                "BackgroundProcessNames": [], "MandatoryAppFolderName": game.name, "OwnershipToken": "false",
+                "CatalogNamespace": ns, "CatalogItemId": item, "AppName": app, "AppVersionString": version,
+                "MainGameCatalogNamespace": ns, "MainGameCatalogItemId": item, "MainGameAppName": app, "AllowedUriEnvVars": [],
+            }
+            manifests = data / "EpicGamesLauncher/Data/Manifests"
+            manifests.mkdir(parents=True, exist_ok=True)
+            tmp = manifests / f"{guid}.item.tmp"
+            tmp.write_text(json.dumps(record, indent="\t"))
+            os.replace(tmp, manifests / f"{guid}.item")
+            installed["InstallationList"] = [e for e in installed.get("InstallationList", [])
+                                              if e.get("InstallLocation", "").lower() != loc.lower()]
+            installed["InstallationList"].append(
+                {"InstallLocation": loc, "NamespaceId": ns, "ItemId": item, "ArtifactId": app, "AppVersion": version, "AppName": app})
+            known.add(loc.lower())
+            added.append(game.name)
+            break
+    if added:
+        listing.parent.mkdir(parents=True, exist_ok=True)
+        tmp = listing.with_suffix(".tmp")
+        tmp.write_text(json.dumps(installed, indent="\t"))
+        os.replace(tmp, listing)
+        print(f"registered with the Epic launcher: {', '.join(added)}")
+
+
 def prep_steam():
     od = STEAM / "_overlay-disabled"
     od.mkdir(exist_ok=True)
@@ -426,6 +528,7 @@ def start_provider(provider, rt, opts):
         exe = epic_client()
         if not exe:
             die("Epic Games Launcher not found in the prefix")
+        adopt_epic_installs()
         log = LOGS / f"epic-{stamp()}.log"
         spawn(rt, env, [unix_to_win(exe), "-SkipBuildPatchPrereq"], log)
         print(f"starting Epic Games Launcher on {rt} (log {log})")
