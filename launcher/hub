@@ -520,11 +520,13 @@ def start_provider(provider, rt, opts):
         STATE.mkdir(parents=True, exist_ok=True)
         (STATE / "ea-log").write_text(str(log))
     elif provider == "ubisoft":
-        exe = UBISOFT / "UbisoftConnect.exe"
+        exe = UBISOFT / "upc.exe"
+        if not exe.exists():
+            exe = UBISOFT / "UbisoftConnect.exe"
         if not exe.exists():
             die("Ubisoft Connect not found")
-        spawn(rt, env, [unix_to_win(exe)], LOGS / f"ubisoft-{stamp()}.log")
-        print("starting Ubisoft Connect (unverified); give it a moment to sign in")
+        spawn(rt, env, [unix_to_win(exe), "--in-process-gpu"], LOGS / f"ubisoft-{stamp()}.log")
+        print(f"starting Ubisoft Connect on {rt}")
         time.sleep(15)
     elif provider == "epic":
         exe = epic_client()
