@@ -49,6 +49,9 @@ done
 mkdir -p "$RT/lib/wine/dxgi/dxmt/x86_64-unix" "$RT/lib/wine/d3d9/mtld3d/x86_64-unix"
 $CP -c "$DX/x64/src/winemetal/unix/winemetal.so" "$RT/lib/wine/dxgi/dxmt/x86_64-unix/"
 $CP -c "$DX/x64/src/winemetal/unix/winemetal.so" "$RT/lib/wine/x86_64-unix/"
+# compatdb.so's built-in steam-web-helper rule asks for dxgi=gptk (D3DMetal, not shipped); without this alias it
+# falls back to the placeholder dxgi.dll and steamwebhelper crashes in a restart loop
+ln -s dxmt "$RT/lib/wine/dxgi/gptk"
 # --- sign (ad-hoc) with the Wine entitlements
 for f in "$RT/bin/wine" "$RT/bin/wineserver"; do codesign -s - -f --entitlements "$ENT" "$f" >/dev/null 2>&1; done
 echo "base runtime assembled at $RT (mtld3d + media bundle are installed next)"
