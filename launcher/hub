@@ -45,7 +45,7 @@ OTHER_KNOWN = {  # standalone installs under Library/Ubisoft/games and Library/E
     "Far Cry 2": dict(exe="bin/FarCry2.exe", status="unverified"),
     "Far Cry 3": dict(exe="bin/farcry3_d3d11.exe", status="unverified"),
     "WATCH_DOGS2": dict(exe="bin/WatchDogs2.exe", status="unverified", note="ships EasyAntiCheat"),
-    "GTAV": dict(exe="GTAV.exe", status="blocked", note="BattlEye, needs the Epic launcher"),
+    "GTAV": dict(exe="PlayGTAV.exe", status="unverified", note="starts via the Epic launcher and Rockstar Launcher; args.txt carries -nobattleye -noBE"),
 }
 STEAM_SKIP = {"228980"}  # Steamworks Common Redistributables
 ALIASES = {
@@ -384,6 +384,18 @@ def epic_manifest_meta(path):
     return out[1], out[2], out[3]
 
 
+def epic_app_name(game_dir):
+    """Return the Epic app name that LauncherInstalled.dat lists for `game_dir`, or None when the game is not registered."""
+    listing = PREFIX / "drive_c/ProgramData/Epic/UnrealEngineLauncher/LauncherInstalled.dat"
+    try:
+        entries = json.loads(listing.read_text()).get("InstallationList", [])
+    except (OSError, ValueError) as e:
+        print(f"hub: cannot read {listing}: {e}", file=sys.stderr)
+        return None
+    loc = unix_to_win(game_dir).lower()
+    return next((e.get("AppName") for e in entries if e.get("InstallLocation", "").lower() == loc and e.get("AppName")), None)
+
+
 def adopt_epic_installs():
     """Register in the Epic launcher each Library/Epic/<game> install that carries its .egstore and is not listed yet.
 
@@ -615,6 +627,11 @@ def play(args):
             fire(g.extra["prime"])
             time.sleep(15)
         fire(g.extra["offer"])
+    elif provider == "epic":   # Epic games need the launcher's auth arguments: ask the launcher to start the game
+        app = epic_app_name(g.path)
+        if not app:
+            die(f"{g.name} is not registered in the Epic launcher; run `hub start epic` once so it adopts {g.path}")
+        spawn(rt, env, ["start", f"com.epicgames.launcher://apps/{app}?action=launch&silent=true"], plog)
     else:
         exe = g.extra.get("exe")
         spawn(rt, env, [unix_to_win(exe)], plog, cwd=exe.parent)
