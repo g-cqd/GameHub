@@ -1,7 +1,7 @@
 # Logitech MX Master 4 under Wine
 
-Status: investigation of 2026-10-26. The wheel setting below is applied; the button changes are proposals that need the owner's
-Logi Options+ configuration.
+Status: 2026-10-26. The wheel setting and the Wine patch for buttons 5 and up are applied; Back and Forward as real buttons
+need Logi Options+ to be stopped and the mouse power-cycled.
 
 ## How the mouse reaches Windows programs
 
@@ -38,6 +38,21 @@ With Options+ smooth scrolling every wheel event is "continuous": Wine multiplie
 (four or five notches). `HKCU\Software\Wine\Mac Driver\UsePreciseScrolling = n` (set in the shared prefix on 2026-10-26) makes
 Wine accumulate and report whole multiples of 120 instead. Remove the value to go back. A very fast spin still produces large
 multiples (up to 26 notches in one event), the same distance you actually spun.
+
+## Result of the second test (Options+ stopped, mouse power-cycled)
+
+Stopping Options+ is not enough: the mouse stays in diverted mode until it is switched off and on (or reconnected). After that
+power cycle macOS delivers **buttons 3 to 6** and Wine reports Back and Forward as `XBUTTON1` and `XBUTTON2`. The gesture (thumb) and top
+buttons are buttons 5 and 6, which Wine used to encode as invalid `XBUTTON` data (4 and 8). The vertical wheel arrives as plain
+notches (not continuous). The haptic panel sends nothing without Options+.
+
+Wine patch (branch `mx-extra-buttons` of the Wine fork, `dlls/winemac.drv`): macOS buttons 5 and up now arrive as key events F13 to
+F20. With the patched `winemac.so` in `hub-1`, one test gave: gesture button `VK_F13` (0x7c), top button `VK_F14` (0x7d), Back
+`XBUTTON1`, Forward `XBUTTON2`. The previous file is in `Backups/hub-1-winemac-before-extra-buttons-20261026/`. The SDK copy
+(`sdk/wine-ours`) has the patched file too, so a new `assemble_runtime.sh` keeps it.
+
+Cost of this mode: with Options+ stopped, its assignments (Copy, Paste, Smart Zoom, haptic panel, Actions Ring) do not work.
+Starting Options+ again diverts the buttons again; going back to games needs another power cycle of the mouse.
 
 ## What would give the mouse all its controls in games
 

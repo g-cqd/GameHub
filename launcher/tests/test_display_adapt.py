@@ -16,15 +16,23 @@ class DisplayAdaptationTests(unittest.TestCase):
 
     def test_compute_display_settings_4k(self):
         # 4K monitor scaled to 2560x1440 (5120x2880 backing pixels, 60Hz)
-        w, h, hz_int, hz_float, retina_mode = hub.compute_display_settings(2560, 1440, 5120, 2880, 60.0)
+        # 1. High DPI aware (BF4): uses physical backing pixels 5120x2880
+        w, h, hz_int, hz_float, retina_mode = hub.compute_display_settings(2560, 1440, 5120, 2880, 60.0, high_dpi=True)
         self.assertEqual((w, h), (5120, 2880))
         self.assertEqual(hz_int, 60)
         self.assertEqual(hz_float, "60.000000")
         self.assertEqual(retina_mode, "y")
 
+        # 2. DPI unaware (BF3, 32-bit): uses logical points 2560x1440
+        w2, h2, hz_int2, hz_float2, retina_mode2 = hub.compute_display_settings(2560, 1440, 5120, 2880, 60.0, high_dpi=False)
+        self.assertEqual((w2, h2), (2560, 1440))
+        self.assertEqual(hz_int2, 60)
+        self.assertEqual(hz_float2, "60.000000")
+        self.assertEqual(retina_mode2, "y")
+
     def test_compute_display_settings_retina_mbp(self):
         # 16-inch MacBook Pro: 1728x1117 points, 3456x2234 pixels, 120Hz
-        w, h, hz_int, hz_float, retina_mode = hub.compute_display_settings(1728, 1117, 3456, 2234, 120.0)
+        w, h, hz_int, hz_float, retina_mode = hub.compute_display_settings(1728, 1117, 3456, 2234, 120.0, high_dpi=True)
         self.assertEqual((w, h), (3456, 2234))
         self.assertEqual(hz_int, 120)
         self.assertEqual(hz_float, "120.000000")
@@ -32,7 +40,7 @@ class DisplayAdaptationTests(unittest.TestCase):
 
     def test_compute_display_settings_14inch_mbp(self):
         # 14-inch MacBook Pro: 1512x982 points, 3024x1964 pixels, 120Hz
-        w, h, hz_int, hz_float, retina_mode = hub.compute_display_settings(1512, 982, 3024, 1964, 120.0)
+        w, h, hz_int, hz_float, retina_mode = hub.compute_display_settings(1512, 982, 3024, 1964, 120.0, high_dpi=True)
         self.assertEqual((w, h), (3024, 1964))
         self.assertEqual(hz_int, 120)
         self.assertEqual(retina_mode, "y")

@@ -73,60 +73,73 @@ FROSTBITE_PROFILES = {
 }
 
 GAME_DISPLAY_ADAPTERS = {
-    "Battlefield 4": ("frostbite", "drive_c/users/crossover/Documents/Battlefield 4/settings/PROFSAVE_profile"),
-    "Battlefield 3": ("frostbite", "drive_c/users/crossover/Documents/Battlefield 3/settings/PROF_SAVE_profile"),
-    "Battlefield 1": ("frostbite", "drive_c/users/crossover/Documents/Battlefield 1/settings/PROFSAVE_profile"),
-    "Battlefield V": ("frostbite", "drive_c/users/crossover/Documents/Battlefield V/settings/PROFSAVE_profile"),
-    "Need for Speed (2015)": ("frostbite", "drive_c/users/crossover/Documents/Need For Speed/settings/PROFILEOPTIONS_profile"),
-    "Need for Speed": ("frostbite", "drive_c/users/crossover/Documents/Need For Speed/settings/PROFILEOPTIONS_profile"),
-    "GTAV": ("gtav", "drive_c/users/crossover/Documents/Rockstar Games/GTA V/settings.xml"),
-    "Command & Conquer: Generals": ("generals", "drive_c/users/crossover/Documents/Command and Conquer Generals Data/Options.ini"),
-    "Command & Conquer Generals Zero Hour": ("generals", "drive_c/users/crossover/Documents/Command and Conquer Generals Zero Hour Data/Options.ini"),
-    "Act of Aggression": ("aoa", "drive_c/users/crossover/Saved Games/EugenSystems/ActOfAggression/Option.ini"),
+    "Battlefield 4": ("frostbite", "drive_c/users/crossover/Documents/Battlefield 4/settings/PROFSAVE_profile", True),
+    "Battlefield 3": ("frostbite", "drive_c/users/crossover/Documents/Battlefield 3/settings/PROF_SAVE_profile", False),
+    "Battlefield 1": ("frostbite", "drive_c/users/crossover/Documents/Battlefield 1/settings/PROFSAVE_profile", True),
+    "Battlefield V": ("frostbite", "drive_c/users/crossover/Documents/Battlefield V/settings/PROFSAVE_profile", True),
+    "Need for Speed (2015)": ("frostbite", "drive_c/users/crossover/Documents/Need For Speed/settings/PROFILEOPTIONS_profile", False),
+    "Need for Speed": ("frostbite", "drive_c/users/crossover/Documents/Need For Speed/settings/PROFILEOPTIONS_profile", False),
+    "GTAV": ("gtav", "drive_c/users/crossover/Documents/Rockstar Games/GTA V/settings.xml", True),
+    "Command & Conquer: Generals": ("generals", "drive_c/users/crossover/Documents/Command and Conquer Generals Data/Options.ini", False),
+    "Command & Conquer Generals Zero Hour": ("generals", "drive_c/users/crossover/Documents/Command and Conquer Generals Zero Hour Data/Options.ini", False),
+    "Act of Aggression": ("aoa", "drive_c/users/crossover/Saved Games/EugenSystems/ActOfAggression/Option.ini", False),
 }
 
 
 def get_display_facts():
-    """Query the active main display on macOS. Return (main_id, point_w, point_h, pixel_w, pixel_h, refresh_hz)."""
+    """Query the active main display on macOS. Return (main_id, point_w, point_h, panel_w, panel_h, refresh_hz)."""
     try:
         cg = ctypes.cdll.LoadLibrary("/System/Library/Frameworks/CoreGraphics.framework/CoreGraphics")
         cg.CGMainDisplayID.restype = ctypes.c_uint32
-        cg.CGDisplayPixelsWide.restype = ctypes.c_size_t
-        cg.CGDisplayPixelsWide.argtypes = [ctypes.c_uint32]
-        cg.CGDisplayPixelsHigh.restype = ctypes.c_size_t
-        cg.CGDisplayPixelsHigh.argtypes = [ctypes.c_uint32]
         cg.CGDisplayCopyDisplayMode.restype = ctypes.c_void_p
         cg.CGDisplayCopyDisplayMode.argtypes = [ctypes.c_uint32]
         cg.CGDisplayModeGetRefreshRate.restype = ctypes.c_double
         cg.CGDisplayModeGetRefreshRate.argtypes = [ctypes.c_void_p]
+        cg.CGDisplayModeGetWidth.restype = ctypes.c_size_t
+        cg.CGDisplayModeGetWidth.argtypes = [ctypes.c_void_p]
+        cg.CGDisplayModeGetHeight.restype = ctypes.c_size_t
+        cg.CGDisplayModeGetHeight.argtypes = [ctypes.c_void_p]
         cg.CGDisplayModeGetPixelWidth.restype = ctypes.c_size_t
         cg.CGDisplayModeGetPixelWidth.argtypes = [ctypes.c_void_p]
         cg.CGDisplayModeGetPixelHeight.restype = ctypes.c_size_t
         cg.CGDisplayModeGetPixelHeight.argtypes = [ctypes.c_void_p]
 
         main_id = cg.CGMainDisplayID()
-        point_w = int(cg.CGDisplayPixelsWide(main_id))
-        point_h = int(cg.CGDisplayPixelsHigh(main_id))
         mode = cg.CGDisplayCopyDisplayMode(main_id)
         if mode:
-            pixel_w = int(cg.CGDisplayModeGetPixelWidth(mode))
-            pixel_h = int(cg.CGDisplayModeGetPixelHeight(mode))
+            point_w = int(cg.CGDisplayModeGetWidth(mode))
+            point_h = int(cg.CGDisplayModeGetHeight(mode))
+            buf_w = int(cg.CGDisplayModeGetPixelWidth(mode))
+            buf_h = int(cg.CGDisplayModeGetPixelHeight(mode))
             refresh_hz = float(cg.CGDisplayModeGetRefreshRate(mode))
         else:
-            pixel_w, pixel_h, refresh_hz = point_w, point_h, 60.0
-        return int(main_id), point_w, point_h, pixel_w, pixel_h, refresh_hz
+            point_w, point_h, buf_w, buf_h, refresh_hz = 1920, 1080, 1920, 1080, 60.0
+
+        panel_w, panel_h = buf_w, buf_h
+        try:
+            out = subprocess.run(["ioreg", "-l"], capture_output=True, text=True, timeout=5).stdout
+            w_m = re.search(r'"NativeFormatHorizontalPixels"\s*=\s*(\d+)', out)
+            h_m = re.search(r'"NativeFormatVerticalPixels"\s*=\s*(\d+)', out)
+            if w_m and h_m:
+                panel_w, panel_h = int(w_m.group(1)), int(h_m.group(1))
+        except Exception:
+            pass
+        return int(main_id), point_w, point_h, panel_w, panel_h, refresh_hz
     except Exception:
         return 1, 1920, 1080, 1920, 1080, 60.0
 
 
-def compute_display_settings(point_w, point_h, pixel_w, pixel_h, refresh_hz):
-    """Compute optimal game resolution, refresh, and RetinaMode setting based on display scaling and safety rules."""
+def compute_display_settings(point_w, point_h, pixel_w, pixel_h, refresh_hz, high_dpi=False):
+    """Compute optimal game resolution, refresh, and RetinaMode setting based on display scaling and game capability."""
     hz_int = max(60, int(round(refresh_hz)))
     hz_float = f"{float(hz_int):.6f}"
-    # Keep RetinaMode on ("y") so Wine renders with full Retina high-DPI and HIGHDPIAWARE without pixelation.
     retina_mode = "y"
-    target_w = pixel_w
-    target_h = pixel_h
+    if high_dpi:
+        target_w = pixel_w
+        target_h = pixel_h
+    else:
+        target_w = point_w
+        target_h = point_h
     return target_w, target_h, hz_int, hz_float, retina_mode
 
 
@@ -139,9 +152,10 @@ def update_profile_text(text, width, height, hz_int, hz_float):
         "GstRender.FullscreenRefreshRate": hz_float,
         "GstRender.ResolutionHertz": str(hz_int),
         "GstRender.FullscreenEnabled": "1",
-        "GstRender.FullscreenMode": "1",
         "GstRender.FullscreenScreen": "0",
     }
+    if "GstRender.FullscreenMode" in text:
+        target_values["GstRender.FullscreenMode"] = "1"
     pending = dict(target_values)
     lines = text.split("\n")
     for i, line in enumerate(lines):
@@ -269,10 +283,10 @@ def adapt_game_display(game_name, verbose=True):
     entry = GAME_DISPLAY_ADAPTERS.get(game_name)
     if not entry:
         return False
-    kind, rel = entry
+    kind, rel, high_dpi = entry
     main_id, point_w, point_h, pixel_w, pixel_h, refresh_hz = get_display_facts()
     target_w, target_h, hz_int, hz_float, retina_mode = compute_display_settings(
-        point_w, point_h, pixel_w, pixel_h, refresh_hz
+        point_w, point_h, pixel_w, pixel_h, refresh_hz, high_dpi=high_dpi
     )
     if not running_runtime():
         reg_updated = update_user_reg_retina(PREFIX / "user.reg", retina_mode)
@@ -294,7 +308,7 @@ def watch_display_loop(game_name, interval=2.0):
     entry = GAME_DISPLAY_ADAPTERS.get(game_name)
     if not entry:
         return
-    kind, rel = entry
+    kind, rel, high_dpi = entry
     log_file = LOGS / "display-watch.log"
     LOGS.mkdir(parents=True, exist_ok=True)
 
@@ -317,7 +331,7 @@ def watch_display_loop(game_name, interval=2.0):
         ):
             main_id, _, _, pixel_w, pixel_h, refresh_hz = cur_state
             target_w, target_h, hz_int, hz_float, _ = compute_display_settings(
-                cur_state[1], cur_state[2], pixel_w, pixel_h, refresh_hz
+                cur_state[1], cur_state[2], pixel_w, pixel_h, refresh_hz, high_dpi=high_dpi
             )
             prof_path = PREFIX / rel
             changed = adapt_profile_file(prof_path, target_w, target_h, hz_int, hz_float, kind=kind)
@@ -583,7 +597,7 @@ def session_env(rt, provider, opts):
     scoped = provider in GAME_PROCS
     ext = rtp / "lib/external"
     env = {"PATH": "/usr/bin:/bin:/usr/sbin:/sbin", "LANG": "en_US.UTF-8", "USER": "Player", "HOME": str(HOME), "TMPDIR": str(TEMP),
-           "WINEPREFIX": str(PREFIX), "WINEMSYNC": "1", "WINEDEBUG": opts.debug or ("err+all" if provider == "steam" else "-all"),
+           "WINEPREFIX": str(PREFIX), "WINEMSYNC": "1", "WINEDEBUG": opts.debug or "-all",
            "WINEDLLOVERRIDES": "mscoree,mshtml=d;winemenubuilder.exe=d", "WINE_COMPATDB": compat_db(rt, opts.dxgi or "dxmt", game_env(provider, fx))}
     if ext.is_dir():
         env["DYLD_FALLBACK_LIBRARY_PATH"] = f"{ext}:{ext}/media:{ext}/vulkan"
