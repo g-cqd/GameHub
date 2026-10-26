@@ -19,7 +19,7 @@ Hub/{Logs,State,Home,Temp}. This script and launcher/settings live in the repo; 
 Only one Wine runtime can serve the prefix at a time (wineserver version mismatch), so switching between launchers
 stops the launcher that is running.
 """
-import argparse, glob, json, os, re, shutil, struct, subprocess, sys, time, zlib
+import argparse, ctypes, glob, json, os, re, shutil, struct, subprocess, sys, time, zlib
 from pathlib import Path
 
 ROOT = Path(os.environ.get("HUB_ROOT", "/Volumes/ExT2/GameHub"))
@@ -60,6 +60,271 @@ ALIASES = {
 }
 # Per-game settings kept across sessions: (settings file inside the prefix, golden copy in this repo)
 SETTINGS = {"318020": ("drive_c/users/crossover/Saved Games/EugenSystems/ActOfAggression/Option.ini", "settings/ActOfAggression/Option.ini")}
+
+# ---------------------------------------------------------------- display adaptation
+
+FROSTBITE_PROFILES = {
+    "Battlefield 4": "drive_c/users/crossover/Documents/Battlefield 4/settings/PROFSAVE_profile",
+    "Battlefield 3": "drive_c/users/crossover/Documents/Battlefield 3/settings/PROF_SAVE_profile",
+    "Battlefield 1": "drive_c/users/crossover/Documents/Battlefield 1/settings/PROFSAVE_profile",
+    "Battlefield V": "drive_c/users/crossover/Documents/Battlefield V/settings/PROFSAVE_profile",
+    "Need for Speed (2015)": "drive_c/users/crossover/Documents/Need For Speed/settings/PROFILEOPTIONS_profile",
+    "Need for Speed": "drive_c/users/crossover/Documents/Need For Speed/settings/PROFILEOPTIONS_profile",
+}
+
+GAME_DISPLAY_ADAPTERS = {
+    "Battlefield 4": ("frostbite", "drive_c/users/crossover/Documents/Battlefield 4/settings/PROFSAVE_profile"),
+    "Battlefield 3": ("frostbite", "drive_c/users/crossover/Documents/Battlefield 3/settings/PROF_SAVE_profile"),
+    "Battlefield 1": ("frostbite", "drive_c/users/crossover/Documents/Battlefield 1/settings/PROFSAVE_profile"),
+    "Battlefield V": ("frostbite", "drive_c/users/crossover/Documents/Battlefield V/settings/PROFSAVE_profile"),
+    "Need for Speed (2015)": ("frostbite", "drive_c/users/crossover/Documents/Need For Speed/settings/PROFILEOPTIONS_profile"),
+    "Need for Speed": ("frostbite", "drive_c/users/crossover/Documents/Need For Speed/settings/PROFILEOPTIONS_profile"),
+    "GTAV": ("gtav", "drive_c/users/crossover/Documents/Rockstar Games/GTA V/settings.xml"),
+    "Command & Conquer: Generals": ("generals", "drive_c/users/crossover/Documents/Command and Conquer Generals Data/Options.ini"),
+    "Command & Conquer Generals Zero Hour": ("generals", "drive_c/users/crossover/Documents/Command and Conquer Generals Zero Hour Data/Options.ini"),
+    "Act of Aggression": ("aoa", "drive_c/users/crossover/Saved Games/EugenSystems/ActOfAggression/Option.ini"),
+}
+
+
+def get_display_facts():
+    """Query the active main display on macOS. Return (main_id, point_w, point_h, pixel_w, pixel_h, refresh_hz)."""
+    try:
+        cg = ctypes.cdll.LoadLibrary("/System/Library/Frameworks/CoreGraphics.framework/CoreGraphics")
+        cg.CGMainDisplayID.restype = ctypes.c_uint32
+        cg.CGDisplayPixelsWide.restype = ctypes.c_size_t
+        cg.CGDisplayPixelsWide.argtypes = [ctypes.c_uint32]
+        cg.CGDisplayPixelsHigh.restype = ctypes.c_size_t
+        cg.CGDisplayPixelsHigh.argtypes = [ctypes.c_uint32]
+        cg.CGDisplayCopyDisplayMode.restype = ctypes.c_void_p
+        cg.CGDisplayCopyDisplayMode.argtypes = [ctypes.c_uint32]
+        cg.CGDisplayModeGetRefreshRate.restype = ctypes.c_double
+        cg.CGDisplayModeGetRefreshRate.argtypes = [ctypes.c_void_p]
+        cg.CGDisplayModeGetPixelWidth.restype = ctypes.c_size_t
+        cg.CGDisplayModeGetPixelWidth.argtypes = [ctypes.c_void_p]
+        cg.CGDisplayModeGetPixelHeight.restype = ctypes.c_size_t
+        cg.CGDisplayModeGetPixelHeight.argtypes = [ctypes.c_void_p]
+
+        main_id = cg.CGMainDisplayID()
+        point_w = int(cg.CGDisplayPixelsWide(main_id))
+        point_h = int(cg.CGDisplayPixelsHigh(main_id))
+        mode = cg.CGDisplayCopyDisplayMode(main_id)
+        if mode:
+            pixel_w = int(cg.CGDisplayModeGetPixelWidth(mode))
+            pixel_h = int(cg.CGDisplayModeGetPixelHeight(mode))
+            refresh_hz = float(cg.CGDisplayModeGetRefreshRate(mode))
+        else:
+            pixel_w, pixel_h, refresh_hz = point_w, point_h, 60.0
+        return int(main_id), point_w, point_h, pixel_w, pixel_h, refresh_hz
+    except Exception:
+        return 1, 1920, 1080, 1920, 1080, 60.0
+
+
+def compute_display_settings(point_w, point_h, pixel_w, pixel_h, refresh_hz):
+    """Compute optimal game resolution, refresh, and RetinaMode setting based on display scaling and safety rules."""
+    hz_int = max(60, int(round(refresh_hz)))
+    hz_float = f"{float(hz_int):.6f}"
+    # Keep RetinaMode on ("y") so Wine renders with full Retina high-DPI and HIGHDPIAWARE without pixelation.
+    retina_mode = "y"
+    target_w = pixel_w
+    target_h = pixel_h
+    return target_w, target_h, hz_int, hz_float, retina_mode
+
+
+def update_profile_text(text, width, height, hz_int, hz_float):
+    """Update Frostbite profile text with display values, preserving unchanged lines and line endings."""
+    crlf = "\r\n" if "\r\n" in text else "\n"
+    target_values = {
+        "GstRender.ResolutionWidth": str(width),
+        "GstRender.ResolutionHeight": str(height),
+        "GstRender.FullscreenRefreshRate": hz_float,
+        "GstRender.ResolutionHertz": str(hz_int),
+        "GstRender.FullscreenEnabled": "1",
+        "GstRender.FullscreenMode": "1",
+        "GstRender.FullscreenScreen": "0",
+    }
+    pending = dict(target_values)
+    lines = text.split("\n")
+    for i, line in enumerate(lines):
+        trimmed = line.rstrip("\r")
+        parts = trimmed.split(" ", 1)
+        if len(parts) == 2 and parts[0] in pending:
+            ending = "\r" if line.endswith("\r") else ""
+            lines[i] = f"{parts[0]} {pending[parts[0]]}{ending}"
+            del pending[parts[0]]
+
+    result = "\n".join(lines)
+    if pending:
+        if not result.endswith(crlf) and result:
+            result += crlf
+        for k, v in pending.items():
+            result += f"{k} {v}{crlf}"
+    return result
+
+
+def update_gtav_settings_text(text, width, height, hz_int):
+    """Update GTA V settings.xml with ScreenWidth, ScreenHeight, and RefreshRate."""
+    text = re.sub(r'<ScreenWidth\s+value="[^"]*"', f'<ScreenWidth value="{width}"', text)
+    text = re.sub(r'<ScreenHeight\s+value="[^"]*"', f'<ScreenHeight value="{height}"', text)
+    text = re.sub(r'<RefreshRate\s+value="[^"]*"', f'<RefreshRate value="{hz_int}"', text)
+    return text
+
+
+def update_ini_resolution_text(text, key, value_str):
+    """Update an INI file resolution entry like 'Resolution = 1920 1080'."""
+    pattern = re.compile(r'^[ \t]*' + re.escape(key) + r'[ \t]*=.*$', re.MULTILINE)
+    replacement = f'{key} = {value_str}'
+    if pattern.search(text):
+        return pattern.sub(replacement, text)
+    crlf = "\r\n" if "\r\n" in text else "\n"
+    if not text.endswith(crlf) and text:
+        text += crlf
+    return text + f"{replacement}{crlf}"
+
+
+def update_aoa_options_text(text, width, height):
+    """Update Act of Aggression Option.ini resolution entries."""
+    text = re.sub(r'(DefaultResolutionX\s*=\s*)\d+', rf'\g<1>{width}', text)
+    text = re.sub(r'(DefaultResolutionY\s*=\s*)\d+', rf'\g<1>{height}', text)
+    text = re.sub(r'(DesktopWidth\s*=\s*)\d+', rf'\g<1>{width}', text)
+    text = re.sub(r'(DesktopHeight\s*=\s*)\d+', rf'\g<1>{height}', text)
+    return text
+
+
+def adapt_profile_file(profile_path, width, height, hz_int, hz_float, kind="frostbite", max_backups=5):
+    """Update profile on disk atomically with backup and rotation. Return True if file changed."""
+    p = Path(profile_path)
+    if not p.is_file():
+        return False
+    try:
+        text = p.read_text(encoding="utf-8", errors="replace")
+    except OSError:
+        return False
+    if kind == "frostbite":
+        updated = update_profile_text(text, width, height, hz_int, hz_float)
+    elif kind == "gtav":
+        updated = update_gtav_settings_text(text, width, height, hz_int)
+    elif kind == "generals":
+        updated = update_ini_resolution_text(text, "Resolution", f"{width} {height}")
+    elif kind == "aoa":
+        updated = update_aoa_options_text(text, width, height)
+    else:
+        return False
+    if updated == text:
+        return False
+    backup = p.with_name(f"{p.name}.bak-{stamp()}")
+    try:
+        p.parent.mkdir(parents=True, exist_ok=True)
+        backup.write_text(text, encoding="utf-8")
+        tmp = p.with_suffix(".tmp")
+        tmp.write_text(updated, encoding="utf-8")
+        os.replace(tmp, p)
+        prefix = f"{p.name}.bak-"
+        existing = sorted([f for f in p.parent.iterdir() if f.name.startswith(prefix)], key=lambda x: x.name, reverse=True)
+        for old in existing[max_backups:]:
+            try:
+                old.unlink()
+            except OSError:
+                pass
+        return True
+    except OSError as e:
+        print(f"hub: failed to update profile {p}: {e}", file=sys.stderr)
+        return False
+
+
+def update_user_reg_retina(reg_path, desired_mode):
+    """Ensure [Software\\Wine\\Mac Driver] RetinaMode matches desired_mode in user.reg."""
+    p = Path(reg_path)
+    if not p.is_file():
+        return False
+    try:
+        text = p.read_text(encoding="utf-8", errors="replace")
+    except OSError:
+        return False
+    sec_pattern = re.compile(r'(\[Software\\\\Wine\\\\Mac Driver\][^\n]*\n)(.*?)(?=\n\[|\Z)', re.DOTALL)
+    m = sec_pattern.search(text)
+    desired_line = f'"RetinaMode"="{desired_mode}"'
+    if m:
+        sec_header, sec_body = m.group(1), m.group(2)
+        if re.search(r'"RetinaMode"="' + re.escape(desired_mode) + r'"', sec_body, re.IGNORECASE):
+            return False
+        if re.search(r'"RetinaMode"="[^"]*"', sec_body):
+            new_sec_body = re.sub(r'"RetinaMode"="[^"]*"', desired_line, sec_body)
+        else:
+            new_sec_body = sec_body + f"{desired_line}\n"
+        new_text = text[:m.start()] + sec_header + new_sec_body + text[m.end():]
+    else:
+        new_text = text + f'\n[Software\\\\Wine\\\\Mac Driver]\n{desired_line}\n'
+
+    try:
+        tmp = p.with_suffix(".tmp")
+        tmp.write_text(new_text, encoding="utf-8")
+        os.replace(tmp, p)
+        return True
+    except OSError:
+        return False
+
+
+def adapt_game_display(game_name, verbose=True):
+    """Detect current display and adapt game profile and Wine RetinaMode."""
+    entry = GAME_DISPLAY_ADAPTERS.get(game_name)
+    if not entry:
+        return False
+    kind, rel = entry
+    main_id, point_w, point_h, pixel_w, pixel_h, refresh_hz = get_display_facts()
+    target_w, target_h, hz_int, hz_float, retina_mode = compute_display_settings(
+        point_w, point_h, pixel_w, pixel_h, refresh_hz
+    )
+    if not running_runtime():
+        reg_updated = update_user_reg_retina(PREFIX / "user.reg", retina_mode)
+        if reg_updated and verbose:
+            print(f"hub: set Wine RetinaMode={retina_mode} for display {target_w}x{target_h}")
+
+    prof_path = PREFIX / rel
+    changed = adapt_profile_file(prof_path, target_w, target_h, hz_int, hz_float, kind=kind)
+    if (changed or verbose) and prof_path.is_file():
+        msg = f"hub: adapted {game_name} display settings to {target_w}x{target_h}@{hz_int}Hz (display {main_id})"
+        if changed:
+            print(msg)
+        return True
+    return False
+
+
+def watch_display_loop(game_name, interval=2.0):
+    """Background watcher: monitor active display while game runs and re-adapt on display changes."""
+    entry = GAME_DISPLAY_ADAPTERS.get(game_name)
+    if not entry:
+        return
+    kind, rel = entry
+    log_file = LOGS / "display-watch.log"
+    LOGS.mkdir(parents=True, exist_ok=True)
+
+    def log(msg):
+        with open(log_file, "a", encoding="utf-8") as f:
+            f.write(f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] {msg}\n")
+
+    games = [g for g in discover() if g.name == game_name]
+    if not games:
+        return
+    g = games[0]
+    log(f"started watching display for {game_name}")
+
+    last_state = get_display_facts()
+    while game_procs(g):
+        time.sleep(interval)
+        cur_state = get_display_facts()
+        if (cur_state[0], cur_state[3], cur_state[4], int(round(cur_state[5]))) != (
+            last_state[0], last_state[3], last_state[4], int(round(last_state[5]))
+        ):
+            main_id, _, _, pixel_w, pixel_h, refresh_hz = cur_state
+            target_w, target_h, hz_int, hz_float, _ = compute_display_settings(
+                cur_state[1], cur_state[2], pixel_w, pixel_h, refresh_hz
+            )
+            prof_path = PREFIX / rel
+            changed = adapt_profile_file(prof_path, target_w, target_h, hz_int, hz_float, kind=kind)
+            log(f"display changed to {target_w}x{target_h}@{hz_int}Hz (display {main_id}, profile_updated={changed})")
+            last_state = cur_state
+
+    log(f"game {game_name} exited; display watcher stopped")
 
 
 class Game:
@@ -655,6 +920,8 @@ def play(args):
         keep.parent.mkdir(parents=True, exist_ok=True)
         if not live.exists():
             shutil.copy2(keep if keep.exists() else HERE / golden, live)
+    if g.name in GAME_DISPLAY_ADAPTERS:
+        adapt_game_display(g.name)
     offsets = {"console": size(STEAM / "logs/console_log.txt")}
     plog = LOGS / f"play-{norm(g.name)}-{stamp()}.log"
     if provider == "steam":
@@ -716,6 +983,9 @@ def play(args):
     procs = wait_for(started, 300 if provider == "steam" else 180, f"{g.name} to start", every=3)
     if procs:
         print(f"{g.name} is running (pid {procs[0][0]})")
+        if g.name in GAME_DISPLAY_ADAPTERS:
+            subprocess.Popen([sys.executable, str(Path(__file__).resolve()), "_watch_display", g.name], start_new_session=True,
+                             stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         if provider in TRIM_PATTERNS and not args.keep_launcher:   # free the launcher's memory once the game has had time to start up
             subprocess.Popen([sys.executable, str(Path(__file__).resolve()), "_trim_later", provider, str(TRIM_DELAY)], start_new_session=True,
                              stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
@@ -862,8 +1132,9 @@ def main():
     sub.add_parser("doctor").set_defaults(f=cmd_doctor)
     p = sub.add_parser("_keep"); p.add_argument("gid"); p.set_defaults(f=lambda a: keep_settings(a.gid))
     p = sub.add_parser("_trim_later"); p.add_argument("provider"); p.add_argument("delay"); p.set_defaults(f=lambda a: trim_later(a.provider, a.delay))
+    p = sub.add_parser("_watch_display"); p.add_argument("game"); p.set_defaults(f=lambda a: watch_display_loop(a.game))
     args = ap.parse_args()
-    if args.cmd not in ("_keep", "_trim_later") and not ROOT.is_dir():
+    if args.cmd not in ("_keep", "_trim_later", "_watch_display") and not ROOT.is_dir():
         die(f"{ROOT} is not mounted (plug in ExT2)")
     for d in (LOGS, STATE, TEMP, HOME):
         d.mkdir(parents=True, exist_ok=True)
