@@ -1,0 +1,5 @@
+# airconv runs on the build machine against the x86_64 LLVM 15 in native_llvm_path, so build it for x86_64 (Rosetta)
+[binaries]
+c = ['clang', '-arch', 'x86_64']
+cpp = ['clang++', '-arch', 'x86_64']
+ar = 'llvm-ar'

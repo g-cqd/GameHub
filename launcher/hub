@@ -48,14 +48,23 @@ OTHER_KNOWN = {  # standalone installs under Library/Ubisoft/games and Library/E
     "WATCH_DOGS2": dict(exe="bin/WatchDogs2.exe", status="unverified", note="ships EasyAntiCheat"),
     "GTAV": dict(exe="PlayGTAV.exe", status="unverified", note="starts via the Epic launcher and Rockstar Launcher; args.txt carries -nobattleye -noBE"),
 }
-# Providers whose launcher must not get per-game DXMT settings (a MetalFX swapchain there broke the Epic launcher): their game
-# processes get them as env= fields of a compat rule instead. exe -> folder of launcher/settings/ with the game's dxmt.conf
-GAME_PROCS = {"epic": {"GTA5.exe": "GTAV"}}
+# Game processes that get DXMT settings of their own as env= fields of a compat rule: DXMT's info log in Hub/Logs/dxmt-<folder>/,
+# launcher/settings/<folder>/dxmt.conf when it exists, the HUB_DXMT_HUD/HUB_DXMT_DUMP switches and, under SCOPED_FX, --metalfx.
+# exe -> folder. (EA may start its games with a clean environment; settings that must always hold go in DXMT's own app profiles.)
+GAME_PROCS = {
+    "epic": {"GTA5.exe": "GTAV"},
+    "steam": {"Zero Hour.exe": "ZeroHour", "Crysis2Remastered.exe": "Crysis2Remastered"},
+    "ea": {"bf3.exe": "BF3", "Crysis3.exe": "Crysis3"},
+}
+# Providers whose launcher breaks under a session-wide MetalFX swapchain: there --metalfx reaches only the GAME_PROCS exes.
+# Elsewhere it stays session-wide, so a game without a GAME_PROCS entry (Act of Aggression) still gets it.
+SCOPED_FX = {"epic"}
 STEAM_SKIP = {"228980"}  # Steamworks Common Redistributables
 ALIASES = {
     "aoa": "318020", "ron": "287450", "generals": "2229870", "zh": "2732960", "wd": "243470",
     "bf3": "Battlefield 3", "bf4": "Battlefield 4", "bf1": "Battlefield 1", "bfv": "Battlefield V",
     "nfs": "Need for Speed", "nfs2015": "Need for Speed", "c3": "Crysis 3", "f124": "F1 24",
+    "c2r": "2096600", "crysis2": "2096600", "c2": "2096600",
     "fc2": "Far Cry 2", "fc3": "Far Cry 3", "acu": "Assassin's Creed Unity", "wd2": "WATCH_DOGS2",
 }
 # Per-game settings kept across sessions: (settings file inside the prefix, golden copy in this repo)
@@ -594,7 +603,7 @@ def compat_db(rt, gd="dxmt", exe_env=None):
 def session_env(rt, provider, opts):
     rtp = RUNTIMES / rt
     fx = metalfx_factor(opts.metalfx) if opts.metalfx else None
-    scoped = provider in GAME_PROCS
+    scoped = provider in SCOPED_FX
     ext = rtp / "lib/external"
     env = {"PATH": "/usr/bin:/bin:/usr/sbin:/sbin", "LANG": "en_US.UTF-8", "USER": "Player", "HOME": str(HOME), "TMPDIR": str(TEMP),
            "WINEPREFIX": str(PREFIX), "WINEMSYNC": "1", "WINEDEBUG": opts.debug or "-all",
