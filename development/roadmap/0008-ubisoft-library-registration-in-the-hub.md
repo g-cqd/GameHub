@@ -1,0 +1,20 @@
+---
+status: not-started
+blocked-by: []
+date: 2026-10-31
+---
+
+# 0008: The hub registers Ubisoft installs itself
+
+On 2026-10-31 the install-dir values for AC Unity (`Installs\720`), Far Cry 2, Far Cry 3 and Watch Dogs 2 were
+imported from an ad-hoc `/tmp/ubi-register.reg`. The value names come from the `register:` entries in
+`Library/Ubisoft/cache/configuration/configurations`. The registry backups are
+`Prefix/{system,user}.reg.bak-20261031-register-libraries`.
+
+## Work
+Have the hub read those entries and write the values for every game folder in `Library/Ubisoft/games/`. Epic installs
+are already registered this way ("register Library/Epic installs", 2026-10-24). Do it while the prefix is stopped,
+with a backup, and idempotently.
+
+## Done when
+A prefix with no such values gets them from `hub start ubisoft`, and Ubisoft Connect shows each game's folder.

@@ -26,15 +26,17 @@ See [`launcher/README.md`](launcher/README.md) for the layout of the volume, the
 |---|---|
 | `launcher/` | `hub`, the single command (Python, standard library only), and the known-good game settings in `settings/` |
 | `runtime/` | `hub-rules.txt`: per-program rules (renderer backend, environment, arguments) shipped inside the runtime |
-| `scripts/` | Runtime assembly (`assemble_runtime.sh`), media bundling, mtld3d install, and `check_links.py` for the docs |
+| `scripts/` | Runtime assembly (`assemble_runtime.sh`), media bundling, mtld3d install, `check_links.py` for the docs, and the static-analysis checkers in `static-analysis/` |
 | `toolchains/` | `provision.sh`: the build toolchains (Rust, MSVC headers, llvm-mingw, Wine SDK) on the external volume |
 | `apps/bundler/` | Swift package: native starters and signed, notarized bundles for Need for Speed, Call of Duty 4, Far Cry 2 and Battlefield 3, plus the GameHub app and `gamehub-cli` |
-| `docs/` | Documentation; start at [`docs/README.md`](docs/README.md) |
+| `docs/` | Documentation of how things work today; start at [`docs/README.md`](docs/README.md) |
+| `development/` | The project's rules ([`WHITE-PAPER.md`](development/WHITE-PAPER.md)), decisions (`adr/`), work items (`roadmap/`) and the day-by-day `diary/` |
 | `research/` | Scripts from the EA anti-cheat investigation |
 | `archive/` | Finished work kept for reference |
 
 ## Documentation entry points
 
+- Rules, decisions, open work and history: [`development/`](development/WHITE-PAPER.md)
 - How the hub works and how to restart it: [`docs/hub/`](docs/hub/)
 - Renderer, x87 sidecar and Wine SDK knowledge: [`docs/knowledge/`](docs/knowledge/)
 - Bundler, per-game notes, licensing and source offer: [`apps/bundler/docs/`](apps/bundler/docs/)

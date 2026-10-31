@@ -24,7 +24,7 @@ runtime and launcher each needs, starts it, and starts the game.
 - All launchers (Steam, EA, Ubisoft, Epic) run on the unified `hub-2` runtime. Switching launchers cleanly stops the other one (refused while a game runs, unless `--restart`).
 
 ## What makes it work (do not remove)
-1. Steam overlay files are moved to `_overlay-disabled` (the overlay crashes AoA right after its intro). `hub start steam` re-applies this at every start; a client update puts them back while Steam runs (see `docs/hub/ROADMAP.md`).
+1. Steam overlay files are moved to `_overlay-disabled` (the overlay crashes AoA right after its intro). `hub start steam` re-applies this at every start; a client update puts them back while Steam runs (see `development/roadmap/0005-steam-overlay-stays-off-after-client-updates.md`).
 2. Steam is the current 64-bit client (since 2026-10-31, on hub-2), started without flags and allowed to update itself; `prep_steam` removes a leftover `steam.cfg` update block. The Steam Client Service is registered in the prefix (`SteamService.exe /install`, image `C:\Program Files (x86)\Common Files\Steam\SteamService.exe`); without it Steam shows "Steam Service Error". The 2025 32-bit client it replaced (it needed `BootStrapperInhibitAll` and `-nobootstrapupdate` etc.) is in `Library/Steam-legacy`.
 3. The runtime bundles the GStreamer `deinterlace` plugin (the intro video stalls without it).
 4. Game exe backend via compat DB: AoA uses DXMT (`HUB_GAME_DXGI=wined3d` to override); everything else d3d9=mtld3d, dxgi=dxmt. 32-bit games get x87sidecar automatically.
