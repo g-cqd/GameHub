@@ -18,6 +18,11 @@ name=epic-cef;exe=EpicWebHelper.exe;dxgi=wined3d
 # software (--disable-gpu); --in-process-gpu stays so that any GPU fallback still draws from upc.exe
 name=hub-upc;exe=upc.exe;arguments=--in-process-gpu --disable-gpu
 
+# Watch_Dogs (Steam 243470): the Ubisoft overlay (overlay64.dll, injected whatever settings.yaml says) hooks
+# user32/dxgi in the game and its main thread spins on the overlay's mutex before the D3D device exists; it only
+# went on when another game started. Keep the overlay out of the game.
+name=watchdogs-no-overlay;exe=Watch_Dogs.exe;company=Ubisoft Entertainment;dll_overrides=overlay64=d
+
 # Rockstar Games Launcher: it needs a D3D10.1 device, which DXMT lacks (black window). compatdb's built-in rule gives
 # it wined3d, but wined3d's Vulkan renderer offers no D3D11 feature level on MoltenVK and the launcher exits with code 1
 # ("Unable to launch game"). wined3d on OpenGL provides the device.

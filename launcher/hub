@@ -606,7 +606,7 @@ def session_env(rt, provider, opts):
     scoped = provider in SCOPED_FX
     ext = rtp / "lib/external"
     env = {"PATH": "/usr/bin:/bin:/usr/sbin:/sbin", "LANG": "en_US.UTF-8", "USER": "Player", "HOME": str(HOME), "TMPDIR": str(TEMP),
-           "WINEPREFIX": str(PREFIX), "WINEMSYNC": "1", "WINEDEBUG": opts.debug or "-all",
+           "WINEPREFIX": str(PREFIX), "WINEMSYNC": os.environ.get("HUB_WINEMSYNC", "1"), "WINEDEBUG": opts.debug or "-all",
            "WINEDLLOVERRIDES": "mscoree,mshtml=d;winemenubuilder.exe=d", "WINE_COMPATDB": compat_db(rt, opts.dxgi or "dxmt", game_env(provider, fx))}
     if ext.is_dir():
         env["DYLD_FALLBACK_LIBRARY_PATH"] = f"{ext}:{ext}/media:{ext}/vulkan"
@@ -885,7 +885,7 @@ def stop_all(rt=None):
     if not rt:
         print("nothing is running in the prefix")
         return
-    env = {"PATH": "/usr/bin:/bin:/usr/sbin:/sbin", "WINEPREFIX": str(PREFIX), "WINEMSYNC": "1"}
+    env = {"PATH": "/usr/bin:/bin:/usr/sbin:/sbin", "WINEPREFIX": str(PREFIX), "WINEMSYNC": os.environ.get("HUB_WINEMSYNC", "1")}
     ws = str(RUNTIMES / rt / "bin/wineserver")
     subprocess.run([ws, "-k"], env=env, capture_output=True)
     subprocess.run([ws, "-w"], env=env, capture_output=True, timeout=90)
