@@ -1,0 +1,8 @@
+r0 0808 rip DINPUT8.dll+7c0a rcx=386180 | Disrupt_b64.dll+3a50 Disrupt_b64.dll+3a50 Disrupt_b64.dll+4820c3 msvcr100.dll+5b456 rsaenh.dll+16d10 msvcr100.dll+59ca0 Disrupt_b64.dll+2e4d575 msvcr100.dll+8f884 msvcr100.dll+5b26a
+r0 0820 rip win32u.dll+150dc rcx=6fffe2472190 |
+r0 0824 rip ntdll.dll+55144 rcx=6fffff589e40 | kernelbase.dll+686d9 ntdll.dll+27087 rpcrt4.dll+35f50 ntdll.dll+551c4 rpcrt4.dll+36015 rpcrt4.dll+3d189 rpcrt4.dll+2eeca ucrtbase.dll+60c10 sechost.dll+1196c ucrtbase.dll+37e4e rpcrt4.dll+3d189 sechost.dll+119e0
+r0 0830 rip ntdll.dll+55144 rcx=6fffe2a107d0 | kernelbase.dll+686d9 Disrupt_b64.dll+158140 kernel32.dll+11030 Disrupt_b64.dll+462d2c
+r0 0834 rip ntdll.dll+55144 rcx=6fffe2a107d0 | kernelbase.dll+686d9 Disrupt_b64.dll+158140 kernel32.dll+11030 Disrupt_b64.dll+462d2c
+r0 0838 rip ntdll.dll+55144 rcx=6fffe2a107d0 |
+r0 083c rip ntdll.dll+55144 rcx=6fffe2a107d0 |
+r0 0840 rip win32u.dll+150dc rcx=6fffe269e220 |

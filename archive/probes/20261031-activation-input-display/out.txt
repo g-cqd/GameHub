@@ -1,0 +1,25 @@
+compatdb: PEB pointer is null
+compatdb: kusd.exe [x86_64]
+compatdb:   rules = default
+compatdb:   dxgi = dxmt (from /Volumes/ExT2/GameHub/Runtimes/hub-2/lib/wine/dxgi/dxmt)
+compatdb:   d3d9 = mtld3d (from /Volumes/ExT2/GameHub/Runtimes/hub-2/lib/wine/d3d9/mtld3d)
+k= 0 kusd_tick=+99 ms  kusd_itime=+985800ns  GetTickCount=+99 ms
+k= 1 kusd_tick=+199 ms  kusd_itime=+1985800ns  GetTickCount=+199 ms
+k= 2 kusd_tick=+298 ms  kusd_itime=+2985000ns  GetTickCount=+298 ms
+k= 3 kusd_tick=+398 ms  kusd_itime=+3985000ns  GetTickCount=+398 ms
+k= 4 kusd_tick=+498 ms  kusd_itime=+4984600ns  GetTickCount=+498 ms
+k= 5 kusd_tick=+599 ms  kusd_itime=+5985500ns  GetTickCount=+599 ms
+k= 6 kusd_tick=+698 ms  kusd_itime=+6984900ns  GetTickCount=+698 ms
+k= 7 kusd_tick=+799 ms  kusd_itime=+7986500ns  GetTickCount=+799 ms
+k= 8 kusd_tick=+901 ms  kusd_itime=+9011300ns  GetTickCount=+901 ms
+k= 9 kusd_tick=+999 ms  kusd_itime=+9986500ns  GetTickCount=+999 ms
+k=10 kusd_tick=+1099 ms  kusd_itime=+10986100ns  GetTickCount=+1099 ms
+k=11 kusd_tick=+1199 ms  kusd_itime=+11986600ns  GetTickCount=+1199 ms
+k=12 kusd_tick=+1299 ms  kusd_itime=+12985600ns  GetTickCount=+1299 ms
+k=13 kusd_tick=+1399 ms  kusd_itime=+13986100ns  GetTickCount=+1399 ms
+k=14 kusd_tick=+1499 ms  kusd_itime=+14985600ns  GetTickCount=+1499 ms
+k=15 kusd_tick=+1598 ms  kusd_itime=+15983200ns  GetTickCount=+1598 ms
+k=16 kusd_tick=+1699 ms  kusd_itime=+16986000ns  GetTickCount=+1699 ms
+k=17 kusd_tick=+1799 ms  kusd_itime=+17985600ns  GetTickCount=+1799 ms
+k=18 kusd_tick=+1899 ms  kusd_itime=+18986600ns  GetTickCount=+1899 ms
+k=19 kusd_tick=+2000 ms  kusd_itime=+19996800ns  GetTickCount=+2000 ms

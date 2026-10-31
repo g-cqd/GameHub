@@ -1,0 +1,2 @@
+compatdb: PEB pointer is null
+0bb8:err:sync:msync_init Server is running with WINEMSYNC but this process is not, please enable WINEMSYNC or restart wineserver.

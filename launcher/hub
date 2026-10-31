@@ -1092,6 +1092,9 @@ def play(args):
     procs = wait_for(started, 300 if provider == "steam" else 180, f"{g.name} to start", every=3)
     if procs:
         print(f"{g.name} is running (pid {procs[0][0]})")
+        if os.environ.get("HUB_NO_ACTIVATE") != "1":   # a store-started game is not made active by macOS on its own
+            subprocess.Popen([sys.executable, str(Path(__file__).resolve()), "_activate", str(procs[0][0]), str(ACTIVATE_DELAY)],
+                             start_new_session=True, stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         if g.name in GAME_DISPLAY_ADAPTERS:
             subprocess.Popen([sys.executable, str(Path(__file__).resolve()), "_watch_display", g.name], start_new_session=True,
                              stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
@@ -1104,6 +1107,31 @@ def play(args):
                              stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     else:
         sys.exit(1)
+
+
+ACTIVATE_SRC = HERE / "macos/activate-handoff.swift"
+ACTIVATE_DELAY = 6   # seconds for the game to open its window before activation is handed to it
+
+
+def activation_helper():
+    """The compiled activation helper (built with swiftc into Hub/State/bin when the source is newer), or None."""
+    out = STATE / "bin/activate-handoff"
+    if out.exists() and out.stat().st_mtime >= ACTIVATE_SRC.stat().st_mtime:
+        return out
+    out.parent.mkdir(parents=True, exist_ok=True)
+    r = subprocess.run(["swiftc", "-O", str(ACTIVATE_SRC), "-o", str(out)], capture_output=True, text=True, check=False)
+    if r.returncode:
+        print(f"hub: cannot build the activation helper: {r.stderr.strip()[:300]}", file=sys.stderr)
+        return None
+    return out
+
+
+def activate_later(pid, delay):
+    """Background step of `play`: make the game's Wine process the active macOS app (roadmap 0016)."""
+    time.sleep(float(delay))
+    helper = activation_helper()
+    if helper:
+        subprocess.run([str(helper), str(pid)], capture_output=True, timeout=30, check=False)
 
 
 def keep_settings(gid):
@@ -1248,6 +1276,8 @@ def main():
     p.set_defaults(f=cmd_stop)
     sub.add_parser("doctor").set_defaults(f=cmd_doctor)
     p = sub.add_parser("_keep"); p.add_argument("gid"); p.set_defaults(f=lambda a: keep_settings(a.gid))
+    p = sub.add_parser("_activate"); p.add_argument("pid"); p.add_argument("delay")
+    p.set_defaults(f=lambda a: activate_later(a.pid, a.delay))
     p = sub.add_parser("_trim_later"); p.add_argument("provider"); p.add_argument("delay"); p.set_defaults(f=lambda a: trim_later(a.provider, a.delay))
     p = sub.add_parser("_watch_display"); p.add_argument("game"); p.set_defaults(f=lambda a: watch_display_loop(a.game))
     args = ap.parse_args()
