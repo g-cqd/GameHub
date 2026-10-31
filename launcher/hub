@@ -832,12 +832,28 @@ def adopt_epic_installs():
         print(f"registered with the Epic launcher: {', '.join(added)}")
 
 
+# The Steam overlay crashes Act of Aggression right after its intro (ADR-0011). The 64-bit client puts these files
+# back when it updates itself while running, so they are moved again before every Steam game, not only at start.
+STEAM_OVERLAY_FILES = ("GameOverlayRenderer.dll", "GameOverlayRenderer64.dll", "gameoverlayui.exe", "gameoverlayui64.exe",
+                       "GameOverlayUI.exe", "SteamOverlayVulkanLayer.dll", "SteamOverlayVulkanLayer64.dll",
+                       "SteamOverlayVulkanLayer.json", "SteamOverlayVulkanLayer64.json")
+
+
+def disable_steam_overlay(steam_dir=None):
+    """Move the overlay files present in `steam_dir` to `_overlay-disabled`; returns the names moved."""
+    steam_dir = steam_dir or STEAM
+    od = steam_dir / "_overlay-disabled"
+    moved = []
+    for n in STEAM_OVERLAY_FILES:
+        if (steam_dir / n).exists():
+            od.mkdir(exist_ok=True)
+            os.replace(steam_dir / n, od / n)   # a newer copy replaces the one disabled earlier
+            moved.append(n)
+    return moved
+
+
 def prep_steam():
-    od = STEAM / "_overlay-disabled"
-    od.mkdir(exist_ok=True)
-    for n in ("GameOverlayRenderer.dll", "GameOverlayRenderer64.dll", "gameoverlayui.exe", "gameoverlayui64.exe", "GameOverlayUI.exe"):
-        if (STEAM / n).exists():   # the overlay crashes Act of Aggression right after its intro
-            shutil.move(str(STEAM / n), str(od / n))
+    disable_steam_overlay()
     # The current 64-bit client renders and updates itself under hub-2 (2026-10-31); the 2025 32-bit client
     # needed its updates blocked. Drop a leftover block so the client stays current.
     cfg = STEAM / "steam.cfg"
@@ -916,11 +932,37 @@ def ea_booted():
     return "SPA load success" in t
 
 
+def session_opts():
+    """The options the running launcher session was started with (`session.json`), for commands sent into it."""
+    try:
+        session = json.loads((STATE / "session.json").read_text())
+    except (OSError, ValueError):
+        session = {}
+    return argparse.Namespace(metalfx=session.get("metalfx"), dxgi=session.get("dxgi"), debug=session.get("debug"))
+
+
+def quit_steam(rt, timeout=30):
+    """Ask a running Steam to exit, with the session's environment (WINEMSYNC must match the running wineserver),
+    and wait for it. False when it is still running after `timeout` seconds."""
+    if "steam" not in provider_running():
+        return True
+    env = session_env(rt, "steam", session_opts())
+    spawn(rt, env, ["E:\\Library\\Steam\\steam.exe", "-shutdown"], LOGS / f"steam-shutdown-{stamp()}.log")
+    deadline = time.time() + timeout
+    while time.time() < deadline:
+        time.sleep(1)
+        if "steam" not in provider_running():
+            return True
+    return False
+
+
 def stop_all(rt=None):
     rt = rt or running_runtime()
     if not rt:
         print("nothing is running in the prefix")
         return
+    if not quit_steam(rt):   # a clean exit saves Steam's state; the wineserver kill below ends anything left
+        print("Steam did not exit within 30 s; stopping it with the prefix")
     env = {"PATH": "/usr/bin:/bin:/usr/sbin:/sbin", "WINEPREFIX": str(PREFIX), "WINEMSYNC": os.environ.get("HUB_WINEMSYNC", "1")}
     ws = str(RUNTIMES / rt / "bin/wineserver")
     subprocess.run([ws, "-k"], env=env, capture_output=True)
@@ -984,6 +1026,9 @@ def play(args):
     offsets = {"console": size(STEAM / "logs/console_log.txt")}
     plog = LOGS / f"play-{norm(g.name)}-{stamp()}.log"
     if provider == "steam":
+        moved = disable_steam_overlay()
+        if moved:
+            print(f"moved the Steam overlay files the client restored: {', '.join(moved)}")
         spawn(rt, env, ["E:\\Library\\Steam\\steam.exe", f"steam://rungameid/{g.id}"], plog)
     elif provider == "ea":
         client = ea_client()
@@ -1114,6 +1159,10 @@ def cmd_start(args):
 
 
 def cmd_stop(args):
+    if not args.game and not args.force:
+        busy = all_running_games(discover())
+        if busy:
+            die("a game is running in the prefix: " + ", ".join(b.name for b in busy) + ". Close it, or use --force")
     if args.game:
         g = find_game(discover(), args.game)
         procs = game_procs(g)
@@ -1194,7 +1243,9 @@ def main():
     p = sub.add_parser("start"); p.add_argument("provider", choices=["steam", "ea", "ubisoft", "epic"]); common(p); p.set_defaults(f=cmd_start)
     sub.add_parser("status").set_defaults(f=cmd_status)
     p = sub.add_parser("trim", help="stop a store launcher while its game runs, to free memory"); p.add_argument("provider", choices=sorted(TRIM_PATTERNS)); p.set_defaults(f=cmd_trim)
-    p = sub.add_parser("stop"); p.add_argument("game", nargs="?"); p.set_defaults(f=cmd_stop)
+    p = sub.add_parser("stop"); p.add_argument("game", nargs="?")
+    p.add_argument("--force", action="store_true", help="stop the prefix even while a game runs")
+    p.set_defaults(f=cmd_stop)
     sub.add_parser("doctor").set_defaults(f=cmd_doctor)
     p = sub.add_parser("_keep"); p.add_argument("gid"); p.set_defaults(f=lambda a: keep_settings(a.gid))
     p = sub.add_parser("_trim_later"); p.add_argument("provider"); p.add_argument("delay"); p.set_defaults(f=lambda a: trim_later(a.provider, a.delay))

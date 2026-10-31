@@ -1,5 +1,5 @@
 ---
-status: not-started
+status: in-progress
 blocked-by: []
 date: 2026-10-31
 ---
@@ -18,3 +18,9 @@ date: 2026-10-31
 
 ## Done when
 `hub doctor` passes after a client update, and Act of Aggression passes its intro.
+
+## Progress (2026-10-31)
+`disable_steam_overlay()` moves all nine overlay files, including the `SteamOverlayVulkanLayer` DLLs and JSON files,
+at Steam start and again before every Steam game launch. A file the client restored replaces the copy disabled
+earlier. It has unit tests (`launcher/tests/test_steam.py`). Not run yet, because the owner was playing; the "Done
+when" still needs a client update and `hub doctor`.
