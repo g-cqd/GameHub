@@ -41,6 +41,8 @@ for arch in i386 x86_64; do
     n=${d%%:*}; dir=${d##*:}; $CP -c "$dx/src/$dir/$n.dll" "$RT/lib/wine/dxgi/dxmt/$pe/$n.dll"
   done
   $CP -c "$RT/lib/wine/dxgi/wined3d/$pe/d3d10.dll" "$RT/lib/wine/dxgi/wined3d/$pe/d3d10_1.dll" "$RT/lib/wine/dxgi/dxmt/$pe/"
+  # DXMT's D3D12 (meson -Denable_d3d12=true), ahead of Wine's vkd3d-based d3d12 for every DXMT process
+  if [ -f "$dx/src/d3d12/d3d12.dll" ]; then $CP -c "$dx/src/d3d12/d3d12.dll" "$RT/lib/wine/dxgi/dxmt/$pe/"; fi
   for f in "$RT/lib/wine/dxgi/dxmt/$pe"/*.dll; do "$WB" --builtin "$f" >/dev/null 2>&1 || true; done
   "$WB" --fake-module -o "$RT/lib/wine/$pe/d3d9.dll" -b $b --dll "$RT/lib/wine/d3d9/wined3d/$pe/d3d9.dll"
   for n in dxgi d3d10 d3d10_1 d3d10core d3d11; do "$WB" --fake-module -o "$RT/lib/wine/$pe/$n.dll" -b $b --dll "$RT/lib/wine/dxgi/wined3d/$pe/$n.dll"; done
@@ -52,6 +54,14 @@ $CP -c "$DX/x64/src/winemetal/unix/winemetal.so" "$RT/lib/wine/x86_64-unix/"
 # compatdb.so's built-in steam-web-helper rule asks for dxgi=gptk (D3DMetal, not shipped); without this alias it
 # falls back to the placeholder dxgi.dll and steamwebhelper crashes in a restart loop
 ln -s dxmt "$RT/lib/wine/dxgi/gptk"
+# Apple's D3DMetal, local only (development/adr/0019): GPTK_REDIST=<GPTK evaluation environment>/redist puts it in
+# dxgi/d3dmetal, which runtime rules select per program with hub_dll_dir=dxgi/d3dmetal
+if [ -n "${GPTK_REDIST:-}" ]; then
+  D=$RT/lib/wine/dxgi/d3dmetal; mkdir -p "$D/x86_64-windows" "$D/x86_64-unix"; ln -s ../dxmt/i386-windows "$D/i386-windows"
+  $CP -c "$GPTK_REDIST"/lib/wine/x86_64-windows/*.dll "$D/x86_64-windows/"
+  $CP -c "$GPTK_REDIST"/lib/wine/x86_64-unix/*.so "$GPTK_REDIST/lib/external/libd3dshared.dylib" "$D/x86_64-unix/"
+  $CP -c -R "$GPTK_REDIST/lib/external/D3DMetal.framework" "$D/x86_64-unix/"
+fi
 # per-program rules read by the fork's ntdll before compatdb.so (dlls/ntdll/unix/hubrules.c)
 $CP "$(dirname "$0")/../runtime/hub-rules.txt" "$RT/share/wine/hub-rules.txt"
 # --- sign (ad-hoc) with the Wine entitlements

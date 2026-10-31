@@ -35,3 +35,10 @@ when machine=i386;section=.ubx2 => gate_selector_fixup=true
 
 # Defaults for every process: mtld3d for D3D8/9, DXMT for D3D10/11
 name=default;exe=*;d3d9=mtld3d;dxgi=dxmt
+
+# D3D12 games DXMT's D3D12 can't run yet (DXIL wave operations, ...): Apple's D3DMetal from the Game Porting
+# Toolkit in lib/wine/dxgi/d3dmetal, put ahead of the backend by ntdll (hub_dll_dir). Not gptk: compatdb.so's
+# built-in rule sends steamwebhelper.exe to gptk, and Steam's web helper crash-loops on D3DMetal. Local install
+# only, never shipped (Apple's evaluation licence; development/adr/0019).
+# disabled: GPTK 4.0b3 D3DMetal hangs before a window here (winemac exports the D3DMetal 3.0 interface of CrossOver 26)
+# when exe=HITMAN3.exe => hub_dll_dir=dxgi/d3dmetal
