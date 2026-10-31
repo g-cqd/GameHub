@@ -948,8 +948,8 @@ def play(args):
         session = json.loads((STATE / "session.json").read_text())
     except (OSError, ValueError):
         session = {}
-    # launcher environment (runtime, MetalFX, backend) is fixed when the launcher starts: an explicit different option needs a restart
-    changed = provider in up and any(getattr(args, k) is not None and getattr(args, k) != session.get(k) for k in ("metalfx", "dxgi"))
+    # launcher environment (runtime, MetalFX, backend, WINEDEBUG) is fixed when the launcher starts: an explicit different option needs a restart
+    changed = provider in up and any(getattr(args, k) is not None and getattr(args, k) != session.get(k) for k in ("metalfx", "dxgi", "debug"))
     other_launchers = up - {provider}
     needs_restart = bool(cur_rt) and (cur_rt != rt or changed or bool(other_launchers))
     if needs_restart:

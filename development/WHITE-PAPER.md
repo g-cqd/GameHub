@@ -29,7 +29,7 @@ beside it:
 smooth, show the right display mode, play its audio, take its input, and need no per-game ritual. This aim is the
 test for every change.
 
-Three properties follow from it, and they bind every component.
+Four properties follow from it, and they bind every component.
 
 **Generic first.** A fix is made so that it applies to every game that has the same problem, never only to the game
 where it was found. A fix that only one program needs is written as a rule in `runtime/hub-rules.txt`, matched by
@@ -40,6 +40,9 @@ file.
 one EA app, one Ubisoft Connect and one Epic launcher, all installed in that prefix. There is one `main` branch per
 fork (ADR-0003). When there are two copies of anything, they drift apart, and the drift costs more than the
 duplication saved.
+
+**Parity with Windows.** A game has the same modes, settings and online play as on a PC, even when that means
+presenting a PC's identity to a game that never considered Macs (§5, ADR-0014).
 
 **Native and nearly invisible at run time.** Anything that runs while a game runs goes into the forks themselves
 (C, Rust, Swift, assembly), where it costs least. It is not a script or a polling helper. The launcher only prepares a
@@ -144,12 +147,20 @@ analysis only, the session stops at level 4 and says so.
   - mtld3d: through its `Makefile`.
   - In these build trees, use `/bin/cp -c` for APFS clones. The `cp` on `PATH` is GNU coreutils and has no `-c`.
 
-## 5. Anti-cheat and protection
+## 5. Parity with Windows
 
-The goal is for protected games to **run on Wine**, truthfully (ADR-0014). We implement what Windows provides
-(syscalls, the documented kernel interfaces, the files and registry a real install has) until the protection
-accepts it, and we never forge an identity or hide from detection. Reverse-engineering for compatibility is in
-scope, as recorded in each fork's `REVERSE-ENGINEERING.md`.
+The aim is that a game on the Mac has **the same functionality as on a Windows PC** (ADR-0014). Studios write for
+PCs and rarely think of Macs. So we give each game the Windows environment it expects:
+
+1. **Real Windows behaviour first.** Syscalls, kernel interfaces, files, registry and services are implemented
+   correctly, because a correct implementation survives game updates.
+2. **A Windows PC's identity where a game insists on one.** A game that refuses or degrades because of the Mac's real
+   GPU vendor, CPU features, Windows build or Wine markers is shown what a PC would show. The disguise is the
+   smallest one that works, set by a per-game rule, with a comment saying what the game checks.
+3. **Protection runs as on Windows.** Anti-cheat and DRM are made to run and pass, never stripped or patched out.
+
+**The line is the purpose.** We change what a game believes about the machine, never the game itself, and never to
+gain an advantage over other players or to get around ownership.
 
 ## 6. Records
 
