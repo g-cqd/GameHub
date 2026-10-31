@@ -19,8 +19,9 @@ Hub/{Logs,State,Home,Temp}. This script and launcher/settings live in the repo; 
 Only one Wine runtime can serve the prefix at a time (wineserver version mismatch), so switching between launchers
 stops the launcher that is running.
 """
-import argparse, ctypes, glob, json, os, re, shutil, struct, subprocess, sys, time, zlib
+import argparse, ctypes, json, os, re, shutil, struct, subprocess, sys, time, zlib
 from pathlib import Path
+from typing import NoReturn
 
 ROOT = Path(os.environ.get("HUB_ROOT", "/Volumes/ExT2/GameHub"))
 PREFIX = Path(os.environ.get("HUB_PREFIX", ROOT / "Prefix"))
@@ -31,8 +32,8 @@ STEAM = ROOT / "Library/Steam"
 UBISOFT = ROOT / "Library/Ubisoft"
 EA_GAMES = ROOT / "EA Games"
 
-# Which runtime each launcher runs on (override with --runtime / HUB_RUNTIME). Every launcher now defaults to hub-1.
-PROVIDER_RUNTIME = {"steam": "hub-2", "ea": "hub-1", "ubisoft": "hub-1", "direct": "hub-1", "epic": "hub-1"}
+# Which runtime each launcher runs on (override with --runtime / HUB_RUNTIME). Every launcher runs on hub-2 (hub-1 was retired).
+PROVIDER_RUNTIME = {"steam": "hub-2", "ea": "hub-2", "ubisoft": "hub-2", "direct": "hub-2", "epic": "hub-2"}
 
 # Knowledge about specific games. status: verified (seen working), unverified (never confirmed), blocked (needs anti-cheat that is not bypassed).
 EA_KNOWN = {
@@ -95,6 +96,44 @@ GAME_DISPLAY_ADAPTERS = {
 }
 
 
+K_DISPLAY_MODE_NATIVE_FLAG = 0x02000000   # IOGraphicsTypes.h kDisplayModeNativeFlag
+
+
+def native_panel_size(cg, display):
+    """The panel's native pixel size for `display`: its mode flagged native, else the ioreg native format of the
+    only display that reports one. None when neither is known."""
+    try:
+        cf = ctypes.cdll.LoadLibrary("/System/Library/Frameworks/CoreFoundation.framework/CoreFoundation")
+        cf.CFArrayGetCount.restype, cf.CFArrayGetCount.argtypes = ctypes.c_long, [ctypes.c_void_p]
+        cf.CFArrayGetValueAtIndex.restype = ctypes.c_void_p
+        cf.CFArrayGetValueAtIndex.argtypes = [ctypes.c_void_p, ctypes.c_long]
+        cf.CFRelease.argtypes = [ctypes.c_void_p]
+        cg.CGDisplayCopyAllDisplayModes.restype = ctypes.c_void_p
+        cg.CGDisplayCopyAllDisplayModes.argtypes = [ctypes.c_uint32, ctypes.c_void_p]
+        cg.CGDisplayModeGetIOFlags.restype, cg.CGDisplayModeGetIOFlags.argtypes = ctypes.c_uint32, [ctypes.c_void_p]
+        modes = cg.CGDisplayCopyAllDisplayModes(display, None)
+        if modes:
+            try:
+                for i in range(cf.CFArrayGetCount(modes)):
+                    m = cf.CFArrayGetValueAtIndex(modes, i)
+                    if cg.CGDisplayModeGetIOFlags(m) & K_DISPLAY_MODE_NATIVE_FLAG:
+                        return int(cg.CGDisplayModeGetPixelWidth(m)), int(cg.CGDisplayModeGetPixelHeight(m))
+            finally:
+                cf.CFRelease(modes)
+    except (OSError, AttributeError) as e:
+        print(f"hub: display modes unavailable ({e}); falling back to ioreg", file=sys.stderr)
+    try:
+        out = subprocess.run(["ioreg", "-l"], capture_output=True, text=True, timeout=5, check=False).stdout
+    except (OSError, subprocess.TimeoutExpired):
+        return None
+    sizes = set(zip(re.findall(r'"NativeFormatHorizontalPixels"\s*=\s*(\d+)', out),
+                    re.findall(r'"NativeFormatVerticalPixels"\s*=\s*(\d+)', out), strict=False))
+    if len(sizes) == 1:   # several displays: ioreg doesn't say which one is the main display
+        w, h = sizes.pop()
+        return int(w), int(h)
+    return None
+
+
 def get_display_facts():
     """Query the active main display on macOS. Return (main_id, point_w, point_h, panel_w, panel_h, refresh_hz)."""
     try:
@@ -112,6 +151,7 @@ def get_display_facts():
         cg.CGDisplayModeGetPixelWidth.argtypes = [ctypes.c_void_p]
         cg.CGDisplayModeGetPixelHeight.restype = ctypes.c_size_t
         cg.CGDisplayModeGetPixelHeight.argtypes = [ctypes.c_void_p]
+        cg.CGDisplayModeRelease.argtypes = [ctypes.c_void_p]
 
         main_id = cg.CGMainDisplayID()
         mode = cg.CGDisplayCopyDisplayMode(main_id)
@@ -121,18 +161,11 @@ def get_display_facts():
             buf_w = int(cg.CGDisplayModeGetPixelWidth(mode))
             buf_h = int(cg.CGDisplayModeGetPixelHeight(mode))
             refresh_hz = float(cg.CGDisplayModeGetRefreshRate(mode))
+            cg.CGDisplayModeRelease(mode)
         else:
             point_w, point_h, buf_w, buf_h, refresh_hz = 1920, 1080, 1920, 1080, 60.0
 
-        panel_w, panel_h = buf_w, buf_h
-        try:
-            out = subprocess.run(["ioreg", "-l"], capture_output=True, text=True, timeout=5).stdout
-            w_m = re.search(r'"NativeFormatHorizontalPixels"\s*=\s*(\d+)', out)
-            h_m = re.search(r'"NativeFormatVerticalPixels"\s*=\s*(\d+)', out)
-            if w_m and h_m:
-                panel_w, panel_h = int(w_m.group(1)), int(h_m.group(1))
-        except Exception:
-            pass
+        panel_w, panel_h = native_panel_size(cg, main_id) or (buf_w, buf_h)
         return int(main_id), point_w, point_h, panel_w, panel_h, refresh_hz
     except Exception:
         return 1, 1920, 1080, 1920, 1080, 60.0
@@ -500,7 +533,7 @@ def find_game(games, query):
 
 # ---------------------------------------------------------------- processes
 
-def die(msg, code=1):
+def die(msg, code=1) -> NoReturn:
     print(f"hub: {msg}", file=sys.stderr)
     sys.exit(code)
 
@@ -630,9 +663,9 @@ def signature(rt, provider, opts):
 
 def spawn(rt, env, args, log, cwd=None):
     LOGS.mkdir(parents=True, exist_ok=True)
-    f = open(log, "ab")
-    return subprocess.Popen([str(RUNTIMES / rt / "bin/wine")] + args, env=env, cwd=str(cwd or TEMP), stdin=subprocess.DEVNULL,
-                            stdout=f, stderr=subprocess.STDOUT, start_new_session=True)
+    with open(log, "ab") as f:   # the child keeps its own copy of the descriptor
+        return subprocess.Popen([str(RUNTIMES / rt / "bin/wine")] + args, env=env, cwd=str(cwd or TEMP),
+                                stdin=subprocess.DEVNULL, stdout=f, stderr=subprocess.STDOUT, start_new_session=True)
 
 
 def stamp():
@@ -907,7 +940,7 @@ def play(args):
     if g.status == "blocked" and not args.force:
         die(f"{g.name} is known not to work: {g.note}. (--force to try anyway)")
     provider = g.provider
-    rt = args.runtime or os.environ.get("HUB_RUNTIME") or PROVIDER_RUNTIME.get(provider if provider in PROVIDER_RUNTIME else "direct")
+    rt = args.runtime or os.environ.get("HUB_RUNTIME") or PROVIDER_RUNTIME.get(provider, PROVIDER_RUNTIME["direct"])
     if not (RUNTIMES / rt / "bin/wine").exists():
         die(f"runtime {rt} not found (ExT2 mounted?)")
     cur_rt, up = running_runtime(), provider_running()
@@ -953,10 +986,15 @@ def play(args):
     if provider == "steam":
         spawn(rt, env, ["E:\\Library\\Steam\\steam.exe", f"steam://rungameid/{g.id}"], plog)
     elif provider == "ea":
-        launcher = unix_to_win(ea_client().parent / "EALauncher.exe")
+        client = ea_client()
+        if not client:
+            die("the EA app is not installed in the prefix")
+        launcher = unix_to_win(client.parent / "EALauncher.exe")
         def fire(offer):
-            subprocess.run([str(RUNTIMES / rt / "bin/wine"), launcher, f"origin2://game/launch/?offerIds={offer}"], env=env,
-                           cwd=str(TEMP), stdin=subprocess.DEVNULL, stdout=open(plog, "ab"), stderr=subprocess.STDOUT, timeout=120)
+            with open(plog, "ab") as f:
+                subprocess.run([str(RUNTIMES / rt / "bin/wine"), launcher, f"origin2://game/launch/?offerIds={offer}"],
+                               env=env, cwd=str(TEMP), stdin=subprocess.DEVNULL, stdout=f, stderr=subprocess.STDOUT,
+                               timeout=120, check=False)
         if g.extra.get("prime"):   # NFS 2015: prime EA's catalog cache with the public offer id first, or the launch is dropped
             fire(g.extra["prime"])
             time.sleep(15)
@@ -1058,7 +1096,7 @@ def cmd_status(args):
     print(f"runtime: {rt or 'none running'}   launchers: {', '.join(sorted(up)) or 'none'}")
     for g in discover():
         if g.installed:
-            for pid, et, cmd in game_procs(g)[:1]:
+            for pid, et, _cmd in game_procs(g)[:1]:
                 print(f"running: {g.name} (pid {pid}, {et})")
 
 
@@ -1096,7 +1134,7 @@ def cmd_trim(args):
     """Stop the launcher processes of `args.provider` and leave the game, the other launchers and the wineserver running."""
     pat = re.compile(TRIM_PATTERNS[args.provider])
     victims = [(pid, cmd) for pid, _, cmd in ps() if pat.search(cmd) and "x87sidecar" not in cmd and "launcher/hub" not in cmd]
-    for pid, cmd in victims:
+    for pid, _cmd in victims:
         try:
             os.kill(pid, 15)
         except OSError as e:
@@ -1145,7 +1183,9 @@ def main():
     sub = ap.add_subparsers(dest="cmd", required=True)
 
     def common(p):
-        p.add_argument("--runtime"), p.add_argument("--debug"), p.add_argument("--dxgi", choices=["dxmt", "wined3d"])
+        p.add_argument("--runtime")
+        p.add_argument("--debug")
+        p.add_argument("--dxgi", choices=["dxmt", "wined3d"])
         p.add_argument("--metalfx", nargs="?", const="1.40625", metavar="FACTOR")
     p = sub.add_parser("list"); p.add_argument("--all", action="store_true"); p.set_defaults(f=cmd_list)
     p = sub.add_parser("play"); p.add_argument("game"); common(p)
