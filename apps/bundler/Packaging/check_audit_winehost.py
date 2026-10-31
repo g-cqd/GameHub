@@ -12,7 +12,7 @@ import shutil
 import subprocess
 from tempfile import TemporaryDirectory
 
-from audit_winehost import audit_winehost, decode_profile, profile_problems, run_tool
+from audit_winehost import audit_winehost, decode_profile, profile_problems
 from signing_policy import WINEHOST_BUNDLE_IDENTIFIER, WINEHOST_TEAM, signing_entitlements
 from winehost import APP_RELATIVE, EXECUTABLE_RELATIVE, PROFILE_RELATIVE, info_plist
 

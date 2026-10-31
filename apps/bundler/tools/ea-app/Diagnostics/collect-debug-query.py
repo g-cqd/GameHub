@@ -44,7 +44,7 @@ def _parse_record(line, signatures):
             return None
     elif len(arguments) != len(widths) or any(
         not argument or len(argument) > width
-        for argument, width in zip(arguments, widths)
+        for argument, width in zip(arguments, widths, strict=True)
     ):
         return None
     return {

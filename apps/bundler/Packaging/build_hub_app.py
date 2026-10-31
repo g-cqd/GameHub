@@ -43,7 +43,7 @@ def settings_data_store():
     try:
         settings = json.loads(SETTINGS_FILE.read_text())
     except ValueError as error:
-        raise SystemExit(f'Cannot read {SETTINGS_FILE}: {error}')
+        raise SystemExit(f'Cannot read {SETTINGS_FILE}: {error}') from error
     keys = {'schemaVersion', 'dataStoreRoot', 'runtimeApp'}
     if not isinstance(settings, dict) or set(settings) != keys:
         raise SystemExit(f'{SETTINGS_FILE} must hold exactly these keys: {", ".join(sorted(keys))}')

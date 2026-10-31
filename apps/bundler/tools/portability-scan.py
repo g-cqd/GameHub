@@ -12,7 +12,7 @@ The needles are the build Mac's own home folder, its generic `/Users/`, and the 
 project builds in; a hit under the home folder in a file of ours is a defect, a hit in the third-party Wine
 runtime is listed, not fixed.
 """
-import io, json, os, sys, tarfile
+import json, sys, tarfile
 from collections import defaultdict
 from pathlib import Path
 

@@ -15,7 +15,7 @@ client files, registry entries and service registration in place and with no acc
 EA's. With --no-network the sandbox also denies every IP connection, so a pass shows that the first start needs no
 network at all.
 """
-import argparse, hashlib, json, os, shutil, subprocess, sys, time
+import argparse, hashlib, json, shutil, subprocess, sys, time
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'Packaging'))

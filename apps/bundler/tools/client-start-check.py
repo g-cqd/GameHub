@@ -26,7 +26,6 @@ from pathlib import Path
 import shutil
 import subprocess
 import sys
-import tempfile
 import time
 
 OFFLINE_PROFILE = '(version 1)\n(allow default)\n(deny network-outbound (remote ip))\n(deny network-bind (local ip))\n'

@@ -8,7 +8,7 @@ set of GStreamer plugins need into RUNTIME_ROOT/lib/external/media, rewrites eve
 a relative one, ad-hoc signs, and relinks the Wine unix modules. The runtime then needs no
 Homebrew at run time; set GST_PLUGIN_SYSTEM_PATH_1_0 / GST_PLUGIN_PATH to lib/external/media/plugins.
 """
-import os, re, shutil, subprocess, sys
+import os, shutil, subprocess, sys
 
 PLUGINS = """coreelements typefindfunctions playback app audioconvert audioresample audioparsers audiorate
 volume videoconvertscale videorate videofilter videoparsersbad asf avi isomp4 matroska mpegtsdemux

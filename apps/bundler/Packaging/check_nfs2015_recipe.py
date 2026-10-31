@@ -1,6 +1,5 @@
 """The Need for Speed (2015) recipe: an import edition that packages no game bytes, and a bundled edition pinned file by file."""
 from copy import deepcopy
-import json
 from pathlib import Path
 import re
 from tempfile import TemporaryDirectory

@@ -7,8 +7,7 @@ from tempfile import TemporaryDirectory
 
 from recipes import RECIPE_DIRECTORY, load_recipe, validate_recipe
 from signing_policy import WINEHOST_BUNDLE_IDENTIFIER
-from winehost import (EXECUTABLE_RELATIVE, PROFILE_RELATIVE, require_arm64_macho, stage_winehost,
-                      validate_winehost)
+from winehost import (EXECUTABLE_RELATIVE, PROFILE_RELATIVE, require_arm64_macho, stage_winehost)
 
 ARM64 = bytes.fromhex('cffaedfe0c000001') + bytes(56)
 INTEL = bytes.fromhex('cffaedfe07000001') + bytes(56)

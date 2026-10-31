@@ -13,7 +13,7 @@ import sys
 import tempfile
 
 import authenticode
-from authenticode import (Node, SignatureError, parse_signature, pe_authenticode_digest, read_node, check_tree,
+from authenticode import (SignatureError, parse_signature, pe_authenticode_digest, read_node, check_tree,
                           verify, export_roots)
 
 INSTALLER = Path(os.environ.get('EA_INSTALLER', Path.home() / 'Downloads/EAappInstaller.exe'))
