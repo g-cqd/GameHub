@@ -15,7 +15,7 @@ Every provider has defaulted to hub-2 since b2455c8 (ADR-0009). hub-1 is the onl
    - The only lead is `WSALookupServiceBegin failed with: 0` (`network_change_notifier_win.cc`).
    - EA booted in about 6 s on hub-1.
 2. Run the same test for Epic, then `hub play` GTA V through it.
-3. If both pass, delete `Runtimes/hub-1` and `bin/hubenv.sh`, and update the remaining mentions in the docs.
+3. If both pass, delete `Runtimes/hub-1` (`bin/hubenv.sh` is already gone), and update the remaining mentions in the docs.
 
 ## Done when
 EA boots and starts one game on hub-2, Epic does the same, and hub-1 is gone.

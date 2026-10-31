@@ -1,5 +1,5 @@
 ---
-status: not-started
+status: in-progress
 blocked-by: []
 date: 2026-10-31
 ---
@@ -23,3 +23,20 @@ ExT2 has 16 GB free of 932 GB, and swap reaches 6 of 7 GB with several launchers
 
 ## Done when
 These are gone and ExT2 has room for the Halo MCC reinstall.
+
+## Progress (2026-10-31)
+**Deleted:**
+- The ten probe copies in the prefix's `C:\`.
+- In `/tmp`: `/tmp/dxmt-base`, `/tmp/kusd` (its sources are kept in `archive/probes/20261031-activation-input-display/`),
+  `/tmp/ubi-register.reg` (its values are in roadmap 0008), `/tmp/wh2.py`, the `/tmp/screen*.png` screenshots, and
+  the review's `/tmp/review`.
+- `bin/hubenv.sh` and `bin/start-steam.sh` on ExT2, copied first to `archive/work/ext2-bin-20261031/`.
+
+**Left for the owner to decide** (`C:\` files from earlier sessions):
+- `bf3-rtv.log` (19 MB, from the removed BF3 d3d11 proxy);
+- `click_eaac.exe`, `mtest17.exe`, `replay.exe`, `wguest.exe`, `winspy.exe`;
+- `epic_install.log`;
+- the `eaanticheat` folder.
+
+The backups and `Library/Steam-legacy` and `Library/SteamGames` also need the owner's agreement, as above.
+

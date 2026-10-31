@@ -18,3 +18,14 @@ with a backup, and idempotently.
 
 ## Done when
 A prefix with no such values gets them from `hub start ubisoft`, and Ubisoft Connect shows each game's folder.
+
+## The values written on 2026-10-31 (32-bit view, from `/tmp/ubi-register.reg`)
+
+| Key under `HKLM\Software\Wow6432Node\` | Value | Data |
+|---|---|---|
+| `Ubisoft\Launcher\Installs\720` | `InstallDir` | `E:\Library\Ubisoft\games\Assassin's Creed Unity\` |
+| `UBISOFT\Far Cry 2` | `installdir` | `E:\Library\Ubisoft\games\Far Cry 2\` |
+| `UBISOFT\Far Cry 3` | `InstallDir` | `E:\Library\Ubisoft\games\Far Cry 3\` |
+| `Ubisoft\WatchDogs2` | `InstallDir` | `E:\Library\Ubisoft\games\WATCH_DOGS2\` |
+
+The value names, and their case, come from each game's `register:` entry in Ubisoft's configuration.

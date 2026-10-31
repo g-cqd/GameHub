@@ -33,4 +33,4 @@ Status: 2026-10-22. Launcher and settings: `launcher/` (`launcher/hub`). Runtime
 - Re-test a BF game under hub-0 on the merged prefix.
 - HITMAN 3 (77 GB), Wolfenstein II (49 GB), Crysis Remastered (20 GB), Halo MCC (16 GB) and the Unity "Zero Hour" are in `steamapps/common` without manifests, so Steam does not list them as installed. In Steam, install each into this library and let it verify; it should reuse the files.
 - Bisect which AoA setting hangs the RE; add a MetalFX preset to `hub play aoa`.
-- Old `bin/hubenv.sh` and `bin/start-steam.sh` on ExT2 are superseded by `launcher/`; remove when convenient.
+- The old `bin/hubenv.sh` and `bin/start-steam.sh` on ExT2 were removed on 2026-10-31 (copies in `archive/work/ext2-bin-20261031/`).
