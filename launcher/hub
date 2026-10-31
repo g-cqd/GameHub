@@ -32,7 +32,7 @@ UBISOFT = ROOT / "Library/Ubisoft"
 EA_GAMES = ROOT / "EA Games"
 
 # Which runtime each launcher runs on (override with --runtime / HUB_RUNTIME). Every launcher now defaults to hub-1.
-PROVIDER_RUNTIME = {"steam": "hub-1", "ea": "hub-1", "ubisoft": "hub-1", "direct": "hub-1", "epic": "hub-1"}
+PROVIDER_RUNTIME = {"steam": "hub-2", "ea": "hub-1", "ubisoft": "hub-1", "direct": "hub-1", "epic": "hub-1"}
 
 # Knowledge about specific games. status: verified (seen working), unverified (never confirmed), blocked (needs anti-cheat that is not bypassed).
 EA_KNOWN = {
