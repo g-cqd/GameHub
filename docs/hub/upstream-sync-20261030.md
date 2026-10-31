@@ -11,12 +11,28 @@
 
 ## Runtime hub-2
 
-An APFS clone of hub-1 with the new DXMT (x64, x32, winemetal.so) and the new production mtld3d. Wine, x87sidecar,
-compatdb.so, external libraries and `hub-rules.txt` are hub-1's. Try it with `hub play <game> --runtime hub-2` (the
-prefix session restarts when the runtime changes). Not yet run with any game.
+Built from the `main` branch of every fork and assembled from scratch with `scripts/assemble_runtime.sh`,
+`scripts/install_mtld3d.sh` and `scripts/bundle_media.py` (same file set as hub-1, no file missing):
 
-DXMT's meson build dirs (`$HUB_ROOT/build/dxmt/{x64,x32}`) were configured with cross files in `/tmp/dxmt-cross`, which
-were gone; they are now kept in `toolchains/dxmt-cross/` (copy them to `/tmp/dxmt-cross/` before `ninja`).
+| Component | Source |
+|---|---|
+| Wine | g-cqd/wine `main` 7819dea: athei cx-26-patched + our 123 commits (all ten wine-0010 bundle patches, trap-flag and W^X emulation, EA anti-cheat, raw syscalls, winemac full-screen work, mouse buttons) + the wine-0011 dsound SSE2 resampler and phase cache, which only the BF3 and NFS bundles had |
+| DXMT | g-cqd/dxmt `main` ae22950 |
+| mtld3d | g-cqd/mtld3d `main` 6f119dc, production profile |
+| x87sidecar | g-cqd/x87sidecar `main` dbda79a |
+| compatdb.so, lib/external (freetype, gnutls, SDL), hub-rules.txt | as in hub-1 (`runtime/hub-rules.txt` of the repo) |
+
+Smoke-tested in a scratch prefix (64-bit and 32-bit `cmd`); not yet run with a game. Try it with
+`hub play <game> --runtime hub-2` (the prefix session restarts when the runtime changes).
+
+Build notes:
+- `build/wine-ours` had been reconfigured on 2026-10-26 without `build-macos-x86_64.sh`, so pkg-config gave arm64
+  Homebrew paths and ws2_32, winegstreamer, winedmo and sfnt2fon no longer linked. Always configure through the script
+  (`WINE_BUILD_DIR=/Volumes/ExT2/GameHub/build/wine-ours ./build-macos-x86_64.sh configure --enable-archs=i386,x86_64
+  --prefix=/Volumes/ExT2/GameHub/sdk/wine-ours --with-mingw`), and do not put llvm-mingw first in PATH: its `clang`
+  then replaces the configured host compiler.
+- DXMT's meson build dirs (`$HUB_ROOT/build/dxmt/{x64,x32}`) were configured with cross files in `/tmp/dxmt-cross`,
+  which were gone; they are now kept in `toolchains/dxmt-cross/` (copy them to `/tmp/dxmt-cross/` before `ninja`).
 
 ## Battlefield 3
 
