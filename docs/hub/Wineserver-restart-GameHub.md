@@ -1,6 +1,6 @@
 # Start, stop and restart the GameHub Wine session
 
-All launchers share one prefix (`$HUB_ROOT/Prefix`, default `/Volumes/ExT2/GameHub`) and one runtime (`hub-1`). One
+All launchers share one prefix (`$HUB_ROOT/Prefix`, default `/Volumes/ExT2/GameHub`) and one runtime (`hub-2`). One
 wineserver serves the prefix, so a launcher or game started with a different runtime or environment needs a restart.
 Use `launcher/hub`; it picks the runtime and prefix itself.
 
@@ -26,7 +26,7 @@ lsof -a -d cwd -c wineserv        # the current directory of a wineserver is the
 ## Stop by hand (when `hub stop` cannot)
 
 ```bash
-RT=/Volumes/ExT2/GameHub/Runtimes/hub-1
+RT=/Volumes/ExT2/GameHub/Runtimes/hub-2
 export WINEPREFIX=/Volumes/ExT2/GameHub/Prefix
 "$RT/wineserver" -k      # kill every Wine process of this prefix, then the server
 "$RT/wineserver" -w      # wait until the server has exited

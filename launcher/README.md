@@ -5,9 +5,9 @@ Background, decisions and troubleshooting: `docs/hub/steam-light-aoa.md`.
 
 | What | Where |
 |---|---|
-| Wine runtime (fork Wine + mtld3d + DXMT + x87sidecar + GStreamer/FFmpeg + MoltenVK) | `$HUB_ROOT/Runtimes/hub-1` |
+| Wine runtime (fork Wine + mtld3d + DXMT + x87sidecar + GStreamer/FFmpeg + MoltenVK) | `$HUB_ROOT/Runtimes/hub-2` |
 | General prefix | `$HUB_ROOT/Prefix` (`E:` = `$HUB_ROOT`, user `crossover`) |
-| Steam client (the only one: older 32-bit build, updates blocked) and the one Steam library | `$HUB_ROOT/Library/Steam` = `E:\Library\Steam` (also `Z:\Volumes\ExT2\Steam` through the ext2 root symlink) |
+| Steam client (the only one: current 64-bit client, updates itself; the old 32-bit client is in `Library/Steam-legacy`) and the one Steam library | `$HUB_ROOT/Library/Steam` = `E:\Library\Steam` (also `Z:\Volumes\ExT2\Steam` through the ext2 root symlink) |
 | Games | `E:\Library\Steam\steamapps\common`: AoA 318020, Generals 2229870, C&C Zero Hour 2732960, Rise of Nations 287450, Watch_Dogs 243470, "Zero Hour" (Unity) 1359090, plus folders Steam does not know yet (HITMAN 3, Wolfenstein II, Crysis Remastered, Halo MCC; see docs) |
 | Logs / session state | `$HUB_ROOT/Hub/Logs`, `$HUB_ROOT/Hub/State` |
 | Known-good game settings (versioned) | `settings/` in this directory |
@@ -21,10 +21,10 @@ runtime and launcher each needs, starts it, and starts the game.
 - Options: `--restart`, `--runtime NAME`, `--metalfx [FACTOR]`, `--dxgi wined3d`, `--debug SPEC`, `--no-wait`, `--force`.
 - `hub trim epic` stops the Epic launcher and its web helpers and overlay while a game started through it runs. They held about 5 GB, mostly compressed, and the Mac swapped 50-400 MB/s while GTA V played. Whether every game survives it is untested; GTA V is being tested.
 - `--metalfx` turns on DXMT's MetalFX spatial upscaler (factor above 1.0, at most 2.0; the game's output is its resolution times the factor). It applies to the whole session, except for Epic, where it is scoped to `GTA5.exe` so the launcher itself keeps its normal swapchain.
-- All launchers (Steam, EA, Ubisoft, Epic) run on the unified `hub-1` runtime. Switching launchers cleanly stops the other one (refused while a game runs, unless `--restart`).
+- All launchers (Steam, EA, Ubisoft, Epic) run on the unified `hub-2` runtime. Switching launchers cleanly stops the other one (refused while a game runs, unless `--restart`).
 
 ## What makes it work (do not remove)
-1. Steam overlay files are moved to `_overlay-disabled` (the overlay crashes AoA right after its intro). `start-steam.sh` re-applies this.
+1. Steam overlay files are moved to `_overlay-disabled` (the overlay crashes AoA right after its intro). `hub start steam` re-applies this at every start; a client update puts them back while Steam runs (see `docs/hub/ROADMAP.md`).
 2. Steam is the current 64-bit client (since 2026-10-31, on hub-2), started without flags and allowed to update itself; `prep_steam` removes a leftover `steam.cfg` update block. The Steam Client Service is registered in the prefix (`SteamService.exe /install`, image `C:\Program Files (x86)\Common Files\Steam\SteamService.exe`); without it Steam shows "Steam Service Error". The 2025 32-bit client it replaced (it needed `BootStrapperInhibitAll` and `-nobootstrapupdate` etc.) is in `Library/Steam-legacy`.
 3. The runtime bundles the GStreamer `deinterlace` plugin (the intro video stalls without it).
 4. Game exe backend via compat DB: AoA uses DXMT (`HUB_GAME_DXGI=wined3d` to override); everything else d3d9=mtld3d, dxgi=dxmt. 32-bit games get x87sidecar automatically.

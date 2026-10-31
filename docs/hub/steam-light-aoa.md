@@ -5,7 +5,7 @@ Status: 2026-10-22. Launcher and settings: `launcher/` (`launcher/hub`). Runtime
 ## Layout (all under `/Volumes/ExT2/GameHub`)
 - Runtimes: `Runtimes/hub-1` (fork Wine + mtld3d + DXMT + x87sidecar; used by `launcher/` scripts) and `Runtimes/hub-0-winemacfs-dxmtrtv-noWineVer` (EA identity runtime, see `hub-shared-prefix-design-20261011.md`). Both run on the same prefix; pick with `HUB_RUNTIME`.
 - The one prefix: `Prefix` (`E:` = GameHub root, user `crossover`). It holds EA (signed in), BF3/BF4/Crysis 3, NFS, and now Steam.
-- The one Steam: `Library/Steam` (`E:\Library\Steam`), older 32-bit client with updates blocked, one library folder `E:\Library\Steam\steamapps`. Logs: `Hub/Logs`; state: `Hub/State`.
+- The one Steam: `Library/Steam` (`E:\Library\Steam`), current 64-bit client on hub-2 since 2026-10-31 (the old 32-bit client is in `Library/Steam-legacy`), one library folder `E:\Library\Steam\steamapps`. Logs: `Hub/Logs`; state: `Hub/State`.
 
 ## How the merge was done (2026-10-22)
 1. The standalone "SteamLight" prefix (`~/Games/SteamLight`, 30 GB on the internal drive) was moved into this layout; its registry files, logs and screenshots are in `Backups/steamlight-migration-20261022/`. Per-user data (`Saved Games`, `Documents`, Steam `AppData`) was merged into the prefix without overwriting.

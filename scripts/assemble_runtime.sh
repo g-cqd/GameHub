@@ -1,6 +1,6 @@
 #!/bin/bash
 # Assemble a GameHub runtime from the freshly built fork tree.
-# usage: assemble_runtime.sh RUNTIME_DIR      (e.g. /Volumes/ExT2/GameHub/Runtimes/hub-1)
+# usage: assemble_runtime.sh RUNTIME_DIR      (e.g. /Volumes/ExT2/GameHub/Runtimes/hub-2)
 # inputs (override with env):
 #   WINE_SDK_OURS  make-installed fork Wine (--enable-archs=i386,x86_64)
 #   DXMT_BUILD     meson build dirs x64/ and x32/
@@ -11,7 +11,7 @@ RT=${1:?runtime dir}
 S=${WINE_SDK_OURS:-/Volumes/ExT2/GameHub/sdk/wine-ours}
 DX=${DXMT_BUILD:-/Volumes/ExT2/GameHub/build/dxmt}
 X87=${X87_BIN:-/Volumes/ExT2/GameHub/build/x87sidecar/bin/x87sidecar}
-OLD=${OLD_RT:-/Volumes/ExT2/GameHub/Runtimes/hub-1}
+OLD=${OLD_RT:-/Volumes/ExT2/GameHub/Runtimes/hub-2}
 ENT=${ENT:-/Users/gc/Developer/wine/wine-entitlements.plist}
 WB=$S/bin/winebuild
 CP=/bin/cp
