@@ -14,8 +14,9 @@ name=ea-gep;exe=EAGEP.exe;dxgi=wined3d
 name=epic-cef;exe=EpicWebHelper.exe;dxgi=wined3d
 # Ubisoft Connect: CEF's GPU process would draw into upc.exe's window from another process, and DXMT has no
 # cross-process swapchain (white window); keep the GPU work inside upc.exe (the CW HACK 25737 libcef patch makes
-# CEF read its command line)
-name=hub-upc;exe=upc.exe;arguments=--in-process-gpu
+# CEF read its command line). With the 2026-10-30 DXMT (hub-2) its in-process GPU drawing glitched, so CEF renders in
+# software (--disable-gpu); --in-process-gpu stays so that any GPU fallback still draws from upc.exe
+name=hub-upc;exe=upc.exe;arguments=--in-process-gpu --disable-gpu
 
 # Rockstar Games Launcher: it needs a D3D10.1 device, which DXMT lacks (black window). compatdb's built-in rule gives
 # it wined3d, but wined3d's Vulkan renderer offers no D3D11 feature level on MoltenVK and the launcher exits with code 1
