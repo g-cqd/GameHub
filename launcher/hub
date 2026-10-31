@@ -805,7 +805,11 @@ def prep_steam():
     for n in ("GameOverlayRenderer.dll", "GameOverlayRenderer64.dll", "gameoverlayui.exe", "gameoverlayui64.exe", "GameOverlayUI.exe"):
         if (STEAM / n).exists():   # the overlay crashes Act of Aggression right after its intro
             shutil.move(str(STEAM / n), str(od / n))
-    (STEAM / "steam.cfg").write_bytes(b"BootStrapperInhibitAll=enable\r\nBootStrapperForceSelfUpdate=disable\r\n")
+    # The current 64-bit client renders and updates itself under hub-2 (2026-10-31); the 2025 32-bit client
+    # needed its updates blocked. Drop a leftover block so the client stays current.
+    cfg = STEAM / "steam.cfg"
+    if cfg.exists() and b"BootStrapperInhibitAll" in cfg.read_bytes():
+        cfg.unlink()
 
 
 def start_provider(provider, rt, opts):
@@ -816,8 +820,7 @@ def start_provider(provider, rt, opts):
         prep_steam()
         conn = STEAM / "logs/connection_log.txt"
         off, log = size(conn), LOGS / f"steam-{stamp()}.log"
-        spawn(rt, env, ["E:\\Library\\Steam\\steam.exe", "-noverifyfiles", "-nobootstrapupdate", "-skipinitialbootstrap",
-                        "-inhibitbootstrap", "-no-cef-sandbox"], log)
+        spawn(rt, env, ["E:\\Library\\Steam\\steam.exe"], log)
         print(f"starting Steam on {rt} (log {log})")
         ok = wait_for(lambda: "Logged On" in log_tail_from(conn, off), 120, "Steam to log on")
         if not ok:

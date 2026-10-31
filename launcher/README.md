@@ -25,7 +25,7 @@ runtime and launcher each needs, starts it, and starts the game.
 
 ## What makes it work (do not remove)
 1. Steam overlay files are moved to `_overlay-disabled` (the overlay crashes AoA right after its intro). `start-steam.sh` re-applies this.
-2. Older Steam client with updates blocked: `steam.cfg` (`BootStrapperInhibitAll=enable`) plus `-noverifyfiles -nobootstrapupdate -skipinitialbootstrap -inhibitbootstrap -no-cef-sandbox`. The modern client did not render under Wine; its files are archived on ext2 (see docs).
+2. Steam is the current 64-bit client (since 2026-10-31, on hub-2), started without flags and allowed to update itself; `prep_steam` removes a leftover `steam.cfg` update block. The Steam Client Service is registered in the prefix (`SteamService.exe /install`, image `C:\Program Files (x86)\Common Files\Steam\SteamService.exe`); without it Steam shows "Steam Service Error". The 2025 32-bit client it replaced (it needed `BootStrapperInhibitAll` and `-nobootstrapupdate` etc.) is in `Library/Steam-legacy`.
 3. The runtime bundles the GStreamer `deinterlace` plugin (the intro video stalls without it).
 4. Game exe backend via compat DB: AoA uses DXMT (`HUB_GAME_DXGI=wined3d` to override); everything else d3d9=mtld3d, dxgi=dxmt. 32-bit games get x87sidecar automatically.
 5. Retina mode is prefix-wide (`HKCU\Software\Wine\Mac Driver\RetinaMode=y`) with `LogPixels=192` (HKCU `Control Panel\Desktop` and `Software\Wine\Fonts`) so Steam stays readable.
