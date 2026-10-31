@@ -11,7 +11,7 @@ DL=$T/downloads
 mkdir -p "$T/logs" "$DL"
 SUM=$T/logs/summary.txt
 : > "$SUM"
-step() { local name=$1; shift; local s=$(date +%s); ( set -e; "$@" ) > "$T/logs/$name.log" 2>&1; echo "$name exit=$? secs=$(( $(date +%s)-s ))" >> "$SUM"; }
+step() { local name=$1 s; shift; s=$(date +%s); ( set -e; "$@" ) > "$T/logs/$name.log" 2>&1; echo "$name exit=$? secs=$(( $(date +%s)-s ))" >> "$SUM"; }
 sha() { shasum -a 256 "$1" | cut -d' ' -f1; }
 check() { # check <file> <expected-sha256>
   local got; got=$(sha "$1"); echo "sha256 $1 = $got (expected $2)"; [ "$got" = "$2" ]; }
@@ -76,7 +76,7 @@ wine_sdk() {     # the wine-build release CI pins (WINE_RELEASE in ci.yml)
   local top; top=$(dirname "$(dirname "$(find "$T/wine-sdk-$WINE_REL" -maxdepth 4 -path '*/bin/wine' -type f | head -1)")")
   echo "sdk-root=$top"; echo "$top" > "$T/wine-sdk-root.txt"
   ls "$top/bin"; ls "$top/lib/wine"
-  echo "i386 .a: $(ls "$top/lib/wine/i386-windows" | grep -c '\.a$')  x86_64 .a: $(ls "$top/lib/wine/x86_64-windows" | grep -c '\.a$')"
+  echo "i386 .a: $(find "$top/lib/wine/i386-windows" -maxdepth 1 -name '*.a' | wc -l | tr -d ' ')  x86_64 .a: $(find "$top/lib/wine/x86_64-windows" -maxdepth 1 -name '*.a' | wc -l | tr -d ' ')"
   ls -la "$top/lib/wine/tests/i386-windows/d3d9_test.exe" "$top/lib/wine/tests/x86_64-windows/d3d9_test.exe"
   "$top/bin/wine" --version
 }

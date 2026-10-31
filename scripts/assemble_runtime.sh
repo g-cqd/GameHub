@@ -31,7 +31,7 @@ $CP -c -R "$OLD/lib/external" "$RT/lib/external"; chflags -R nouchg "$RT"
 $CP -c "$X87" "$RT/bin/x87sidecar"
 # --- relocate wined3d into its backend dirs, leave fake modules behind
 for arch in i386 x86_64; do
-  pe=$arch-windows; b=$([ $arch = i386 ] && echo i686-windows || echo x86_64-windows); m=$([ $arch = i386 ] && echo -m32 || echo -m64)
+  pe=$arch-windows; b=$([ $arch = i386 ] && echo i686-windows || echo x86_64-windows)
   mkdir -p "$RT/lib/wine/d3d9/wined3d/$pe" "$RT/lib/wine/dxgi/wined3d/$pe" "$RT/lib/wine/d3d9/mtld3d/$pe" "$RT/lib/wine/dxgi/dxmt/$pe"
   mv "$RT/lib/wine/$pe/d3d9.dll" "$RT/lib/wine/d3d9/wined3d/$pe/"
   for d in dxgi d3d10 d3d10_1 d3d10core d3d11; do mv "$RT/lib/wine/$pe/$d.dll" "$RT/lib/wine/dxgi/wined3d/$pe/"; done
@@ -42,7 +42,7 @@ for arch in i386 x86_64; do
   done
   $CP -c "$RT/lib/wine/dxgi/wined3d/$pe/d3d10.dll" "$RT/lib/wine/dxgi/wined3d/$pe/d3d10_1.dll" "$RT/lib/wine/dxgi/dxmt/$pe/"
   for f in "$RT/lib/wine/dxgi/dxmt/$pe"/*.dll; do "$WB" --builtin "$f" >/dev/null 2>&1 || true; done
-  for n in d3d9; do "$WB" --fake-module -o "$RT/lib/wine/$pe/$n.dll" -b $b --dll "$RT/lib/wine/d3d9/wined3d/$pe/$n.dll"; done
+  "$WB" --fake-module -o "$RT/lib/wine/$pe/d3d9.dll" -b $b --dll "$RT/lib/wine/d3d9/wined3d/$pe/d3d9.dll"
   for n in dxgi d3d10 d3d10_1 d3d10core d3d11; do "$WB" --fake-module -o "$RT/lib/wine/$pe/$n.dll" -b $b --dll "$RT/lib/wine/dxgi/wined3d/$pe/$n.dll"; done
   "$WB" --fake-module -o "$RT/lib/wine/$pe/winemetal.dll" -b $b --dll "$RT/lib/wine/dxgi/dxmt/$pe/winemetal.dll"
 done
