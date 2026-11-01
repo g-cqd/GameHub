@@ -1,5 +1,5 @@
 ---
-status: not-started
+status: in-progress
 blocked-by: []
 date: 2026-11-01
 ---
@@ -18,3 +18,10 @@ Starting Steam again afterwards works, because the update is already installed.
 ## Done when
 After a client update, Steam relaunches itself and logs on without a second `hub start`. Until then, `hub` could
 start Steam once more when the bootstrap log ends with "Update complete" and no `steam.exe` remains.
+
+## Progress (2026-11-01)
+Mitigation in `start_provider`: when Steam dies during start and `bootstrap_log.txt` reports "Update complete" since
+the spawn, the hub starts the updated client once more. Not yet exercised: it needs the next client update. The
+Wine-side cause (the relaunch's nested exception on the signal stack) is still open, and can only be reproduced
+during an update.
+

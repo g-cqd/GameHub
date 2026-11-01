@@ -909,11 +909,17 @@ def start_provider(provider, rt, opts):
         if not (STEAM / "steam.exe").exists():
             die(f"Steam not found at {STEAM}")
         prep_steam()
-        conn = STEAM / "logs/connection_log.txt"
-        off, log = size(conn), LOGS / f"steam-{stamp()}.log"
+        conn, boot = STEAM / "logs/connection_log.txt", STEAM / "logs/bootstrap_log.txt"
+        off, boot_off, log = size(conn), size(boot), LOGS / f"steam-{stamp()}.log"
         spawn(rt, env, ["E:\\Library\\Steam\\steam.exe"], log)
         print(f"starting Steam on {rt} (log {log})")
         verdict = wait_for_steam_logon(conn, off)
+        if verdict == "died" and "Update complete" in log_tail_from(boot, boot_off):
+            # Steam updated itself and its own relaunch didn't come up (roadmap 0033): start the updated client once
+            print("Steam updated itself and did not relaunch; starting it again")
+            log = LOGS / f"steam-{stamp()}.log"
+            spawn(rt, env, ["E:\\Library\\Steam\\steam.exe"], log)
+            verdict = wait_for_steam_logon(conn, off)
         if verdict == "died":
             die(f"Steam exited while starting; see {log}")
         if verdict == "timeout":
