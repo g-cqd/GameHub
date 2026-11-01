@@ -14,6 +14,16 @@ public struct RulesResult: Equatable, Sendable {
     public var dllDirectory: Bytes?
     /// The line numbers (1-based) of the detection rules that matched.
     public var matchedLines: [Int]
+    /// The report lines and warnings, in rule order.
+    public var messages: [RulesMessage]
+
+    /// The report lines, each with its newline: what ntdll prints on stderr for the matches.
+    public var report: Bytes {
+        messages.flatMap { message -> Bytes in
+            if case .report(let text) = message { return text + [ASCII.newline] }
+            return []
+        }
+    }
 }
 
 public enum RulesEngine {
@@ -22,7 +32,13 @@ public enum RulesEngine {
 
     /// The rules for the executable `exe` (a file name), its PE facts, and the launcher's own WINE_COMPATDB (`launcher`).
     public static func apply(rules: Bytes, exe: Bytes, facts: PEFacts?, launcher: Bytes) -> RulesResult {
-        var result = RulesResult(compatDB: [], gateSelectorFixup: false, dllDirectory: nil, matchedLines: [])
+        var result = RulesResult(
+            compatDB: [],
+            gateSelectorFixup: false,
+            dllDirectory: nil,
+            matchedLines: [],
+            messages: []
+        )
         var lines: [Bytes] = [Bytes("v=3".utf8)]
         for (index, rawLine) in ASCII.split(rules[...], on: ASCII.newline).enumerated() {
             let line = rawLine.prefix { $0 != ASCII.carriageReturn }.drop { $0 == ASCII.space || $0 == ASCII.tab }
@@ -51,12 +67,21 @@ public enum RulesEngine {
         facts: PEFacts?,
         into result: inout RulesResult
     ) -> Bytes? {
-        guard let arrow = ASCII.firstRange(of: Bytes("=>".utf8), in: line) else { return nil }
-        guard Predicates.hold(line[(line.startIndex + 5) ..< arrow.lowerBound], exe: exe, facts: facts) else {
+        guard let arrow = ASCII.firstRange(of: Bytes("=>".utf8), in: line) else {
+            result.messages.append(.warning(Bytes("line ".utf8) + ASCII.decimal(number) + Bytes(": no =>".utf8)))
             return nil
         }
+        let predicates = line[(line.startIndex + 5) ..< arrow.lowerBound]
+        guard Predicates.hold(predicates, exe: exe, facts: facts, messages: &result.messages) else { return nil }
         result.matchedLines.append(number)
-        var fields = ASCII.split(line[arrow.upperBound...].drop { $0 == ASCII.space }, on: ASCII.semicolon)
+        let written = line[arrow.upperBound...].drop { $0 == ASCII.space }
+        result.messages.append(
+            .report(
+                Bytes("hubrules: ".utf8) + exe + Bytes(" matches line ".utf8) + ASCII.decimal(number) + Bytes(": ".utf8)
+                    + written
+            )
+        )
+        var fields = ASCII.split(written, on: ASCII.semicolon)
         if let gate = fields.firstIndex(where: { $0.elementsEqual(gateKey) }) {
             fields.remove(at: gate)
             result.gateSelectorFixup = true
@@ -67,6 +92,13 @@ public enum RulesEngine {
             // relative to lib/wine only: no parent references, no absolute paths
             if ASCII.firstRange(of: Bytes("..".utf8), in: value[...]) == nil, value.first != UInt8(ascii: "/") {
                 result.dllDirectory = value
+            } else {
+                result.messages.append(
+                    .warning(
+                        Bytes("line ".utf8) + ASCII.decimal(number) + Bytes(": ".utf8) + dllDirKey + value
+                            + Bytes(" must be relative to lib/wine, ignored".utf8)
+                    )
+                )
             }
         }
         let settings = Bytes(fields.joined(separator: [ASCII.semicolon]))

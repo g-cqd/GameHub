@@ -50,7 +50,12 @@ import Testing
 
     @Test func testsAndEmbeddedNameTheirStage() throws {
         #expect(try run(.gate(.test)) == ["==> swift test (debug)", "==> swift test -c release"])
-        #expect(try run(.gate(.embedded)) == ["==> Embedded Swift: HubRules (x86_64-apple-macos15)"])
+        #expect(
+            try run(.gate(.embedded)) == [
+                "==> Embedded Swift: HubRules (x86_64-apple-macos15)",
+                "[OK] /pkg/.build/quality/embedded/libwinekit.a and winekit.h"
+            ]
+        )
     }
 
     @Test func mutationSaysWhatItMutates() throws {
@@ -59,7 +64,11 @@ import Testing
             "/cache/swift-mutation-testing-1.6.4/swift-mutation-testing": "", "/pkg/Sources/HubRules/A.swift": "",
             reportPath: mutationReport()
         ])
-        #expect(try run(.gate(.mutation), files: files) == ["==> swift-mutation-testing on every library source"])
+        #expect(
+            try run(.gate(.mutation), files: files) == [
+                "==> swift-mutation-testing on Sources/HubRules/A.swift (efficiency cores)"
+            ]
+        )
         let reporter = FakeReporter()
         try Quality(
             workspace: workspace(),
@@ -69,7 +78,11 @@ import Testing
             platform: .macOSArm64
         )
         .mutation(.changed(["Sources/HubRules/A.swift", "Sources/HubRules/B.swift"]))
-        #expect(reporter.lines == ["==> swift-mutation-testing on Sources/HubRules/A.swift Sources/HubRules/B.swift"])
+        #expect(
+            reporter.lines == [
+                "==> swift-mutation-testing on Sources/HubRules/A.swift Sources/HubRules/B.swift (efficiency cores)"
+            ]
+        )
     }
 
     @Test func anUnchangedPackageSaysSo() throws {
@@ -81,16 +94,17 @@ import Testing
         let files = FakeFileSystem([
             "/wine/dlls/ntdll/unix/hubrules.c": "", "/pkg/Differential/rules/a.txt": "",
             "/pkg/Differential/executables": "/pkg/g.exe",
-            "/pkg/g.exe": ""
+            "/pkg/g.exe": "", "/pkg/Sources/HubRules/A.swift": ""
         ])
         #expect(
             try run(.gate(.differential), files: files) == [
-                "==> building Wine's hubrules.c into the C harness", "==> building hubrules-swift",
-                "1 cases, 0 different"
+                "==> Embedded Swift: HubRules (x86_64-apple-macos15)",
+                "[OK] /pkg/.build/quality/differential/winekit/libwinekit.a and winekit.h",
+                "==> building the reference harness", "==> building the wine harness", "1 cases, 0 different"
             ]
         )
         let differing = FakeRunner {
-            $0.executable.hasSuffix("/harness") ? CommandResult(status: 0, output: "x") : CommandResult(status: 0)
+            $0.executable.hasSuffix("/wine/harness") ? CommandResult(status: 0, output: "x") : fine($0)
         }
         let reporter = FakeReporter()
         #expect(throws: QualityError.self) {
@@ -125,13 +139,13 @@ import Testing
                 case "shasum": CommandResult(status: 0, output: "\(sha)  x\n")
                 case let path where path.hasSuffix("/swift-mutation-testing") && call.arguments == ["--version"]:
                     CommandResult(status: 0, output: "1.6.4\n")
-                default: CommandResult(status: 0)
+                default: fine(call)
             }
         }
         _ = try run(.changed(.prePush), files: files, runner: runner)
         let printing: Set<String> = [
             "sh", "swift-format", "swiftlint", "deadwood", "dolly", "arcleak", "fcheck", "modeler", "swift", "swiftc",
-            "clang", "env"
+            "clang", "taskpolicy"
         ]
         for call in runner.calls {
             let name = URL(fileURLWithPath: call.executable).lastPathComponent

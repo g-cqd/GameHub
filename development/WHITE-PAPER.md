@@ -144,8 +144,10 @@ analysis only, the session stops at level 4 and says so.
   Wine fake modules in the standard place. A rule or `--dxgi` picks the backend per process, with no copying or
   renaming (ADR-0005).
 - **Build trees:**
-  - Wine: `$HUB_ROOT/build/wine-ours`, configured only through `build-macos-x86_64.sh`. Don't put llvm-mingw first in
-    `PATH`.
+  - Wine: `$HUB_ROOT/build/wine-ours`, configured and built only through `build-macos-x86_64.sh`. Its `make` first
+    builds WineKit's `libwinekit.a` (`swift package wine-objects`) into `$HUB_ROOT/build/winekit`, which ntdll links
+    (`WINEKIT_DIR`). A bare `make` in the tree needs `WINEKIT_DIR=$HUB_ROOT/build/winekit`. Don't put llvm-mingw first
+    in `PATH`.
   - DXMT: `$HUB_ROOT/build/dxmt/{x64,x32}`, with the cross files from `toolchains/dxmt-cross/` copied to
     `/tmp/dxmt-cross/` first.
   - x87sidecar: `$HUB_ROOT/build/x87sidecar`.

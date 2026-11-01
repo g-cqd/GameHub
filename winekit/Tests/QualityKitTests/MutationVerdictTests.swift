@@ -25,8 +25,10 @@ import Testing
 
     @Test func aSurvivorTheBaselineDoesntHoldIsNew() throws {
         let report = Data(
-            mutationReport([("/Sources/A/a.swift", "Survived", "known"), ("/Sources/A/a.swift", "Survived", "fresh")])
-                .utf8
+            mutationReport([
+                ("/Sources/HubRules/a.swift", "Survived", "known"), ("/Sources/HubRules/a.swift", "Survived", "fresh")
+            ])
+            .utf8
         )
         #expect(try MutationVerdict.newUndetected(report: report, baseline: baseline).map(\.fingerprint) == ["fresh"])
         #expect(try MutationVerdict.newUndetected(report: report, baseline: nil).count == 2)
@@ -40,10 +42,10 @@ import Testing
     @Test func aScopedRunFailsOnANewSurvivorAndNamesIt() throws {
         let files = FakeFileSystem([
             "/pkg/Quality/tools.lock": "swift-mutation-testing 1.6.4 \(sha) -",
-            "/cache/swift-mutation-testing-1.6.4/swift-mutation-testing": "", "/pkg/Sources/A/a.swift": "",
+            "/cache/swift-mutation-testing-1.6.4/swift-mutation-testing": "", "/pkg/Sources/HubRules/a.swift": "",
             "/pkg/.swift-mutation-testing-baseline.json": String(decoding: baseline, as: UTF8.self),
             reportPath: mutationReport([
-                ("/Sources/A/a.swift", "Survived", "known"), ("/Sources/A/a.swift", "Survived", "fresh")
+                ("/Sources/HubRules/a.swift", "Survived", "known"), ("/Sources/HubRules/a.swift", "Survived", "fresh")
             ])
         ])
         let quality = Quality(
@@ -54,12 +56,12 @@ import Testing
             platform: .macOSArm64
         )
         let message =
-            "mutation: undetected mutants the baseline doesn't hold: Sources/A/a.swift:15 RelationalOperatorReplacement < → <="
+            "mutation: undetected mutants the baseline doesn't hold: Sources/HubRules/a.swift:15 RelationalOperatorReplacement < → <="
         #expect(throws: QualityError.gateFailed(message)) {
-            try quality.mutation(.changed(["Sources/A/a.swift"]))
+            try quality.mutation(.changed(["Sources/HubRules/a.swift"]))
         }
-        files.add(reportPath, mutationReport([("/Sources/A/a.swift", "Survived", "known")]))
-        try quality.mutation(.changed(["Sources/A/a.swift"]))
+        files.add(reportPath, mutationReport([("/Sources/HubRules/a.swift", "Survived", "known")]))
+        try quality.mutation(.changed(["Sources/HubRules/a.swift"]))
     }
 
     @Test func aScopedRunWithoutAReportIsUnavailable() {
@@ -75,7 +77,7 @@ import Testing
             platform: .macOSArm64
         )
         #expect(throws: QualityError.unavailable("the mutation run wrote no report at \(reportPath)")) {
-            try quality.mutation(.changed(["Sources/A/a.swift"]))
+            try quality.mutation(.changed(["Sources/HubRules/a.swift"]))
         }
     }
 
@@ -93,8 +95,8 @@ import Testing
             reporter: FakeReporter(),
             platform: .macOSArm64
         )
-        .mutation(.changed(["Sources/A/a.swift"]))
-        let arguments = try #require(runner.calls.first).arguments
+        .mutation(.changed(["Sources/HubRules/a.swift"]))
+        let arguments = try #require(runner.calls(to: "taskpolicy").first).arguments
         #expect(arguments.contains(reportPath) && !arguments.contains("--baseline"))
     }
 }

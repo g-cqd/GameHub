@@ -25,12 +25,9 @@ public struct ChangeSet: Equatable, Sendable {
 
     public var manifestChanged: Bool { files.contains("Package.swift") }
 
-    /// Anything the differential test reads: the Swift rules engine, its host tool, or the corpus.
+    /// Anything the differential test reads: the Swift rules engine, its C interface, or the corpus.
     public var touchesDifferential: Bool {
-        files.contains {
-            $0.hasPrefix("Sources/HubRules/") || $0.hasPrefix("Sources/hubrules-swift/")
-                || $0.hasPrefix("Differential/")
-        }
+        files.contains { $0.hasPrefix("Sources/HubRules/") || $0.hasPrefix("C/") || $0.hasPrefix("Differential/") }
     }
 
     public var isEmpty: Bool { files.isEmpty }

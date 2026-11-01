@@ -46,6 +46,9 @@ extension Quality {
             try embedded()
         }
         if changes.touchesDifferential { try differential() }
-        if !changes.librarySources.isEmpty { try mutation(.changed(changes.librarySources)) }
+        // Mutation testing takes minutes: pushes run it, on the efficiency cores; commits don't wait for it.
+        if hook == .prePush, changes.librarySources.contains(where: MutationScope.isMutated) {
+            try mutation(.changed(changes.librarySources))
+        }
     }
 }

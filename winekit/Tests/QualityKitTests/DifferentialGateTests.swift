@@ -8,18 +8,21 @@ import Testing
         FakeFileSystem([
             "/wine/dlls/ntdll/unix/hubrules.c": "", "/pkg/Differential/unix_private.h": "",
             "/pkg/Differential/harness.c": "",
-            "/pkg/Differential/rules/a.txt": "", "/pkg/Differential/rules/notes.md": "",
-            "/pkg/Differential/executables": "$ROOT/game.exe\n/absent.exe\n", "/pkg/game.exe": "",
-            "/pkg/Differential/launchers/v3": ""
+            "/pkg/Differential/reference/hubrules.c": "", "/pkg/Differential/rules/a.txt": "",
+            "/pkg/Differential/rules/notes.md": "", "/pkg/Differential/executables": "$ROOT/game.exe\n/absent.exe\n",
+            "/pkg/game.exe": "", "/pkg/Differential/launchers/v3": "", "/pkg/Sources/HubRules/A.swift": ""
         ])
     }
 
-    /// Both sides print `c` and `swift` for every case.
-    func runner(c: String = "same", swift: String = "same") -> FakeRunner {
+    /// The reference harness answers `reference`, Wine's answers `wine`.
+    func runner(
+        reference: CommandResult = CommandResult(status: 0, output: "same", errors: "note"),
+        wine: CommandResult = CommandResult(status: 0, output: "same", errors: "note")
+    ) -> FakeRunner {
         FakeRunner { call in
-            if call.executable.hasSuffix("/harness") { return CommandResult(status: 0, output: c) }
-            if call.executable.hasSuffix("/hubrules-swift") { return CommandResult(status: 0, output: swift) }
-            return CommandResult(status: 0)
+            if call.executable.hasSuffix("/reference/harness") { return reference }
+            if call.executable.hasSuffix("/wine/harness") { return wine }
+            return fine(call)
         }
     }
 
@@ -33,34 +36,49 @@ import Testing
         )
     }
 
-    @Test func identicalOutputsPassEveryCase() throws {
+    @Test func bothHarnessesRunEveryCaseWithTheSameArguments() throws {
         let runner = runner()
         try quality(runner, corpus()).run(.gate(.differential))
-        #expect(runner.calls(to: "/harness").count == 2)  // one rules file × one existing executable × (none, v3)
+        let reference = runner.calls(to: "/reference/harness").map(\.arguments)
+        #expect(reference == runner.calls(to: "/wine/harness").map(\.arguments))
+        // one rules file × one existing executable × (no launcher, v3)
         #expect(
-            runner.calls(to: "/hubrules-swift").map(\.arguments) == [
-                ["/pkg/.build/quality/differential/rules/hub-rules.txt", "/pkg/game.exe"],
-                [
-                    "/pkg/.build/quality/differential/rules/hub-rules.txt", "/pkg/game.exe",
-                    "/pkg/Differential/launchers/v3"
-                ]
+            reference == [
+                ["/pkg/.build/quality/differential/rules", "/pkg/game.exe"],
+                ["/pkg/.build/quality/differential/rules", "/pkg/game.exe", "/pkg/Differential/launchers/v3"]
             ]
         )
-        #expect(runner.calls(to: "clang").first?.arguments.contains("-I/wine/include") == true)
     }
 
-    @Test func aDifferenceFailsTheGate() {
-        #expect(throws: QualityError.gateFailed("hubrules-swift differs from Wine's hubrules.c")) {
-            try quality(runner(c: "v=3\n", swift: "v=3"), corpus()).run(.gate(.differential))
-        }
+    @Test func wineIsBuiltWithWineKitAndTheReferenceWithout() throws {
+        let runner = runner()
+        try quality(runner, corpus()).run(.gate(.differential))
+        let builds = runner.calls(to: "clang").map(\.arguments)
+        #expect(builds.count == 2)
+        let objects = "/pkg/.build/quality/differential/winekit"
+        #expect(
+            builds[0].contains("/pkg/.build/quality/differential/reference/harness.c")
+                && !builds[0].contains("-I\(objects)")
+        )
+        #expect(builds[1].suffix(2) == ["-I\(objects)", "\(objects)/libwinekit.a"])
+        #expect(runner.calls(to: "ar").first?.arguments.dropFirst().first == "\(objects)/libwinekit.a")
+        let copies = runner.calls(to: "cp").map(\.arguments)
+        #expect(copies.contains { $0.first == "/pkg/Differential/reference/hubrules.c" })
+        #expect(copies.contains { $0.first == "/wine/dlls/ntdll/unix/hubrules.c" })
     }
 
-    @Test func aSideThatFailsIsADifference() {
-        let crashing = FakeRunner {
-            $0.executable.hasSuffix("/hubrules-swift") ? CommandResult(status: 1) : CommandResult(status: 0)
-        }
-        #expect(throws: QualityError.gateFailed("hubrules-swift differs from Wine's hubrules.c")) {
-            try quality(crashing, corpus()).run(.gate(.differential))
+    @Test func aDifferenceOnEitherStreamFailsTheGate() {
+        let message = "Wine's hubrules.c with WineKit differs from the reference C"
+        let stdout = runner(wine: CommandResult(status: 0, output: "other", errors: "note"))
+        #expect(throws: QualityError.gateFailed(message)) { try quality(stdout, corpus()).run(.gate(.differential)) }
+        let stderr = runner(wine: CommandResult(status: 0, output: "same", errors: "warning"))
+        #expect(throws: QualityError.gateFailed(message)) { try quality(stderr, corpus()).run(.gate(.differential)) }
+    }
+
+    @Test func aReferenceThatFailsIsADifferenceEvenWhenBothFailAlike() {
+        let failing = CommandResult(status: 1)
+        #expect(throws: QualityError.gateFailed("Wine's hubrules.c with WineKit differs from the reference C")) {
+            try quality(runner(reference: failing, wine: failing), corpus()).run(.gate(.differential))
         }
     }
 
@@ -84,7 +102,7 @@ import Testing
 
     @Test func aHelperThatFailsMakesTheGateUnavailable() {
         let readOnly = FakeRunner {
-            $0.executable == "mkdir" ? CommandResult(status: 1, errors: "read-only\n") : CommandResult(status: 0)
+            $0.executable == "mkdir" ? CommandResult(status: 1, errors: "read-only\n") : fine($0)
         }
         #expect(throws: QualityError.unavailable("could not prepare /pkg/.build/quality/differential: read-only")) {
             try quality(readOnly, corpus()).run(.gate(.differential))
@@ -92,8 +110,11 @@ import Testing
     }
 
     @Test func aHarnessThatDoesNotBuildFails() {
-        let noClang = FakeRunner { $0.executable == "clang" ? CommandResult(status: 1) : CommandResult(status: 0) }
-        #expect(throws: QualityError.gateFailed("the C harness did not build")) {
+        let noClang = FakeRunner {
+            $0.executable == "clang" && $0.arguments.contains { $0.hasSuffix("wine/harness.c") }
+                ? CommandResult(status: 1) : fine($0)
+        }
+        #expect(throws: QualityError.gateFailed("the wine harness did not build")) {
             try quality(noClang, corpus()).run(.gate(.differential))
         }
     }

@@ -1,5 +1,5 @@
-# swift-mutation-testing: every test target against mutants of the library sources. `swift package quality mutation` runs
-# it over all of them; the git hooks over the library sources a commit or push changes.
+# swift-mutation-testing: every test target against mutants of the code Wine runs (HubRules). `swift package quality
+# mutation` runs it over all of it, on the efficiency cores; the pre-push hook over what a push changes.
 timeout: 120
 output: .build/mutation-report.json
 markdown-output: .build/mutation-summary.md
@@ -8,6 +8,6 @@ exclude:
   - "/Tests/"
   - "/Plugins/"
   - "/Differential/"
-  - "/hubrules-swift/"
   - "/winekit-quality/"
+  - "/QualityKit/"
 operator-tier: default

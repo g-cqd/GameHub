@@ -160,10 +160,7 @@ import Testing
 
     @Test func embeddedObjectsMayNeedLibcOnly() throws {
         let files = FakeFileSystem(["/pkg/Sources/HubRules/A.swift": "", "/pkg/Sources/HubRules/notes.md": ""])
-        let clean = FakeRunner {
-            $0.executable == "nm"
-                ? CommandResult(status: 0, output: "                 U _free\n") : CommandResult(status: 0)
-        }
+        let clean = FakeRunner()
         try quality(clean, files).run(.gate(.embedded))
         let compile = try #require(clean.calls(to: "swiftc").first)
         #expect(
@@ -179,6 +176,30 @@ import Testing
         }
     }
 
+    @Test func theLibraryMustDefineWhatTheHeaderDeclares() {
+        let files = FakeFileSystem(["/pkg/Sources/HubRules/A.swift": ""])
+        let partial = FakeRunner {
+            $0.executable == "nm" ? CommandResult(status: 0, output: "0000000000000010 T _winekit_free\n") : fine($0)
+        }
+        #expect(
+            throws: QualityError.gateFailed("winekit.h declares _winekit_hub_rules_apply, which no library defines")
+        ) {
+            try quality(partial, files).run(.gate(.embedded))
+        }
+    }
+
+    @Test func wineObjectsArchiveTheObjectsAndCopyTheHeader() throws {
+        let files = FakeFileSystem(["/pkg/Sources/HubRules/A.swift": ""])
+        let runner = FakeRunner()
+        try quality(runner, files).run(.wineObjects(output: "/out"))
+        #expect(runner.calls(to: "ar").first?.arguments == ["rcs", "/out/libwinekit.a", "/out/HubRules.o"])
+        #expect(runner.calls(to: "cp").first?.arguments == ["/pkg/C/winekit.h", "/out"])
+        #expect(runner.calls(to: "rm").first?.arguments == ["-f", "/out/libwinekit.a"])
+        let compile = try #require(runner.calls(to: "swiftc").first).arguments
+        #expect(compile.suffix(3) == ["-emit-object", "-o", "/out/HubRules.o"])
+        #expect(compile.contains("-disable-stack-protector"))
+    }
+
     @Test func libraryTargetsAreTheSourceDirectoriesWithoutAMain() {
         let files = FakeFileSystem([
             "/pkg/Sources/HubRules/A.swift": "", "/pkg/Sources/tool/main.swift": "",
@@ -192,48 +213,87 @@ import Testing
             "/pkg/Quality/tools.lock": "swift-mutation-testing 1.6.4 \(sha) -",
             "/cache/swift-mutation-testing-1.6.4/swift-mutation-testing": "",
             "/pkg/Sources/HubRules/A.swift": "", "/pkg/Sources/HubRules/B.swift": "",
-            "/pkg/Sources/tool/main.swift": "",
-            reportPath: mutationReport()
+            "/pkg/Sources/QualityKit/Q.swift": "", "/pkg/Sources/tool/main.swift": "", reportPath: mutationReport()
         ])
-        if baseline { files.add("/pkg/.swift-mutation-testing-baseline.json", "{}") }
+        if baseline { files.add("/pkg/.swift-mutation-testing-baseline.json", "{\"undetected\": []}") }
         return files
     }
 
-    @Test func aFullMutationRunMutatesEverythingWithoutCache() throws {
-        let runner = FakeRunner()
-        try quality(runner, mutationFiles(baseline: true)).run(.gate(.mutation))
-        let call = try #require(runner.calls.first)
-        #expect(call.executable == "env")
+    /// The mutation tool's call: taskpolicy -b env -u WINEKIT_DEV <tool> <arguments>.
+    func mutationCall(_ runner: FakeRunner) throws -> [String] {
+        let call = try #require(runner.calls(to: "taskpolicy").first)
         #expect(
-            call.arguments.prefix(3) == [
-                "-u", "WINEKIT_DEV", "/cache/swift-mutation-testing-1.6.4/swift-mutation-testing"
+            call.arguments.prefix(5) == [
+                "-b", "env", "-u", "WINEKIT_DEV", "/cache/swift-mutation-testing-1.6.4/swift-mutation-testing"
             ]
         )
-        let arguments = call.arguments
-        #expect(arguments.contains("--no-cache") && !arguments.contains("--exclude"))
+        return Array(call.arguments.dropFirst(5))
+    }
+
+    @Test func aFullRunMutatesTheCodeWineRunsOnTheEfficiencyCores() throws {
+        let runner = FakeRunner { $0.executable == "sysctl" ? CommandResult(status: 0, output: "4\n") : fine($0) }
+        try quality(runner, mutationFiles(baseline: true)).run(.gate(.mutation))
+        let arguments = try mutationCall(runner)
         #expect(
-            arguments.suffix(4) == ["--baseline", ".swift-mutation-testing-baseline.json", "--max-new-survivors", "0"]
+            arguments.contains("--no-cache") && !arguments.contains("--baseline")
+                && !arguments.contains("--write-baseline")
+        )
+        #expect(
+            arguments.contains("--operator-tier")
+                && arguments[arguments.firstIndex(of: "--operator-tier")! + 1] == "default"
+        )
+        #expect(arguments[arguments.firstIndex(of: "--concurrency")! + 1] == "4")
+        // HubRules is mutated; QualityKit and the executables are not
+        #expect(
+            arguments.suffix(4) == ["--exclude", "/Sources/QualityKit/Q.swift", "--exclude", "/Sources/tool/main.swift"]
         )
     }
 
-    @Test func aScopedMutationRunExcludesTheRestAndKeepsTheCache() throws {
+    @Test func aScopedRunMutatesOnlyTheChangedCodeWineRunsAndKeepsTheCache() throws {
         let runner = FakeRunner()
         try quality(runner, mutationFiles(baseline: false))
-            .mutation(.changed(["Sources/HubRules/A.swift"]))
-        let arguments = try #require(runner.calls.first).arguments
-        #expect(!arguments.contains("--no-cache") && !arguments.contains("--baseline"))
-        // every other source is excluded, the executable's included: the command line replaces the configuration's list
+            .mutation(.changed(["Sources/HubRules/A.swift", "Sources/QualityKit/Q.swift"]))
+        let arguments = try mutationCall(runner)
+        #expect(!arguments.contains("--no-cache"))
         #expect(
-            arguments.suffix(4) == ["--exclude", "/Sources/HubRules/B.swift", "--exclude", "/Sources/tool/main.swift"]
+            arguments.suffix(6) == [
+                "--exclude", "/Sources/HubRules/B.swift", "--exclude", "/Sources/QualityKit/Q.swift", "--exclude",
+                "/Sources/tool/main.swift"
+            ]
         )
+    }
+
+    @Test func aChangeOutsideTheCodeWineRunsMutatesNothing() throws {
+        let runner = FakeRunner()
+        try quality(runner, mutationFiles(baseline: false)).mutation(.changed(["Sources/QualityKit/Q.swift"]))
+        #expect(runner.calls(to: "taskpolicy").isEmpty)
     }
 
     @Test func writingTheBaselineRunsEverythingAndRecordsIt() throws {
         let runner = FakeRunner()
         try quality(runner, mutationFiles(baseline: true)).run(.mutationBaseline)
-        let arguments = try #require(runner.calls.first).arguments
-        #expect(arguments.suffix(2) == ["--write-baseline", ".swift-mutation-testing-baseline.json"])
-        #expect(!arguments.contains("--baseline") && arguments.contains("--no-cache"))
+        let arguments = try mutationCall(runner)
+        #expect(
+            arguments.contains("--write-baseline") && arguments.contains("--no-cache")
+                && !arguments.contains("--baseline")
+        )
+    }
+
+    @Test func theEfficiencyCoreCountFallsBackToTwo() throws {
+        let unknown = FakeRunner { $0.executable == "sysctl" ? CommandResult(status: 1) : fine($0) }
+        #expect(try quality(unknown, FakeFileSystem()).efficiencyCores() == 2)
+        let garbage = FakeRunner { $0.executable == "sysctl" ? CommandResult(status: 0, output: "many") : fine($0) }
+        #expect(try quality(garbage, FakeFileSystem()).efficiencyCores() == 2)
+        let zero = FakeRunner { $0.executable == "sysctl" ? CommandResult(status: 0, output: "0\n") : fine($0) }
+        #expect(try quality(zero, FakeFileSystem()).efficiencyCores() == 1)
+        let six = FakeRunner { $0.executable == "sysctl" ? CommandResult(status: 0, output: "6\n") : fine($0) }
+        #expect(try quality(six, FakeFileSystem()).efficiencyCores() == 6)
+    }
+
+    @Test func aFullRunFailsOnASurvivorTheBaselineDoesntHold() {
+        let files = mutationFiles(baseline: true)
+        files.add(reportPath, mutationReport([("/Sources/HubRules/A.swift", "Survived", "fresh")]))
+        #expect(throws: QualityError.self) { try quality(FakeRunner(), files).run(.gate(.mutation)) }
     }
 
     @Test func mutationNeedsMacOSAndItsLock() {

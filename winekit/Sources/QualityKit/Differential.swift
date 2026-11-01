@@ -1,8 +1,10 @@
 import Foundation
 
-/// The differential test: Wine's hubrules.c, built from a Wine checkout with stand-ins for the few ntdll internals it uses,
-/// against hubrules-swift, over every rules file, executable and launcher value of the corpus in `Differential/`. The
-/// outputs must be byte-identical.
+/// The differential test: the C implementation as it was before WineKit (Differential/reference/hubrules.c) against
+/// Wine's hubrules.c as it is, which calls WineKit through libwinekit.a, the code ntdll runs. Both are built into the same
+/// harness, with stand-ins for the few ntdll internals they use, and run over every rules file, executable and launcher
+/// value of the corpus in `Differential/`. What each prints, on standard output and on standard error, must be
+/// byte-identical.
 public struct DifferentialCase: Equatable, Sendable {
     public var rules: String
     public var executable: String
@@ -33,21 +35,18 @@ public enum Differential {
             }
     }
 
-    /// The `clang` arguments that build the C harness in `work`, where hubrules.c, the stand-in unix_private.h and
-    /// harness.c were copied. x86_64, because the C file reads %cs with inline assembly, as in ntdll.
-    public static func harnessArguments(work: String, wineSource: String) -> [String] {
+    /// The `clang` arguments that build the C harness in `work`, where a hubrules.c, the stand-in unix_private.h and
+    /// harness.c were copied, followed by `extra` (WineKit's include directory and library for Wine's side). x86_64,
+    /// because the C file reads %cs with inline assembly, as in ntdll.
+    public static func harnessArguments(work: String, wineSource: String, extra: [String] = []) -> [String] {
         [
             "-arch", "x86_64", "-w", "-O1", "-D__WINESRC__", "-DWINE_UNIX_LIB", "-I\(work)", "-I\(wineSource)/include",
             "-o", "\(work)/harness", "\(work)/harness.c"
-        ]
+        ] + extra
     }
 
-    /// The harness takes the directory holding hub-rules.txt; hubrules-swift takes the file.
+    /// A harness takes the directory holding hub-rules.txt, the executable, and the launcher file if any.
     public static func harnessCall(_ testCase: DifferentialCase, rulesDirectory: String) -> [String] {
         [rulesDirectory, testCase.executable] + (testCase.launcher.map { [$0] } ?? [])
-    }
-
-    public static func swiftCall(_ testCase: DifferentialCase, rulesFile: String) -> [String] {
-        [rulesFile, testCase.executable] + (testCase.launcher.map { [$0] } ?? [])
     }
 }

@@ -5,14 +5,14 @@ import Testing
 @Suite struct ScopeTests {
     let changes = ChangeSet(
         files: [
-            "Sources/HubRules/PEFacts.swift", "Sources/hubrules-swift/main.swift", "Sources/QualityKit/Lock.swift",
+            "Sources/HubRules/PEFacts.swift", "C/winekit.h", "Sources/QualityKit/Lock.swift",
             "Tests/HubRulesTests/X.swift", "Package.swift", "README.md", "Differential/rules/edges.txt"
         ],
         libraryTargets: ["HubRules", "QualityKit"]
     )
 
     @Test func sortsTheFilesForEachGate() {
-        #expect(changes.swiftFiles.count == 5)
+        #expect(changes.swiftFiles.count == 4)
         #expect(changes.librarySources == ["Sources/HubRules/PEFacts.swift", "Sources/QualityKit/Lock.swift"])
         #expect(changes.manifestChanged)
         #expect(changes.touchesDifferential)
@@ -25,7 +25,7 @@ import Testing
     }
 
     @Test func theDifferentialTestFollowsTheEngineTheToolAndTheCorpus() {
-        for file in ["Sources/HubRules/A.swift", "Sources/hubrules-swift/main.swift", "Differential/executables"] {
+        for file in ["Sources/HubRules/A.swift", "C/winekit.h", "Differential/executables"] {
             #expect(ChangeSet(files: [file], libraryTargets: []).touchesDifferential)
         }
         let unrelated = ChangeSet(files: ["Sources/QualityKit/Lock.swift", "README.md"], libraryTargets: ["QualityKit"])
@@ -58,6 +58,9 @@ import Testing
         #expect(EmbeddedCheck.undefinedSymbols(nmOutput: output) == ["_free", "_objc_msgSend"])
         #expect(EmbeddedCheck.disallowed(nmOutput: output) == ["_objc_msgSend"])
         #expect(EmbeddedCheck.disallowed(nmOutput: "                 U _posix_memalign\n").isEmpty)
+        #expect(EmbeddedCheck.exportedSymbols(nmOutput: output) == ["_swift_count"])
+        #expect(EmbeddedCheck.missingExports(nmOutput: output) == EmbeddedCheck.requiredExports)
+        #expect(EmbeddedCheck.missingExports(nmOutput: goodNM).isEmpty)
     }
 
     @Test func embeddedCompilationTargetsWinesUnixSide() {
@@ -93,16 +96,15 @@ import Testing
     @Test func theTwoSidesAreCalledWithTheSameCase() {
         let testCase = DifferentialCase(rules: "/r/a.txt", executable: "/e.exe", launcher: "/l/1")
         #expect(Differential.harnessCall(testCase, rulesDirectory: "/w/rules") == ["/w/rules", "/e.exe", "/l/1"])
-        #expect(
-            Differential.swiftCall(testCase, rulesFile: "/w/rules/hub-rules.txt") == [
-                "/w/rules/hub-rules.txt", "/e.exe", "/l/1"
-            ]
-        )
         let bare = DifferentialCase(rules: "/r/a.txt", executable: "/e.exe", launcher: nil)
         #expect(Differential.harnessCall(bare, rulesDirectory: "/w") == ["/w", "/e.exe"])
-        #expect(Differential.swiftCall(bare, rulesFile: "/w/h") == ["/w/h", "/e.exe"])
         let harness = Differential.harnessArguments(work: "/w", wineSource: "/wine")
         #expect(harness.contains("-I/wine/include") && harness.contains("x86_64") && harness.last == "/w/harness.c")
+        #expect(
+            Differential.harnessArguments(work: "/w", wineSource: "/wine", extra: ["-Ix", "y.a"]).suffix(2) == [
+                "-Ix", "y.a"
+            ]
+        )
     }
 }
 

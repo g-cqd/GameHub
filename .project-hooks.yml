@@ -2,7 +2,8 @@
 # (git config project-hooks.trusted true).
 #
 # WineKit's gates, scoped to what the commit or the push changes in winekit/: format and lint read the changed Swift files,
-# the analyzers report only them, and mutation testing mutates only the changed library sources (QualityKit's Hook).
+# the analyzers report only them. Pushes also run mutation testing on the changed HubRules sources, at background
+# priority on the efficiency cores; commits don't wait for it (QualityKit's Hook).
 # --disable-sandbox: swift-mutation-testing and the nested test builds run SwiftPM, whose manifest sandbox can't nest
 # inside the plugin's.
 pre-commit:

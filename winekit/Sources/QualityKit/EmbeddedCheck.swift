@@ -3,6 +3,9 @@
 public enum EmbeddedCheck {
     public static let target = "x86_64-apple-macos15"
 
+    /// The symbols C/winekit.h declares: the library must define every one.
+    public static let requiredExports = ["_winekit_free", "_winekit_hub_rules_apply"]
+
     public static let allowedSymbols: Set<String> = [
         "___bzero", "___stack_chk_fail", "___stack_chk_guard", "_free", "_posix_memalign", "_memmove", "_memcpy",
         "_memset", "_memcmp"
@@ -12,17 +15,32 @@ public enum EmbeddedCheck {
     public static func compileArguments(module: String, sources: [String], object: String) -> [String] {
         [
             "-target", target, "-enable-experimental-feature", "Embedded", "-wmo", "-Osize", "-parse-as-library",
-            "-strict-memory-safety", "-module-name", module
+            // Wine builds its Unix side with -fno-stack-protector.
+            "-strict-memory-safety", "-Xfrontend", "-disable-stack-protector", "-module-name", module
         ] + sources + ["-emit-object", "-o", object]
     }
 
-    /// The undefined symbols in `nm` output ("                 U _free").
-    public static func undefinedSymbols(nmOutput: String) -> [String] {
+    /// The symbols of one kind in `nm` output: an undefined one is `U _free` (no address), a defined one
+    /// `0000000000001101 T _winekit_free`. The kind is the field before the name, and a line has no other fields.
+    static func symbols(_ kind: String, nmOutput: String) -> [String] {
         nmOutput.split(separator: "\n")
             .compactMap { line in
                 let fields = line.split(separator: " ")
-                return fields.count == 2 && fields[0] == "U" ? String(fields[1]) : nil
+                let count = kind == "U" ? 2 : 3
+                return fields.count == count && fields[count - 2] == kind ? String(fields[count - 1]) : nil
             }
+    }
+
+    /// The undefined symbols in `nm` output.
+    public static func undefinedSymbols(nmOutput: String) -> [String] { symbols("U", nmOutput: nmOutput) }
+
+    /// The symbols `nm` output defines in a text section.
+    public static func exportedSymbols(nmOutput: String) -> Set<String> { Set(symbols("T", nmOutput: nmOutput)) }
+
+    /// The exports of `requiredExports` that `nm` output lacks.
+    public static func missingExports(nmOutput: String) -> [String] {
+        let exported = exportedSymbols(nmOutput: nmOutput)
+        return requiredExports.filter { !exported.contains($0) }
     }
 
     /// The undefined symbols outside `allowedSymbols`, sorted.
@@ -33,7 +51,12 @@ public enum EmbeddedCheck {
 
 /// Which sources a mutation run mutates.
 public enum MutationScope {
-    /// A run over every library source (writing the baseline, or checked against it), or over the changed ones only.
+    /// The sources a run may mutate: those of `Workspace.mutationTargets`, the code Wine runs.
+    public static func isMutated(_ path: String) -> Bool {
+        Workspace.mutationTargets.contains { path.hasPrefix("Sources/\($0)/") }
+    }
+
+    /// A run over every mutated source (writing the baseline, or checked against it), or over the changed ones only.
     public enum Run: Equatable, Sendable {
         case full(writeBaseline: Bool)
         case changed([String])

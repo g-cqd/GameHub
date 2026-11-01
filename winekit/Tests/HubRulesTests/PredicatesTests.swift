@@ -10,7 +10,8 @@ import Testing
     )
 
     func holds(_ list: String, exe: String = "Game.exe", facts: PEFacts?) -> Bool {
-        Predicates.hold(Bytes(list.utf8)[...], exe: Bytes(exe.utf8), facts: facts)
+        var messages: [RulesMessage] = []
+        return Predicates.hold(Bytes(list.utf8)[...], exe: Bytes(exe.utf8), facts: facts, messages: &messages)
     }
 
     @Test func exeMatchesWithoutCaseAndNeedsNoFacts() {

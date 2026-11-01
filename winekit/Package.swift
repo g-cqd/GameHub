@@ -36,13 +36,12 @@ let package = Package(
     platforms: [.macOS(.v15)],
     products: [
         .library(name: "HubRules", targets: ["HubRules"]),
-        .executable(name: "hubrules-swift", targets: ["hubrules-swift"]),
-        .plugin(name: "Quality", targets: ["Quality"])
+        .plugin(name: "Quality", targets: ["Quality"]),
+        .plugin(name: "WineObjects", targets: ["WineObjects"])
     ],
     dependencies: isDev ? [aemi] : [],
     targets: [
         .target(name: "HubRules", swiftSettings: librarySettings, plugins: devPlugins),
-        .executableTarget(name: "hubrules-swift", dependencies: ["HubRules"], swiftSettings: strictSettings),
         .testTarget(name: "HubRulesTests", dependencies: ["HubRules"], swiftSettings: strictSettings),
 
         // The quality gates: QualityKit decides, winekit-quality runs it, the Quality plugin hands it the package.
@@ -59,6 +58,17 @@ let package = Package(
                     ),
                     .writeToPackageDirectory(reason: "Build and test in .build/quality, write the mutation reports")
                 ]
+            ),
+            dependencies: ["winekit-quality"]
+        ),
+        .plugin(
+            name: "WineObjects",
+            capability: .command(
+                intent: .custom(
+                    verb: "wine-objects",
+                    description: "Write libwinekit.a and winekit.h for Wine's build (make WINEKIT_DIR=<dir>)"
+                ),
+                permissions: [.writeToPackageDirectory(reason: "Build the Embedded Swift objects")]
             ),
             dependencies: ["winekit-quality"]
         ),

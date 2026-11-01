@@ -15,7 +15,7 @@ import Testing
         ])
         installedAnalyzers(files)
         let runner = FakeRunner { call in
-            guard call.executable == "git" else { return CommandResult(status: 0) }
+            guard call.executable == "git" else { return fine(call) }
             if call.arguments.contains("@{upstream}") {
                 return upstream.map { CommandResult(status: 0, output: "\($0)\n") } ?? CommandResult(status: 1)
             }
@@ -59,7 +59,7 @@ import Testing
         let order = [
             "sh", "swift-format", "swiftlint", "deadwood", "dolly", "arcleak", "fcheck", "modeler", "swift", "swiftc",
             "nm", "clang",
-            "harness", "hubrules-swift", "env"
+            "harness"
         ]
         let ran = tools(runner)
         #expect(order.compactMap { ran.firstIndex(of: $0) } == order.compactMap { ran.firstIndex(of: $0) }.sorted())
@@ -73,7 +73,26 @@ import Testing
         #expect(files.text("/pkg/.build/quality/changed-files") == "Sources/HubRules/A.swift\n")
         // debug only before a commit
         #expect(runner.calls(to: "swift").filter { $0.arguments.first == "test" }.count == 1)
-        let mutation = try #require(runner.calls(to: "env").first).arguments
+        // commits don't wait for mutation testing
+        #expect(runner.calls(to: "taskpolicy").isEmpty)
+    }
+
+    @Test func aPushMutatesTheChangedCodeWineRunsOnTheEfficiencyCores() throws {
+        let (_, runner, files) = setUp(changed: ["Sources/HubRules/A.swift"], upstream: "origin/main")
+        for (path, text) in [
+            ("/wine/dlls/ntdll/unix/hubrules.c", ""), ("/pkg/Differential/rules/a.txt", ""),
+            ("/pkg/Differential/executables", "$ROOT/Sources/tool/main.swift\n")
+        ] { files.add(path, text) }
+        let quality = Quality(
+            workspace: workspace(),
+            runner: runner,
+            fileSystem: files,
+            reporter: FakeReporter(),
+            platform: .macOSArm64
+        )
+        try quality.run(.changed(.prePush))
+        let mutation = try #require(runner.calls(to: "taskpolicy").first).arguments
+        #expect(mutation.first == "-b")
         #expect(
             mutation.suffix(4) == ["--exclude", "/Sources/QualityKit/Q.swift", "--exclude", "/Sources/tool/main.swift"]
         )
@@ -86,6 +105,7 @@ import Testing
         #expect(runner.calls(to: "swift").count == 2)
         #expect(runner.calls(to: "sh").isEmpty)  // the staged-tags check belongs to commits
         #expect(runner.calls(to: "swiftc").isEmpty)  // QualityKit is a host tool, not Embedded
+        #expect(runner.calls(to: "taskpolicy").isEmpty)  // nor mutated: its tests hold it
     }
 
     @Test func aPushWithoutUpstreamComparesWithOriginMain() throws {

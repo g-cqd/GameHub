@@ -2,11 +2,22 @@
 
 Parts of Wine rewritten in Swift, one boundary at a time (GameHub ADR-0020, roadmap 0035).
 
-| Target | What it is |
+| Path | What it is |
 |---|---|
-| `HubRules` | The runtime rules of `dlls/ntdll/unix/hubrules.c`: rules parsing, predicates, PE header facts. Embedded-Swift clean, so it can link into Wine's x86_64 Unix side with libc only. |
-| `hubrules-swift` | A host tool printing what `hub_rules_apply` would do, for the differential test. |
-| `QualityKit`, `winekit-quality`, `Quality` plugin | The quality gates, in Swift and tested. |
+| `Sources/HubRules` | The runtime rules of Wine's ntdll (parsing, predicates, PE header facts), Embedded-Swift clean. Wine's `dlls/ntdll/unix/hubrules.c` calls it through `C/winekit.h` (wine b9f9755bb12). |
+| `C/winekit.h` | The C interface Wine includes. |
+| `Sources/QualityKit`, `Sources/winekit-quality`, `Plugins/` | The quality gates and the Wine build artifacts, in Swift and tested: `swift package quality …`, `swift package wine-objects …`. |
+| `Differential/` | The differential corpus, and `reference/hubrules.c`: the C implementation as it was before WineKit, the reference Wine's build is compared with. |
+
+## For Wine
+
+```sh
+swift package --disable-sandbox wine-objects --output /Volumes/ExT2/GameHub/build/winekit   # libwinekit.a, winekit.h
+make WINEKIT_DIR=/Volumes/ExT2/GameHub/build/winekit                                         # in Wine's build tree
+```
+
+Wine's `build-macos-x86_64.sh make` does both. The archive holds Embedded Swift objects for `x86_64-apple-macos15`
+that need libc only and define every symbol `winekit.h` declares; the `embedded` gate checks both.
 
 ## Gates
 
@@ -23,10 +34,10 @@ WINEKIT_DEV=1 swift package --disable-sandbox quality changed pre-commit
 | `analyzers` | deadwood, dolly, arcleak, fcheck, modeler, at the versions Aemi's `scripts/analyzers.lock` pins |
 | `test` | the suites in debug, then release |
 | `embedded` | `HubRules` as Embedded Swift for `x86_64-apple-macos15`; only libc symbols may stay undefined |
-| `differential` | Wine's `hubrules.c` (from `WINE_SRC`, default `~/Developer/wine`) against `hubrules-swift` over `Differential/` |
-| `mutation` | swift-mutation-testing over the libraries; no survivor outside `docs/mutation-baseline.md`, score ≥ 90 |
+| `differential` | `Differential/reference/hubrules.c` against Wine's `hubrules.c` (from `WINE_SRC`, default `~/Developer/wine`) with `libwinekit.a`: the same stdout and stderr over `Differential/` |
+| `mutation` | swift-mutation-testing over the code Wine runs (HubRules), on the efficiency cores (`taskpolicy -b`, one worker per E-core); score ≥ 90 and no survivor outside `docs/mutation-baseline.md` |
 | `fast` / `all` | the static gates / everything but mutation |
-| `changed pre-commit\|pre-push` | every gate scoped to the change: format and lint read the changed files, the analyzers report only them, mutation mutates only the changed library sources |
+| `changed pre-commit\|pre-push` | every gate scoped to the change: format and lint read the changed files, the analyzers report only them; a push also mutates the changed HubRules sources (a commit doesn't wait for it) |
 
 `WINEKIT_DEV=1` resolves Aemi (Aemi-Studio/aemi, pinned in `Package.swift`): its LintBuild plugin, scripts, lock and
 configuration. swift-mutation-testing, which Aemi doesn't pin, is pinned in `Quality/tools.lock`. Every download is

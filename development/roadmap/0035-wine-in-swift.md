@@ -17,9 +17,20 @@ date: 2026-11-01
    - swift-mutation-testing.
 
    The git hooks run them scoped to the change (`.project-hooks.yml`).
-2. **Link HubRules into ntdll.** Wine's build compiles `winekit/Sources/HubRules` as Embedded Swift for x86_64 and
-   links it into `ntdll.so`. A C shim keeps the side effects in C: environment, PEB, patching the image. Done when
-   Steam, HITMAN 3 and Far Cry 3 start with the same `WINE_COMPATDB` as with the C, and the C file is gone.
+2. **Done (2026-11-01). HubRules runs inside ntdll** (wine b9f9755bb12, 6e3f9b1cafd).
+   - **C interface:** `winekit/C/winekit.h`, with `winekit_hub_rules_apply` and `winekit_free`.
+   - **Build:** `swift package wine-objects` builds `libwinekit.a` (Embedded Swift, x86_64, no stack protector, libc
+     only). `build-macos-x86_64.sh make` builds it and passes `WINEKIT_DIR`.
+   - **What stays C:** `hubrules.c` keeps the rules file, the executable's bytes (a pread callback), the environment,
+     the PEB and the image fix-up. Its rules logic is gone (-284 lines).
+   - **Checked:**
+     - The C as it was (`Differential/reference/hubrules.c`) and the new file with `libwinekit.a` print the same
+       stdout and stderr in 312 cases, including warnings in rule order and `debugstr_a`'s truncation quirk.
+     - Live: Ubisoft Connect matched line 34 in `upc.exe` and `UplayService.exe`, and rewrote its 10 far jumps.
+       compatdb.so chose the same rules and backends as with the old ntdll.
+   - **Installed** in hub-2, with the previous `ntdll.so` kept as `build/ntdll.so.before-winekit`.
+   - **Not yet run:** Steam, HITMAN 3 (`hub_dll_dir`) and Far Cry 3 with the new ntdll; their executables are in the
+     differential corpus.
 3. **Spike: Embedded Swift for Windows targets.** Build its standard library for i686 and x86_64 Windows, and link one
    PE function into a Wine DLL. Done when it runs in a game process, or when it is shown it can't.
 4. **The next Unix-side piece, chosen by measurement.** The candidates are where roadmap 0036 found the cost: msync

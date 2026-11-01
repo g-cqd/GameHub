@@ -36,12 +36,14 @@ public enum Request: Equatable, Sendable {
     /// A full mutation run that records its undetected mutants as the accepted baseline. Each one needs its reason in
     /// docs/mutation-baseline.md: only an equivalent mutant (one no input can tell apart) belongs there.
     case mutationBaseline
+    /// libwinekit.a and winekit.h, written into the directory for Wine's build (`make WINEKIT_DIR=<dir>`).
+    case wineObjects(output: String)
 
     public static let fastGates: [Gate] = [.config, .manifest, .tags, .format, .lint, .analyzers]
     public static let allGates: [Gate] = fastGates + [.test, .embedded, .differential]
 
     public static let usage =
-        "usage: quality <\(Gate.allCases.map(\.rawValue).joined(separator: "|"))|fast|all|mutation-baseline>"
+        "usage: quality <\(Gate.allCases.map(\.rawValue).joined(separator: "|"))|fast|all|mutation-baseline> | quality wine-objects <dir>"
         + " | quality changed <pre-commit|pre-push>"
 
     public static func parse(_ arguments: [String]) throws -> Request {
@@ -49,6 +51,7 @@ public enum Request: Equatable, Sendable {
             case "fast" where arguments.count == 1: return .fast
             case "all" where arguments.count == 1: return .all
             case "mutation-baseline" where arguments.count == 1: return .mutationBaseline
+            case "wine-objects" where arguments.count == 2: return .wineObjects(output: arguments[1])
             case "changed" where arguments.count == 2:
                 guard let hook = Hook(rawValue: arguments[1]) else { throw QualityError.usage(usage) }
                 return .changed(hook)
@@ -96,6 +99,8 @@ public struct Workspace: Equatable, Sendable {
 
     /// The libraries Wine links: compiled as Embedded Swift.
     public static let embeddedTargets = ["HubRules"]
+    /// What mutation testing mutates: the code Wine runs. QualityKit is tooling, held by its tests.
+    public static let mutationTargets = embeddedTargets
     /// The paths the analyzers read.
     public static let corpus = ["Sources", "Tests", "Plugins"]
     /// The paths swift-format and SwiftLint read.
@@ -133,6 +138,7 @@ public struct Quality: Sendable {
             case .all: for gate in Request.allGates { try run(gate) }
             case .changed(let hook): try runChanged(hook)
             case .mutationBaseline: try mutation(.full(writeBaseline: true))
+            case .wineObjects(let output): try wineObjects(into: URL(fileURLWithPath: output))
         }
     }
 

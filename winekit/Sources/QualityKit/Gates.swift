@@ -88,28 +88,12 @@ extension Quality {
         )
     }
 
-    func embedded() throws {
-        let out = workspace.scratch.appendingPathComponent("embedded")
-        try helper("mkdir", ["-p", out.path], failure: "could not create \(out.path)")
-        for module in Workspace.embeddedTargets {
-            let sources = swiftSources(of: module)
-            let object = out.appendingPathComponent("\(module).o").path
-            reporter.step("Embedded Swift: \(module) (\(EmbeddedCheck.target))")
-            try gate(
-                workspace.toolchainTool("swiftc"),
-                EmbeddedCheck.compileArguments(module: module, sources: sources, object: object),
-                failure: "\(module) does not compile as Embedded Swift"
-            )
-            let symbols = try runner.run("nm", [object], in: workspace.root, echo: false)
-            let outside = EmbeddedCheck.disallowed(nmOutput: symbols.output)
-            guard outside.isEmpty else {
-                throw QualityError.gateFailed("\(module) needs \(outside.joined(separator: ", ")), outside libc")
-            }
-        }
-    }
+    func embedded() throws { try wineObjects(into: workspace.scratch.appendingPathComponent("embedded")) }
 
-    /// Mutation testing over the library sources, or only over `changed`. A scoped run keeps the tool's result cache, so a
-    /// push reuses what the commit already ran. The gate: no survivor the committed baseline doesn't hold, score ≥ 90.
+    /// Mutation testing over the code Wine runs (`Workspace.mutationTargets`), all of it or only `changed`. It runs at
+    /// background priority, which puts it on the efficiency cores with throttled I/O, with one worker per efficiency
+    /// core, so a game or a build on the performance cores keeps them. A scoped run keeps the tool's result cache. The
+    /// gate: a score of at least 90 and no undetected mutant the committed baseline doesn't hold, by fingerprint.
     func mutation(_ scope: MutationScope.Run) throws {
         guard platform == .macOSArm64 else {
             throw QualityError.unavailable("swift-mutation-testing is published for macOS arm64 only")
@@ -130,35 +114,34 @@ extension Quality {
         let executable = try installer.executable(for: tool, from: .swiftMutationTesting)
         let report = workspace.scratch.appendingPathComponent("mutation-report.json")
         let baseline = workspace.root.appendingPathComponent(".swift-mutation-testing-baseline.json")
+        let mutated: [String]
         var arguments = [
-            "run", ".", "--sources-path", "Sources", "--operator-tier", "experimental", "--min-score", "90",
-            "--output", report.path
+            "run", ".", "--sources-path", "Sources", "--operator-tier", "default", "--min-score", "90",
+            "--output", report.path, "--concurrency", String(try efficiencyCores())
         ]
-        if case .changed(let changed) = scope {
-            // The tool refuses a baseline of another scope: the scoped run is compared with it below.
-            // The command line's excludes replace the configuration's: every other Swift file under Sources is listed,
-            // the executables' included.
-            let everySource = fileSystem.files(under: workspace.root.appendingPathComponent("Sources"))
-                .filter { $0.hasSuffix(".swift") }.map { "Sources/\($0)" }
-            arguments += MutationScope.excludeArguments(allSources: everySource, changed: changed)
-            reporter.step("swift-mutation-testing on \(changed.joined(separator: " "))")
-        } else {
-            arguments += ["--no-cache"]
-            reporter.step("swift-mutation-testing on every library source")
-            if scope == .full(writeBaseline: true) {
-                arguments += ["--write-baseline", ".swift-mutation-testing-baseline.json"]
-            } else if fileSystem.fileExists(baseline) {
-                arguments += ["--baseline", ".swift-mutation-testing-baseline.json", "--max-new-survivors", "0"]
-            }
+        switch scope {
+            case .changed(let changed):
+                mutated = changed.filter { MutationScope.isMutated($0) }
+            case .full(let writeBaseline):
+                mutated = Workspace.mutationTargets.flatMap(swiftSources(of:))
+                arguments +=
+                    ["--no-cache"]
+                    + (writeBaseline ? ["--write-baseline", ".swift-mutation-testing-baseline.json"] : [])
         }
-        // Without WINEKIT_DEV: the dev plugins would lint every mutated build, and a lint failure would read as an
-        // unviable mutant rather than a result.
+        guard !mutated.isEmpty else { return }
+        // The command line's excludes replace the configuration's: every other Swift file under Sources is listed.
+        let everySource = fileSystem.files(under: workspace.root.appendingPathComponent("Sources"))
+            .filter { $0.hasSuffix(".swift") }.map { "Sources/\($0)" }
+        arguments += MutationScope.excludeArguments(allSources: everySource, changed: mutated)
+        reporter.step("swift-mutation-testing on \(mutated.joined(separator: " ")) (efficiency cores)")
+        // taskpolicy -b: background priority, inherited by the builds and test runs it starts. Without WINEKIT_DEV: the
+        // dev plugins would lint every mutated build, and a lint failure would read as an unviable mutant.
         try gate(
-            "env",
-            ["-u", "WINEKIT_DEV", executable.path] + arguments,
-            failure: "mutation: a mutant survived that the baseline does not hold, or the score is under 90"
+            "taskpolicy",
+            ["-b", "env", "-u", "WINEKIT_DEV", executable.path] + arguments,
+            failure: "mutation: the score is under 90"
         )
-        guard case .changed = scope else { return }
+        guard scope != .full(writeBaseline: true) else { return }
         guard fileSystem.fileExists(report) else {
             throw QualityError.unavailable("the mutation run wrote no report at \(report.path)")
         }
@@ -171,5 +154,11 @@ extension Quality {
                 "mutation: undetected mutants the baseline doesn't hold: \(new.map(\.description).joined(separator: "; "))"
             )
         }
+    }
+
+    /// The efficiency cores (`hw.perflevel1.logicalcpu`), or 2 when the machine doesn't say.
+    func efficiencyCores() throws -> Int {
+        let answer = try runner.run("sysctl", ["-n", "hw.perflevel1.logicalcpu"], in: workspace.root, echo: false)
+        return answer.succeeded ? Int(answer.output.trimmed).map { max(1, $0) } ?? 2 : 2
     }
 }

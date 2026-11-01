@@ -51,7 +51,7 @@ public struct PEFacts: Equatable, Sendable {
         let raw = file.read(at: ntOffset + 24 + optionalSize, count: count * 40)
         guard raw.count == count * 40 else { return nil }
         let sections = (0 ..< count).map { Section(raw, at: $0 * 40) }
-        var facts = Self(machine: le16(nt, 4), sections: sections.map(\.name), imports: [])
+        var facts = Self(machine: le16(nt, 4), sections: sections.map { $0.name }, imports: [])
         facts.imports = readImports(file, ntOffset: ntOffset, magic: le16(nt, 24), optionalSize: optionalSize, sections)
         return facts
     }

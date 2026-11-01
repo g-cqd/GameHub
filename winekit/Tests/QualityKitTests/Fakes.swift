@@ -14,7 +14,7 @@ final class FakeRunner: CommandRunning {
     private let state = Mutex<[Call]>([])
     let respond: @Sendable (Call) -> CommandResult
 
-    init(respond: @escaping @Sendable (Call) -> CommandResult = { _ in CommandResult(status: 0) }) {
+    init(respond: @escaping @Sendable (Call) -> CommandResult = { fine($0) }) {
         self.respond = respond
     }
 
@@ -30,6 +30,14 @@ final class FakeRunner: CommandRunning {
 
     /// The calls whose executable ends with `name`.
     func calls(to name: String) -> [Call] { calls.filter { $0.executable.hasSuffix(name) } }
+}
+
+/// `nm` output of a good object: it defines what winekit.h declares and needs only libc.
+let goodNM = "0000000000000010 T _winekit_free\n0000000000000020 T _winekit_hub_rules_apply\n                 U _free\n"
+
+/// What a command that works answers: success, and for `nm`, a good object.
+@Sendable func fine(_ call: FakeRunner.Call) -> CommandResult {
+    call.executable == "nm" ? CommandResult(status: 0, output: goodNM) : CommandResult(status: 0)
 }
 
 /// Files in memory, by absolute path.

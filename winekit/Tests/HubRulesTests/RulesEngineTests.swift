@@ -30,6 +30,9 @@ import Testing
         let result = apply("# first\nwhen machine=amd64 => dxgi=dxmt;env=A=1")
         #expect(text(result) == "v=3\nname=hubrules-2;exe=Game.exe;dxgi=dxmt;env=A=1")
         #expect(result.matchedLines == [2])
+        #expect(
+            String(decoding: result.report, as: UTF8.self) == "hubrules: Game.exe matches line 2: dxgi=dxmt;env=A=1\n"
+        )
     }
 
     @Test func line10AndLaterAreNumberedInDecimal() {
@@ -41,6 +44,7 @@ import Testing
         let result = apply("when machine=i386 => dxgi=dxmt")
         #expect(text(result) == "v=3")
         #expect(result.matchedLines.isEmpty)
+        #expect(result.report.isEmpty)
     }
 
     @Test func aDetectionRuleWithoutAnArrowIsIgnored() {
@@ -64,6 +68,16 @@ import Testing
         #expect(mixed.gateSelectorFixup)
         #expect(text(mixed) == "v=3\nname=hubrules-1;exe=Game.exe;a=1;b=2")
         #expect(!apply("when exe=game.exe => gate_selector_fixup=truex").gateSelectorFixup)
+    }
+
+    @Test func theReportShowsEachMatchAsWritten() {
+        let result = apply(
+            "when exe=game.exe =>   gate_selector_fixup=true;x=1  \nwhen exe=other.exe => y=1\nwhen exe=game.exe => z=1"
+        )
+        #expect(
+            String(decoding: result.report, as: UTF8.self)
+                == "hubrules: Game.exe matches line 1: gate_selector_fixup=true;x=1  \nhubrules: Game.exe matches line 3: z=1\n"
+        )
     }
 
     @Test func onlyTheFirstGateFieldIsRemoved() {

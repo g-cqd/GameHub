@@ -58,15 +58,6 @@
       "original": "<",
       "replacement": "<=",
       "status": "survived"
-    },
-    {
-      "file": "Sources/QualityKit/MutationVerdict.swift",
-      "fingerprint": "d1e454e7c7dd52287e3cb480a6b6b224",
-      "line": 32,
-      "operator": "RelationalOperatorReplacement",
-      "original": "<",
-      "replacement": "<=",
-      "status": "survived"
     }
   ]
 }

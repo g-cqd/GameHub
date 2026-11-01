@@ -1,9 +1,11 @@
 // The predicates of a detection rule: `machine=i386|amd64`, `exe=<basename>`, `section=<name>`, `imports=<dll>[,<dll>...]`.
 
 enum Predicates {
+    static let known = ["exe", "machine", "section", "imports"].map { Bytes($0.utf8) }
+
     /// Whether every predicate of the ';'-separated list holds for the executable. An unknown predicate, one without '=',
-    /// or a fact the headers couldn't give makes the rule not apply.
-    static func hold(_ list: ArraySlice<UInt8>, exe: Bytes, facts: PEFacts?) -> Bool {
+    /// or a fact the headers couldn't give makes the rule not apply; an unknown one is also reported in `messages`.
+    static func hold(_ list: ArraySlice<UInt8>, exe: Bytes, facts: PEFacts?, messages: inout [RulesMessage]) -> Bool {
         for field in ASCII.split(list, on: ASCII.semicolon) {
             let predicate = field.drop { $0 == ASCII.space }
             if predicate.isEmpty { continue }
@@ -11,6 +13,10 @@ enum Predicates {
             let key = predicate[..<equals]
             var value = predicate[(equals + 1)...]
             while let last = value.last, last == ASCII.space || last == ASCII.tab { value = value.dropLast() }
+            guard known.contains(where: { key.elementsEqual($0) }) else {
+                messages.append(.warning(Bytes("unknown predicate ".utf8) + DebugString.quoted(key)))
+                return false
+            }
             guard holds(key: key, value: value, exe: exe, facts: facts) else { return false }
         }
         return true

@@ -12,7 +12,7 @@ import Testing
             switch call.executable {
                 case "shasum": CommandResult(status: 0, output: "\(digest)  /cache/x.tar.gz\n")
                 case "/cache/dolly-0.13.0/dolly": CommandResult(status: 0, output: "\(version)\n")
-                default: CommandResult(status: 0)
+                default: fine(call)
             }
         }
     }

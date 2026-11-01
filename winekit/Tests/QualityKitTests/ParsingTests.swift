@@ -9,12 +9,15 @@ import Testing
         #expect(try Request.parse(["fast"]) == .fast)
         #expect(try Request.parse(["all"]) == .all)
         #expect(try Request.parse(["mutation-baseline"]) == .mutationBaseline)
+        #expect(try Request.parse(["wine-objects", "/out"]) == .wineObjects(output: "/out"))
         #expect(try Request.parse(["changed", "pre-commit"]) == .changed(.preCommit))
         #expect(try Request.parse(["changed", "pre-push"]) == .changed(.prePush))
     }
 
     @Test func malformedRequestsAreUsageErrors() {
-        for arguments in [[], ["nope"], ["changed"], ["changed", "post-merge"], ["fast", "extra"], ["format", "x"]] {
+        for arguments in [
+            [], ["nope"], ["changed"], ["changed", "post-merge"], ["fast", "extra"], ["format", "x"], ["wine-objects"]
+        ] {
             #expect(throws: QualityError.usage(Request.usage)) { try Request.parse(arguments) }
         }
     }

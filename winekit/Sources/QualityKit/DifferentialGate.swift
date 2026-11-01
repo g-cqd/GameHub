@@ -1,34 +1,29 @@
 import Foundation
 
 extension Quality {
-    /// Wine's hubrules.c against hubrules-swift over the corpus in Differential/; see `Differential`.
+    /// The C implementation as it was against Wine's hubrules.c with WineKit; see `Differential`.
     func differential() throws {
         guard let wine = workspace.wineSource,
             fileSystem.fileExists(wine.appendingPathComponent("dlls/ntdll/unix/hubrules.c"))
         else { throw QualityError.unavailable("no Wine checkout with dlls/ntdll/unix/hubrules.c (set WINE_SRC)") }
-        let root = workspace.root
-        let corpus = root.appendingPathComponent("Differential")
+        let corpus = workspace.root.appendingPathComponent("Differential")
         let work = workspace.scratch.appendingPathComponent("differential")
         for step in [["rm", "-rf", work.path], ["mkdir", "-p", work.appendingPathComponent("rules").path]] {
             try helper(step[0], Array(step.dropFirst()), failure: "could not prepare \(work.path)")
         }
-        let inputs = [
-            wine.appendingPathComponent("dlls/ntdll/unix/hubrules.c").path,
-            corpus.appendingPathComponent("unix_private.h").path,
-            corpus.appendingPathComponent("harness.c").path
-        ]
-        try helper("cp", inputs + [work.path], failure: "could not copy the C sources")
-        reporter.step("building Wine's hubrules.c into the C harness")
-        try gate(
-            "clang",
-            Differential.harnessArguments(work: work.path, wineSource: wine.path),
-            failure: "the C harness did not build"
+        let objects = work.appendingPathComponent("winekit")
+        try wineObjects(into: objects)
+        let reference = try harness(
+            "reference",
+            source: corpus.appendingPathComponent("reference/hubrules.c"),
+            work: work,
+            extra: []
         )
-        reporter.step("building hubrules-swift")
-        try gate(
-            workspace.toolchainTool("swift"),
-            ["build"] + workspace.nestedBuildArguments + ["--product", "hubrules-swift"],
-            failure: "hubrules-swift did not build"
+        let candidate = try harness(
+            "wine",
+            source: wine.appendingPathComponent("dlls/ntdll/unix/hubrules.c"),
+            work: work,
+            extra: ["-I\(objects.path)", objects.appendingPathComponent("libwinekit.a").path]
         )
 
         let cases = Differential.cases(
@@ -40,31 +35,23 @@ extension Quality {
             ),
             launchers: fileSystem.files(under: corpus.appendingPathComponent("launchers"))
                 .map { corpus.appendingPathComponent("launchers/\($0)").path },
-            root: root.path,
+            root: workspace.root.path,
             exists: { fileSystem.fileExists(URL(fileURLWithPath: $0)) }
         )
         guard !cases.isEmpty else { throw QualityError.gateFailed("the differential corpus has no case") }
 
-        let rulesDirectory = work.appendingPathComponent("rules")
-        let rulesFile = rulesDirectory.appendingPathComponent("hub-rules.txt").path
-        let harness = work.appendingPathComponent("harness").path
-        let swiftTool = workspace.scratch.appendingPathComponent("debug/hubrules-swift").path
+        let rulesDirectory = work.appendingPathComponent("rules").path
         var different: [DifferentialCase] = []
         for testCase in cases {
-            try helper("cp", [testCase.rules, rulesFile], failure: "could not stage \(testCase.rules)")
-            let c = try runner.run(
-                harness,
-                Differential.harnessCall(testCase, rulesDirectory: rulesDirectory.path),
-                in: root,
-                echo: false
+            try helper(
+                "cp",
+                [testCase.rules, rulesDirectory + "/hub-rules.txt"],
+                failure: "could not stage \(testCase.rules)"
             )
-            let swift = try runner.run(
-                swiftTool,
-                Differential.swiftCall(testCase, rulesFile: rulesFile),
-                in: root,
-                echo: false
-            )
-            if c.output != swift.output || !c.succeeded || !swift.succeeded {
+            let call = Differential.harnessCall(testCase, rulesDirectory: rulesDirectory)
+            let before = try runner.run(reference, call, in: workspace.root, echo: false)
+            let after = try runner.run(candidate, call, in: workspace.root, echo: false)
+            if before != after || !before.succeeded {
                 different.append(testCase)
                 reporter.note(
                     "[DIFF] \(testCase.rules) | \(testCase.executable) | \(testCase.launcher ?? "no launcher")"
@@ -72,6 +59,31 @@ extension Quality {
             }
         }
         reporter.note("\(cases.count) cases, \(different.count) different")
-        guard different.isEmpty else { throw QualityError.gateFailed("hubrules-swift differs from Wine's hubrules.c") }
+        guard different.isEmpty else {
+            throw QualityError.gateFailed("Wine's hubrules.c with WineKit differs from the reference C")
+        }
+    }
+
+    /// Builds the harness around `source` in work/<name> and returns its path.
+    private func harness(_ name: String, source: URL, work: URL, extra: [String]) throws -> String {
+        let directory = work.appendingPathComponent(name)
+        let corpus = workspace.root.appendingPathComponent("Differential")
+        try helper("mkdir", ["-p", directory.path], failure: "could not create \(directory.path)")
+        let inputs = [
+            source.path, corpus.appendingPathComponent("unix_private.h").path,
+            corpus.appendingPathComponent("harness.c").path
+        ]
+        try helper("cp", inputs + [directory.path], failure: "could not copy the \(name) sources")
+        reporter.step("building the \(name) harness")
+        try gate(
+            "clang",
+            Differential.harnessArguments(
+                work: directory.path,
+                wineSource: workspace.wineSource?.path ?? "",
+                extra: extra
+            ),
+            failure: "the \(name) harness did not build"
+        )
+        return directory.appendingPathComponent("harness").path
     }
 }
