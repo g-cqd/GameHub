@@ -15,14 +15,26 @@ The obvious place for it was the `gptk` backend directory. But compatdb.so's bui
 system framework, over a million crash lines) and Steam never logged on.
 
 ## Decision
-- **Where it lives:** D3DMetal goes in `lib/wine/dxgi/d3dmetal`, copied from a local GPTK by
-  `assemble_runtime.sh` with `GPTK_REDIST`. `gptk` stays an alias of DXMT.
-- **How a game gets it:** a program gets D3DMetal through a detection rule, `when exe=<exe> => hub_dll_dir=dxgi/d3dmetal`.
-  Our ntdll prepends that directory after compatdb.so has chosen its backend (wine 2dbfcfc).
-- **Shipping:** D3DMetal is never part of a bundle or a published runtime (ADR-0001's bundles, apps/bundler).
+- **Where it lives:** D3DMetal is installed exactly as CrossOver ships it, taken from a CrossOver Wine build
+  (`toolchains/wine-sdk-cx-26.3.0-5`, D3DMetal 4.0b2):
+  - CrossOver's `dxgi/gptk` glue goes in `lib/wine/dxgi/d3dmetal`. The PE DLLs are copied; each
+    `x86_64-unix/*.so` is a symlink to `../../../../external/libd3dshared.dylib`.
+  - `libd3dshared.dylib` and `D3DMetal.framework` go in `lib/external`.
 
-## Status of the interface
-Our winemac exports the `macdrv_functions` table of CrossOver 26, which ships **D3DMetal 3.0**. With GPTK
-**4.0 beta 3**, HITMAN 3 loads D3DMetal and then waits forever, before creating a window. September's records show
-the same with 4.0b2 and NFS 2015. So until winemac supports the 4.0 interface, or a D3DMetal 3.0 is available
-locally, the HITMAN rule stays disabled (roadmap 0030).
+  `assemble_runtime.sh` does this with `CX_SDK`. `gptk` stays an alias of DXMT, because compatdb.so's built-in
+  rule sends `steamwebhelper.exe` to `gptk`, and Steam's web helper crash-loops on D3DMetal.
+- **How a game gets it:** through a detection rule, `when exe=<exe> => hub_dll_dir=dxgi/d3dmetal`. Our ntdll
+  prepends that directory after compatdb.so has chosen its backend (wine 2dbfcfc).
+- **Shipping:** D3DMetal is never part of a bundle or a published runtime.
+
+## What went wrong first (2026-10-31)
+Apple's Game Porting Toolkit downloads (4.0b3, then 3.0) were installed from their evaluation "redist". That glue
+is built for **Apple's** evaluation Wine. In ours:
+- D3DMetal called NULL entry points;
+- exceptions went to a handler at a garbage address (`0x0020019008070C10`, 269 times);
+- the game hung with no window.
+
+Swapping D3DMetal versions, removing the NVIDIA shim and disabling Streamline's Reflex changed nothing, because the
+glue itself was the problem. CrossOver's own glue for the same D3DMetal works: HITMAN 3 runs and plays (owner,
+2026-10-31). The lesson is in development/diary/2026-10-31-07.md: start from a known-good reference integration and
+change one variable at a time.

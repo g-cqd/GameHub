@@ -54,13 +54,15 @@ $CP -c "$DX/x64/src/winemetal/unix/winemetal.so" "$RT/lib/wine/x86_64-unix/"
 # compatdb.so's built-in steam-web-helper rule asks for dxgi=gptk (D3DMetal, not shipped); without this alias it
 # falls back to the placeholder dxgi.dll and steamwebhelper crashes in a restart loop
 ln -s dxmt "$RT/lib/wine/dxgi/gptk"
-# Apple's D3DMetal, local only (development/adr/0019): GPTK_REDIST=<GPTK evaluation environment>/redist puts it in
-# dxgi/d3dmetal, which runtime rules select per program with hub_dll_dir=dxgi/d3dmetal
-if [ -n "${GPTK_REDIST:-}" ]; then
-  D=$RT/lib/wine/dxgi/d3dmetal; mkdir -p "$D/x86_64-windows" "$D/x86_64-unix"; ln -s ../dxmt/i386-windows "$D/i386-windows"
-  $CP -c "$GPTK_REDIST"/lib/wine/x86_64-windows/*.dll "$D/x86_64-windows/"
-  $CP -c "$GPTK_REDIST"/lib/wine/x86_64-unix/*.so "$GPTK_REDIST/lib/external/libd3dshared.dylib" "$D/x86_64-unix/"
-  $CP -c -R "$GPTK_REDIST/lib/external/D3DMetal.framework" "$D/x86_64-unix/"
+# Apple's D3DMetal, local only (development/adr/0019), exactly as CrossOver lays it out: its dxgi/gptk glue (PE DLLs,
+# and x86_64-unix/*.so symlinks to ../../../../external/libd3dshared.dylib) in dxgi/d3dmetal, libd3dshared.dylib and
+# D3DMetal.framework in lib/external. Taken from a CrossOver Wine build (CX_SDK=<sdk>/wine). Apple's GPTK "redist" glue
+# is built for Apple's evaluation Wine and does not work here. Rules select it per program: hub_dll_dir=dxgi/d3dmetal
+if [ -n "${CX_SDK:-}" ] && [ -d "$CX_SDK/lib/wine/dxgi/gptk" ]; then
+  D=$RT/lib/wine/dxgi/d3dmetal; mkdir -p "$D"; ln -s ../dxmt/i386-windows "$D/i386-windows"
+  $CP -c -R "$CX_SDK/lib/wine/dxgi/gptk/x86_64-windows" "$CX_SDK/lib/wine/dxgi/gptk/x86_64-unix" "$D/"   # keeps the symlinks
+  $CP -c "$CX_SDK/lib/external/libd3dshared.dylib" "$RT/lib/external/"
+  $CP -c -R "$CX_SDK/lib/external/D3DMetal.framework" "$RT/lib/external/"
 fi
 # per-program rules read by the fork's ntdll before compatdb.so (dlls/ntdll/unix/hubrules.c)
 $CP "$(dirname "$0")/../runtime/hub-rules.txt" "$RT/share/wine/hub-rules.txt"

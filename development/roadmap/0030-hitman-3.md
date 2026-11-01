@@ -1,5 +1,5 @@
 ---
-status: blocked
+status: in-progress
 blocked-by: []
 date: 2026-10-31
 ---
@@ -25,11 +25,14 @@ HITMAN 3 is D3D12-only. It has been launched through `hub play hitman` on hub-2;
 - **Apple D3DMetal** (GPTK 4.0b3, ADR-0019): loads, then the game waits forever with no window. This is most
   likely the D3DMetal 4.0 interface against our winemac's CrossOver 26 (3.0) table.
 
-## Next, either
-1. **DXMT:** implement DXIL wave operations in `src/airconv/nt` (Metal SIMD-group functions), then the next missing
-   piece; or
-2. **D3DMetal:** get D3DMetal 3.0, from a CrossOver 26 install or GPTK 3, and enable the rule in
-   `runtime/hub-rules.txt`. Or work out the 4.0 `macdrv_functions` interface.
+## Running (2026-10-31, 23:57)
+HITMAN 3 runs and plays on hub-2 with D3DMetal 4.0b2, installed as CrossOver ships it (ADR-0019), through the rule
+`when exe=HITMAN3.exe => hub_dll_dir=dxgi/d3dmetal`. The owner: "it's working rather good". Not yet measured:
+frame rate, a whole mission, saving and loading.
+
+## Next
+- Play a mission, then note frame rate and any graphical issue here.
+- The DXMT D3D12 path stays useful for every D3D12 game without D3DMetal. Its next gap is DXIL wave operations.
 
 ## Done when
 HITMAN 3 reaches its main menu and plays a mission.
