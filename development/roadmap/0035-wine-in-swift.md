@@ -19,7 +19,7 @@ date: 2026-11-01
    The git hooks run them scoped to the change (`.project-hooks.yml`).
 2. **Done (2026-11-01). HubRules runs inside ntdll** (wine b9f9755bb12, 6e3f9b1cafd).
    - **C interface:** `winekit/C/winekit.h`, with `winekit_hub_rules_apply` and `winekit_free`.
-   - **Build:** `swift package wine-objects` builds `libwinekit.a` (Embedded Swift, x86_64, no stack protector, libc
+   - **Build:** `swift package quality wine-objects` builds `libwinekit.a` (Embedded Swift, x86_64, no stack protector, libc
      only). `build-macos-x86_64.sh make` builds it and passes `WINEKIT_DIR`.
    - **What stays C:** `hubrules.c` keeps the rules file, the executable's bytes (a pread callback), the environment,
      the PEB and the image fix-up. Its rules logic is gone (-284 lines).

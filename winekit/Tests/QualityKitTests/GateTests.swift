@@ -28,7 +28,7 @@ import Testing
         files.add("/pkg/.swiftlint.yml", "changed")
         #expect(
             throws: QualityError.gateFailed(
-                ".swiftlint.yml differs from Aemi's; run  sh /aemi/scripts/sync-config.sh ."
+                ".swiftlint.yml differs from Aemi's; run  sh /aemi/Scripts/sync-config.sh ."
             )
         ) {
             try quality(FakeRunner(), files).run(.gate(.config))
@@ -51,7 +51,7 @@ import Testing
         try quality(runner, FakeFileSystem()).run(.gate(.tags))
         #expect(
             runner.calls.map(\.arguments) == [
-                ["/aemi/scripts/check-manifest-settings.sh", "Package.swift"], ["/aemi/scripts/check-tags.sh", "all"]
+                ["/aemi/Scripts/check-manifest-settings.sh", "Package.swift"], ["/aemi/Scripts/check-tags.sh", "all"]
             ]
         )
     }
@@ -112,7 +112,7 @@ import Testing
     }
 
     @Test func anAnalyzerMissingFromTheLockIsUnavailable() {
-        let files = FakeFileSystem(["/aemi/scripts/analyzers.lock": "deadwood 1.0.0 \(sha) -"])
+        let files = FakeFileSystem(["/aemi/Scripts/analyzers.lock": "deadwood 1.0.0 \(sha) -"])
         files.add("/cache/deadwood-1.0.0/deadwood")
         #expect(throws: QualityError.unavailable("dolly is not in Aemi's lock")) {
             try quality(FakeRunner(), files).run(.gate(.analyzers))
@@ -162,18 +162,27 @@ import Testing
         let files = FakeFileSystem(["/pkg/Sources/HubRules/A.swift": "", "/pkg/Sources/HubRules/notes.md": ""])
         let clean = FakeRunner()
         try quality(clean, files).run(.gate(.embedded))
-        let compile = try #require(clean.calls(to: "swiftc").first)
+        let compile = try #require(clean.calls(to: "swiftc").last)
         #expect(
             compile.arguments.contains("Sources/HubRules/A.swift")
                 && !compile.arguments.contains("Sources/HubRules/notes.md")
         )
         let runtime = FakeRunner {
-            $0.executable == "nm"
-                ? CommandResult(status: 0, output: "                 U _swift_retain\n") : CommandResult(status: 0)
+            $0.executable == "nm" ? CommandResult(status: 0, output: "                 U _swift_retain\n") : fine($0)
         }
-        #expect(throws: QualityError.gateFailed("HubRules needs _swift_retain, outside libc")) {
+        #expect(throws: QualityError.gateFailed("libwinekit.a needs _swift_retain, outside libc")) {
             try quality(runtime, files).run(.gate(.embedded))
         }
+        // a symbol one object needs and another defines stays inside the archive
+        let kernels = FakeRunner {
+            $0.executable == "nm"
+                ? CommandResult(
+                    status: 0,
+                    output: goodNM + "                 U _adf_scan\n0000000000000020 T _adf_scan\n"
+                )
+                : fine($0)
+        }
+        try quality(kernels, files).run(.gate(.embedded))
     }
 
     @Test func theLibraryMustDefineWhatTheHeaderDeclares() {
@@ -192,12 +201,48 @@ import Testing
         let files = FakeFileSystem(["/pkg/Sources/HubRules/A.swift": ""])
         let runner = FakeRunner()
         try quality(runner, files).run(.wineObjects(output: "/out"))
-        #expect(runner.calls(to: "ar").first?.arguments == ["rcs", "/out/libwinekit.a", "/out/HubRules.o"])
+        #expect(
+            runner.calls(to: "ar").first?.arguments == [
+                "rcs", "/out/libwinekit.a", "/out/aemi/adf_cpu_features.o", "/out/aemi/adf_scan.o",
+                "/out/aemi/AemiKernels.o", "/out/aemi/AemiKernel.o", "/out/HubRules.o"
+            ]
+        )
+        // Aemi's C, with its flags and includes from c-targets.sh, then its modules, each on the next one's path
+        let c = runner.calls(to: "clang").map(\.arguments)
+        #expect(
+            c.first == [
+                "-target", "x86_64-apple-macos15", "-O2", "-fno-stack-protector", "-std=c11", "-Werror",
+                "-I/aemi/Sources/CAemiCPU/include", "-I/aemi/Sources/CAemiKernels/include",
+                "-c", "/aemi/Sources/CAemiCPU/adf_cpu_features.c", "-o", "/out/aemi/adf_cpu_features.o"
+            ]
+        )
+        let swiftc = runner.calls(to: "swiftc").map(\.arguments)
+        #expect(swiftc.count == 3)
+        #expect(swiftc[0].contains("-emit-module-path") && swiftc[0].contains("/out/aemi/AemiKernels.swiftmodule"))
+        #expect(swiftc[1].contains("/out/aemi") && swiftc[1].contains("/out/aemi/AemiKernel.swiftmodule"))
+        #expect(!swiftc[2].contains("-emit-module") && swiftc[2].contains("/out/aemi"))
         #expect(runner.calls(to: "cp").first?.arguments == ["/pkg/C/winekit.h", "/out"])
         #expect(runner.calls(to: "rm").first?.arguments == ["-f", "/out/libwinekit.a"])
-        let compile = try #require(runner.calls(to: "swiftc").first).arguments
+        let compile = try #require(runner.calls(to: "swiftc").last).arguments
         #expect(compile.suffix(3) == ["-emit-object", "-o", "/out/HubRules.o"])
         #expect(compile.contains("-disable-stack-protector"))
+    }
+
+    @Test func aemisCTargetsAreReadFromItsScript() throws {
+        let files = FakeFileSystem(["/pkg/Sources/HubRules/A.swift": ""])
+        let runner = FakeRunner()
+        try quality(runner, files).run(.gate(.embedded))
+        let read = try #require(runner.calls(to: "sh").first)
+        #expect(read.arguments == ["-c", EmbeddedCheck.cTargetsScript, "sh", "/aemi"] && !read.echo)
+        let broken = FakeRunner {
+            $0.executable == "sh" ? CommandResult(status: 2, errors: "no c-targets.sh") : fine($0)
+        }
+        #expect(throws: QualityError.unavailable("could not read Aemi's Scripts/lib/c-targets.sh: no c-targets.sh")) {
+            try quality(broken, files).run(.gate(.embedded))
+        }
+        #expect(EmbeddedCheck.CTargets(scriptOutput: "\n\n\n") == nil)
+        #expect(EmbeddedCheck.CTargets(scriptOutput: "-O2\n") == nil)
+        #expect(EmbeddedCheck.CTargets(scriptOutput: "-O2\n-I/x\n/a.c /b.c\n")?.sources == ["/a.c", "/b.c"])
     }
 
     @Test func libraryTargetsAreTheSourceDirectoriesWithoutAMain() {

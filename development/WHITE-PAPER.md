@@ -145,7 +145,7 @@ analysis only, the session stops at level 4 and says so.
   renaming (ADR-0005).
 - **Build trees:**
   - Wine: `$HUB_ROOT/build/wine-ours`, configured and built only through `build-macos-x86_64.sh`. Its `make` first
-    builds WineKit's `libwinekit.a` (`swift package wine-objects`) into `$HUB_ROOT/build/winekit`, which ntdll links
+    builds WineKit's `libwinekit.a` (`swift package quality wine-objects`) into `$HUB_ROOT/build/winekit`, which ntdll links
     (`WINEKIT_DIR`). A bare `make` in the tree needs `WINEKIT_DIR=$HUB_ROOT/build/winekit`. Don't put llvm-mingw first
     in `PATH`.
   - DXMT: `$HUB_ROOT/build/dxmt/{x64,x32}`, with the cross files from `toolchains/dxmt-cross/` copied to

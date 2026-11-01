@@ -53,7 +53,8 @@ import Testing
     @Test func wineIsBuiltWithWineKitAndTheReferenceWithout() throws {
         let runner = runner()
         try quality(runner, corpus()).run(.gate(.differential))
-        let builds = runner.calls(to: "clang").map(\.arguments)
+        // the harnesses; the other clang calls build Aemi's C kernels into libwinekit.a
+        let builds = runner.calls(to: "clang").map(\.arguments).filter { !$0.contains("-c") }
         #expect(builds.count == 2)
         let objects = "/pkg/.build/quality/differential/winekit"
         #expect(

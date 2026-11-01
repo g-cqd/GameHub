@@ -8,7 +8,7 @@ extension Quality {
             let ours = try? fileSystem.contents(workspace.root.appendingPathComponent(name))
             guard canonical == ours else {
                 throw QualityError.gateFailed(
-                    "\(name) differs from Aemi's; run  sh \(aemi.path)/scripts/sync-config.sh ."
+                    "\(name) differs from Aemi's; run  sh \(aemi.path)/Scripts/sync-config.sh ."
                 )
             }
         }
@@ -41,7 +41,7 @@ extension Quality {
         let aemi = try aemiDirectory()
         let tools = try Lock.parse(
             String(
-                decoding: try fileSystem.contents(aemi.appendingPathComponent("scripts/analyzers.lock")),
+                decoding: try fileSystem.contents(aemi.appendingPathComponent("Scripts/analyzers.lock")),
                 as: UTF8.self
             )
         )

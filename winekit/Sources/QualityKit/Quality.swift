@@ -2,17 +2,17 @@ public import Foundation
 
 /// One check.
 public enum Gate: String, CaseIterable, Sendable {
-    /// .swift-format and .swiftlint.yml are Aemi's canonical ones, unchanged (Aemi's scripts/sync-config.sh copies them).
+    /// .swift-format and .swiftlint.yml are Aemi's canonical ones, unchanged (Aemi's Scripts/sync-config.sh copies them).
     case config
-    /// Package.swift has the family's canonical compiler settings (Aemi's scripts/check-manifest-settings.sh).
+    /// Package.swift has the family's canonical compiler settings (Aemi's Scripts/check-manifest-settings.sh).
     case manifest
-    /// No work-in-progress markers or planning shorthand in the sources (Aemi's scripts/check-tags.sh).
+    /// No work-in-progress markers or planning shorthand in the sources (Aemi's Scripts/check-tags.sh).
     case tags
     /// swift-format lint --strict.
     case format
     /// SwiftLint's size and complexity metrics, --strict.
     case lint
-    /// deadwood, dolly, arcleak, fcheck and modeler, pinned in Aemi's scripts/analyzers.lock.
+    /// deadwood, dolly, arcleak, fcheck and modeler, pinned in Aemi's Scripts/analyzers.lock.
     case analyzers
     /// The suite in debug (bounds checks live), then in release.
     case test
@@ -194,7 +194,7 @@ public struct Quality: Sendable {
     }
 
     func aemiScript(_ name: String, _ arguments: [String], failure: String) throws {
-        let script = try aemiDirectory().appendingPathComponent("scripts/\(name)")
+        let script = try aemiDirectory().appendingPathComponent("Scripts/\(name)")
         reporter.step("\(name) \(arguments.joined(separator: " "))")
         try gate("sh", [script.path] + arguments, failure: failure)
     }

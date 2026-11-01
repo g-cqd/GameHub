@@ -3,6 +3,11 @@
 **For:** the Aemi-Studio/aemi maintainers
 **From:** GameHub / WineKit
 **aemi revision examined:** `c06c050dd13fa737fac9d173113c727d3212c5b8` (2026-11-01)
+**Status:** done in aemi `fbd6b30` (2026-11-01): the three files guarded, `CAemiKernels/include/module.modulemap`,
+`Scripts/check-embedded.sh` (scripts moved to `Scripts/`; CPU detection split into `CAemiCPU`). WineKit pins it:
+HubRules uses `ByteSearch` and `ASCII`, and `quality wine-objects` builds aemi's C and Embedded modules into
+`libwinekit.a`. `Endian` was not adopted: its loads are unchecked, and HubRules parses executables a game ships, so
+its bounds-checked reads stay.
 **Toolchain:** Swift 6.4.2 (swift-6.4.2-RELEASE), Xcode clang, macOS 27.2 on Apple silicon
 
 ## Why

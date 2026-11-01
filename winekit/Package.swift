@@ -20,17 +20,17 @@ let strictSettings: [SwiftSetting] = [
 // The rules engine reads executables a game ships, so every unsafe construct in it must be marked `unsafe`.
 let librarySettings: [SwiftSetting] = strictSettings + [.strictMemorySafety()]
 
-// Aemi, pinned to one revision: QualityKit builds on its libraries (AemiFileSystem), and the gates use its scripts
-// (check-manifest-settings.sh, check-tags.sh, analyzers.lock) and canonical configuration. HubRules doesn't depend on it:
-// it links into ntdll as Embedded Swift, which AemiKernel doesn't support yet (development/reports/aemi-embedded-kernel.md).
-// Aemi's LintBuild plugin (swift-format lint --strict as a prebuild step) only runs behind WINEKIT_DEV, so Wine's build
+// Aemi, pinned to one revision. HubRules builds on AemiKernel, which wine-objects compiles as Embedded Swift with
+// AemiKernels and their C (CAemiKernels, CAemiCPU) into libwinekit.a; QualityKit builds on AemiFileSystem; the gates use
+// Aemi's scripts (check-manifest-settings.sh, check-tags.sh, analyzers.lock, lib/c-targets.sh) and canonical
+// configuration. Aemi's LintBuild plugin (swift-format lint --strict as a prebuild step) only runs behind WINEKIT_DEV, so Wine's build
 // doesn't lint.
 let isDev = Context.environment["WINEKIT_DEV"] != nil
 let devPlugins: [Target.PluginUsage] = isDev ? [.plugin(name: "LintBuild", package: "aemi")] : []
 
 let aemi: Package.Dependency = .package(
     url: "https://github.com/Aemi-Studio/aemi.git",
-    revision: "c06c050dd13fa737fac9d173113c727d3212c5b8"
+    revision: "fbd6b3088abed46e25428832ebcbd6ab053dca77"
 )
 
 let package = Package(
@@ -38,12 +38,16 @@ let package = Package(
     platforms: [.macOS(.v15)],
     products: [
         .library(name: "HubRules", targets: ["HubRules"]),
-        .plugin(name: "Quality", targets: ["Quality"]),
-        .plugin(name: "WineObjects", targets: ["WineObjects"])
+        .plugin(name: "Quality", targets: ["Quality"])
     ],
     dependencies: [aemi],
     targets: [
-        .target(name: "HubRules", swiftSettings: librarySettings, plugins: devPlugins),
+        .target(
+            name: "HubRules",
+            dependencies: [.product(name: "AemiKernel", package: "aemi")],
+            swiftSettings: librarySettings,
+            plugins: devPlugins
+        ),
         .testTarget(name: "HubRulesTests", dependencies: ["HubRules"], swiftSettings: strictSettings),
 
         // The quality gates: QualityKit decides, winekit-quality runs it, the Quality plugin hands it the package.
@@ -57,7 +61,12 @@ let package = Package(
         .plugin(
             name: "Quality",
             capability: .command(
-                intent: .custom(verb: "quality", description: "Run WineKit's quality gates (see QualityKit's Gate)"),
+                intent: .custom(
+                    verb: "quality",
+                    description:
+                        "Run WineKit's quality gates (see QualityKit's Gate), or write libwinekit.a and winekit.h "
+                        + "for Wine's build: quality wine-objects <dir>"
+                ),
                 permissions: [
                     .allowNetworkConnections(
                         scope: .all(ports: [443]),
@@ -65,17 +74,6 @@ let package = Package(
                     ),
                     .writeToPackageDirectory(reason: "Build and test in .build/quality, write the mutation reports")
                 ]
-            ),
-            dependencies: ["winekit-quality"]
-        ),
-        .plugin(
-            name: "WineObjects",
-            capability: .command(
-                intent: .custom(
-                    verb: "wine-objects",
-                    description: "Write libwinekit.a and winekit.h for Wine's build (make WINEKIT_DIR=<dir>)"
-                ),
-                permissions: [.writeToPackageDirectory(reason: "Build the Embedded Swift objects")]
             ),
             dependencies: ["winekit-quality"]
         ),

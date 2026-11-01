@@ -52,6 +52,9 @@ import Testing
         #expect(try run(.gate(.test)) == ["==> swift test (debug)", "==> swift test -c release"])
         #expect(
             try run(.gate(.embedded)) == [
+                "==> C: Aemi's kernels (x86_64-apple-macos15)",
+                "==> Embedded Swift: AemiKernels (x86_64-apple-macos15)",
+                "==> Embedded Swift: AemiKernel (x86_64-apple-macos15)",
                 "==> Embedded Swift: HubRules (x86_64-apple-macos15)",
                 "[OK] /pkg/.build/quality/embedded/libwinekit.a and winekit.h"
             ]
@@ -98,6 +101,9 @@ import Testing
         ])
         #expect(
             try run(.gate(.differential), files: files) == [
+                "==> C: Aemi's kernels (x86_64-apple-macos15)",
+                "==> Embedded Swift: AemiKernels (x86_64-apple-macos15)",
+                "==> Embedded Swift: AemiKernel (x86_64-apple-macos15)",
                 "==> Embedded Swift: HubRules (x86_64-apple-macos15)",
                 "[OK] /pkg/.build/quality/differential/winekit/libwinekit.a and winekit.h",
                 "==> building the reference harness", "==> building the wine harness", "1 cases, 0 different"
@@ -147,7 +153,8 @@ import Testing
             "sh", "swift-format", "swiftlint", "deadwood", "dolly", "arcleak", "fcheck", "modeler", "swift", "swiftc",
             "clang", "taskpolicy"
         ]
-        for call in runner.calls {
+        // reading Aemi's c-targets.sh is a quiet helper; its other sh calls are gates
+        for call in runner.calls where !(call.executable == "sh" && call.arguments.first == "-c") {
             let name = URL(fileURLWithPath: call.executable).lastPathComponent
             #expect(call.echo == printing.contains(name), "\(name) \(call.arguments)")
         }

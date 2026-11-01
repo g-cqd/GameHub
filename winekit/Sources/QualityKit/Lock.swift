@@ -6,7 +6,7 @@ public struct PinnedTool: Equatable, Sendable {
     public var linuxX86SHA: String?
 }
 
-/// The lock format Aemi's scripts/analyzers.lock uses, one tool per line: `name version macos-arm64-sha linux-x86_64-sha`.
+/// The lock format Aemi's Scripts/analyzers.lock uses, one tool per line: `name version macos-arm64-sha linux-x86_64-sha`.
 /// `#` starts a comment; `-` stands for a platform with no archive.
 public enum Lock {
     public static func parse(_ text: String) throws -> [PinnedTool] {

@@ -36,8 +36,17 @@ final class FakeRunner: CommandRunning {
 let goodNM = "0000000000000010 T _winekit_free\n0000000000000020 T _winekit_hub_rules_apply\n                 U _free\n"
 
 /// What a command that works answers: success, and for `nm`, a good object.
+/// What Aemi's Scripts/lib/c-targets.sh prints through `EmbeddedCheck.cTargetsScript`: flags, includes, sources.
+let aemiCTargets =
+    "-std=c11 -Werror\n -I/aemi/Sources/CAemiCPU/include -I/aemi/Sources/CAemiKernels/include\n"
+    + "/aemi/Sources/CAemiCPU/adf_cpu_features.c /aemi/Sources/CAemiKernels/adf_scan.c\n"
+
 @Sendable func fine(_ call: FakeRunner.Call) -> CommandResult {
-    call.executable == "nm" ? CommandResult(status: 0, output: goodNM) : CommandResult(status: 0)
+    switch call.executable {
+        case "nm": CommandResult(status: 0, output: goodNM)
+        case "sh" where call.arguments.first == "-c": CommandResult(status: 0, output: aemiCTargets)
+        default: CommandResult(status: 0)
+    }
 }
 
 /// Files in memory, by absolute path.
@@ -107,6 +116,6 @@ let reportPath = "/pkg/.build/quality/mutation-report.json"
 /// Aemi's lock with every analyzer at version 1.0.0, all already installed in `files`.
 func installedAnalyzers(_ files: FakeFileSystem) {
     let tools = ["deadwood", "dolly", "arcleak", "fcheck", "modeler"]
-    files.add("/aemi/scripts/analyzers.lock", tools.map { "\($0) 1.0.0 \(sha) \(sha)" }.joined(separator: "\n"))
+    files.add("/aemi/Scripts/analyzers.lock", tools.map { "\($0) 1.0.0 \(sha) \(sha)" }.joined(separator: "\n"))
     for tool in tools { files.add("/cache/\(tool)-1.0.0/\(tool)") }
 }

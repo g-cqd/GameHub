@@ -1,8 +1,9 @@
 import Foundation
 import PackagePlugin
 
-/// `swift package quality <gate|fast|all|changed pre-commit|pre-push>`: runs winekit-quality on this package, with the pinned
-/// Aemi checkout when WINEKIT_DEV resolved it. Every decision is in QualityKit, which the tests cover; this only passes paths.
+/// `swift package quality <gate|fast|all|changed pre-commit|pre-push|wine-objects <dir>>`: runs winekit-quality on this
+/// package with the pinned Aemi checkout. `wine-objects <dir>` writes libwinekit.a and winekit.h for Wine's build
+/// (`make WINEKIT_DIR=<dir>`). Every decision is in QualityKit, which the tests cover; this only passes paths.
 @main
 struct QualityCommand: CommandPlugin {
     func performCommand(context: PluginContext, arguments: [String]) async throws {

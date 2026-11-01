@@ -1,5 +1,8 @@
 // Byte-level text helpers. Rules files and PE names are ASCII; working on bytes keeps the library usable in Embedded Swift,
-// where String's Unicode tables are an extra dependency.
+// where String's Unicode tables are an extra dependency. The byte primitives are Aemi's (AemiKernel); these are the C
+// string functions the rules engine was written against, on top of them.
+
+import AemiKernel
 
 /// A byte string, as the C code sees `char *` text.
 public typealias Bytes = [UInt8]
@@ -15,7 +18,7 @@ enum ASCII {
     static let hash = UInt8(ascii: "#")
 
     static func lower(_ byte: UInt8) -> UInt8 {
-        byte >= UInt8(ascii: "A") && byte <= UInt8(ascii: "Z") ? byte + 32 : byte
+        AemiKernel.ASCII.isUppercase(byte) ? byte + 32 : byte
     }
 
     /// `strcasecmp(a, b) == 0`
@@ -42,15 +45,9 @@ enum ASCII {
         Bytes(bytes.prefix { $0 != 0 })
     }
 
-    /// The first index of `needle` in `haystack`, as `strstr`.
+    /// The first range of `needle` in `haystack`, as `strstr`, in `haystack`'s own indices; nil for an empty needle.
     static func firstRange(of needle: Bytes, in haystack: ArraySlice<UInt8>) -> Range<Int>? {
-        guard !needle.isEmpty, haystack.count >= needle.count else { return nil }
-        var start = haystack.startIndex
-        while start + needle.count <= haystack.endIndex {
-            if haystack[start ..< start + needle.count].elementsEqual(needle) { return start ..< start + needle.count }
-            start += 1
-        }
-        return nil
+        ByteSearch.firstRange(of: needle, in: haystack)
     }
 
     static func decimal(_ value: Int) -> Bytes {

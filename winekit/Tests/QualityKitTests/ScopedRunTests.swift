@@ -58,13 +58,12 @@ import Testing
         try quality.run(.changed(.preCommit))
         let order = [
             "sh", "swift-format", "swiftlint", "deadwood", "dolly", "arcleak", "fcheck", "modeler", "swift", "swiftc",
-            "nm", "clang",
-            "harness"
+            "nm", "harness"
         ]
         let ran = tools(runner)
         #expect(order.compactMap { ran.firstIndex(of: $0) } == order.compactMap { ran.firstIndex(of: $0) }.sorted())
         #expect(order.allSatisfy { ran.contains($0) })
-        #expect(runner.calls(to: "sh").first?.arguments == ["/aemi/scripts/check-tags.sh", "staged"])
+        #expect(runner.calls(to: "sh").first?.arguments == ["/aemi/Scripts/check-tags.sh", "staged"])
         #expect(runner.calls(to: "swift-format").first?.arguments == ["lint", "--strict", "Sources/HubRules/A.swift"])
         #expect(
             runner.calls(to: "swiftlint").first?.arguments.suffix(2) == ["--force-exclude", "Sources/HubRules/A.swift"]
@@ -124,7 +123,7 @@ import Testing
         }
         try quality.run(.changed(.prePush))
         #expect(
-            runner.calls(to: "sh").first?.arguments == ["/aemi/scripts/check-manifest-settings.sh", "Package.swift"]
+            runner.calls(to: "sh").first?.arguments == ["/aemi/Scripts/check-manifest-settings.sh", "Package.swift"]
         )
         #expect(runner.calls(to: "swift-format").first?.arguments.last == "Package.swift")
     }
