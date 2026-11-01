@@ -1,0 +1,46 @@
+# GameHub runtime rules, installed as <runtime>/share/wine/hub-rules.txt by scripts/assemble_runtime.sh.
+# Read by the Wine fork's ntdll (dlls/ntdll/unix/hubrules.c) before compatdb.so, in every process.
+# Two kinds of lines:
+#   name=...;exe=...;key=value              a compatdb rule (keys: dxgi, d3d9, dll_overrides, env, arguments, ...)
+#   when pred[;pred...] => key=value;...    applies the settings to the starting executable when every predicate holds
+#                                           predicates: exe=<name>, machine=i386|amd64, section=<name>, imports=<dll>[,<dll>]
+#                                           runtime capability (not passed to compatdb): gate_selector_fixup=true
+# Order: compatdb built-ins < this file < WINE_COMPATDB from the launcher (the launcher wins).
+
+# Chromium-based store clients: DXMT for Steam's webhelper, wined3d for the EA and Epic helpers
+name=steam-webhelper;exe=steamwebhelper.exe;dxgi=dxmt
+name=ea-cef;exe=EACefSubProcess.exe;dxgi=wined3d
+name=ea-gep;exe=EAGEP.exe;dxgi=wined3d
+name=epic-cef;exe=EpicWebHelper.exe;dxgi=wined3d
+# Ubisoft Connect: CEF's GPU process would draw into upc.exe's window from another process, and DXMT has no
+# cross-process swapchain (white window); keep the GPU work inside upc.exe (the CW HACK 25737 libcef patch makes
+# CEF read its command line). With the 2026-10-30 DXMT (hub-2) its in-process GPU drawing glitched, so CEF renders in
+# software (--disable-gpu); --in-process-gpu stays so that any GPU fallback still draws from upc.exe
+name=hub-upc;exe=upc.exe;arguments=--in-process-gpu --disable-gpu
+
+# Watch_Dogs (Steam 243470): the Ubisoft overlay (overlay64.dll, injected whatever settings.yaml says) hooks
+# user32/dxgi in the game and its main thread spins on the overlay's mutex before the D3D device exists; it only
+# went on when another game started. Keep the overlay out of the game.
+name=watchdogs-no-overlay;exe=Watch_Dogs.exe;company=Ubisoft Entertainment;dll_overrides=overlay64=d
+
+# Rockstar Games Launcher: it needs a D3D10.1 device, which DXMT lacks (black window). compatdb's built-in rule gives
+# it wined3d, but wined3d's Vulkan renderer offers no D3D11 feature level on MoltenVK and the launcher exits with code 1
+# ("Unable to launch game"). wined3d on OpenGL provides the device.
+name=rockstar-launcher;exe=Launcher.exe;company=Rockstar Games;dxgi=wined3d;env=WINE_D3D_CONFIG=renderer=gl
+
+# Ubisoft's packer (.ubx sections: upc.exe, UplayService.exe, UbisoftExtension.exe, UplayCrashReporter.exe) far-jumps
+# to Windows' 64-bit code selector 0x33, which Rosetta rejects ("invalid gdt selector index 6"); ntdll rewrites those
+# jumps to this process's 64-bit selector before the image runs
+when machine=i386;section=.ubx2 => gate_selector_fixup=true
+
+# Defaults for every process: mtld3d for D3D8/9, DXMT for D3D10/11
+name=zero-hour-metalfx;exe=Zero Hour.exe;dxgi=dxmt;env=DXMT_METALFX_SPATIAL_SWAPCHAIN=1;env=DXMT_CONFIG=d3d11.metalSpatialUpscaleFactor=1.40625
+name=default;exe=*;d3d9=mtld3d;dxgi=dxmt
+
+# D3D12 games DXMT's D3D12 can't run yet (DXIL wave operations, ...): Apple's D3DMetal from the Game Porting
+# Toolkit in lib/wine/dxgi/d3dmetal, put ahead of the backend by ntdll (hub_dll_dir). Not gptk: compatdb.so's
+# built-in rule sends steamwebhelper.exe to gptk, and Steam's web helper crash-loops on D3DMetal. Local install
+# only, never shipped (Apple's evaluation licence; development/adr/0019).
+# D3DMetal as CrossOver 26.3 ships it (its own glue + D3DMetal 4.0b2): Apple's GPTK redist glue is built for
+# Apple's evaluation Wine and fails in ours
+when exe=HITMAN3.exe => hub_dll_dir=dxgi/d3dmetal

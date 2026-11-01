@@ -1,0 +1,49 @@
+# WineKit (winekit/): the family's shared quality workflow, plus WineKit's own pinned gates.
+name: WineKit
+
+on:
+  push:
+    branches: [main]
+    paths: ["winekit/**", ".github/workflows/winekit.yml"]
+  pull_request:
+    paths: ["winekit/**", ".github/workflows/winekit.yml"]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: winekit-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
+jobs:
+  quality:
+    # Lint gate, build and test on macOS and Linux, coverage: Aemi's reusable workflow, pinned like Package.swift's aemi.
+    uses: Aemi-Studio/aemi/.github/workflows/swift-quality.yml@8475434abab0493d9bda746f78e33087899391c3 # aemi 8475434
+    with:
+      dev-env-var: WINEKIT_DEV
+      package-path: winekit
+      swift-version: "6.4.2"
+      container-image: "swift:6.4.2-noble"
+      # The reusable's static-analysis job installs older analyzers; the gates job below runs the ones Aemi's
+      # scripts/analyzers.lock pins, through `swift package quality`.
+      enable-static-analysis: false
+      enable-docs: false
+
+  gates:
+    # WineKit's own gates: Aemi's configuration and manifest checks, the analyzers, and the Embedded Swift build for Wine's
+    # x86_64 Unix side. The differential test needs a Wine checkout and mutation testing takes minutes: the git hooks run
+    # those, scoped to the change.
+    runs-on: macos-26
+    defaults:
+      run:
+        working-directory: winekit
+    env:
+      WINEKIT_DEV: "1"
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: swift-actions/setup-swift@364295d9c23900ce04d4e5cc708387921b4e50f9 # v3.0.0-beta.1
+        with:
+          swift-version: "6.4.2"
+      - run: brew install swiftlint
+      - run: swift package --disable-sandbox quality fast
+      - run: swift package --disable-sandbox quality embedded

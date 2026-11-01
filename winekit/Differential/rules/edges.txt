@@ -1,0 +1,35 @@
+# Edge cases for the parsers. Every line below is read by both implementations.
+name=plain;exe=foo.exe;dxgi=wined3d
+	  name=indented;exe=bar.exe;d3d9=mtld3d
+name=crlf;exe=baz.exe;dxgi=dxmt
+when exe=HITMAN3.exe => hub_dll_dir=dxgi/d3dmetal
+when exe=hitman3.EXE => dxgi=dxmt;hub_dll_dir=../escape
+when exe=HITMAN3.exe => hub_dll_dir=/absolute;env=A=1
+when machine=amd64 => env=AMD64=1
+when machine=i386 => env=I386=1
+when machine=arm64 => env=never=1
+when machine=AMD64;exe=ACU.exe => env=BOTH=1
+when section=.text => env=TEXT=1
+when section=.tex => env=PREFIX_ONLY=1
+when section=.bind => env=BIND=1
+when imports=kernel32 => env=K32=1
+when imports=KERNEL32.DLL,user32 => env=K32U32=1
+when imports=kernel32.dl => env=PARTIAL=1
+when imports=,kernel32, => env=EMPTY_ITEMS=1
+when imports=d3d11;section=.text => gate_selector_fixup=true;env=GATE=1
+when exe=farcry3_d3d11.exe => gate_selector_fixup=true
+when exe=farcry3_d3d11.exe => env=X=1;gate_selector_fixup=true;env=Y=2
+when   exe=ACU.exe   ;  machine=amd64	 => env=SPACES=1
+when unknown=1 => env=UNKNOWN=1
+when exe => env=NO_EQUALS=1
+when exe=ACU.exe env=NO_ARROW=1
+when ;; ; => env=ONLY_SEPARATORS=1
+when exe=ACU.exe =>    env=LEADING_SPACES=1   
+when exe=ACU.exe => hub_dll_dir=
+when exe=ACU.exe => hub_dll_dir=a;hub_dll_dir=b
+when exe=ACU.exe => gate_selector_fixup=true;gate_selector_fixup=true
+when exe=ACU.exe => env=A=1;;env=B=2;
+when exe=ACU.exe => =>env=DOUBLE_ARROW=1
+whenexe=ACU.exe => env=NOT_A_RULE=1
+name=crlf2;exe=q.exe;dxgi=dxmt
+when exe=ACU.exe => env=CRLF=1

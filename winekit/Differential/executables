@@ -1,0 +1,15 @@
+# One path per line; $ROOT is the package. Files that don't exist on this machine are skipped.
+$ROOT/Differential/corpus/text.bin
+$ROOT/Differential/corpus/mz-truncated.bin
+$ROOT/Differential/corpus/pe32-headers-only.bin
+$ROOT/Differential/corpus/pe32-cut-sections.bin
+$ROOT/Differential/corpus/bad-lfanew.bin
+$ROOT/Differential/corpus/negative-lfanew.bin
+$ROOT/Differential/no-such-file.exe
+/Volumes/ExT2/GameHub/Library/Ubisoft/games/Assassin's Creed Unity/ACU.exe
+/Volumes/ExT2/GameHub/Library/Ubisoft/games/Far Cry 3/bin/farcry3_d3d11.exe
+/Volumes/ExT2/GameHub/Library/Ubisoft/games/Far Cry 3/bin/FC3Updater.exe
+/Volumes/ExT2/GameHub/Library/Steam/steam.exe
+/Volumes/ExT2/GameHub/Library/Steam/steamapps/common/HITMAN 3/Retail/HITMAN3.exe
+/Volumes/ExT2/GameHub/Runtimes/hub-2/lib/wine/x86_64-windows/notepad.exe
+/Volumes/ExT2/GameHub/Runtimes/hub-2/lib/wine/i386-windows/notepad.exe

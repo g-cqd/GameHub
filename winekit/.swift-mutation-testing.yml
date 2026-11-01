@@ -1,0 +1,13 @@
+# swift-mutation-testing: every test target against mutants of the library sources. `swift package quality mutation` runs
+# it over all of them; the git hooks over the library sources a commit or push changes.
+timeout: 120
+output: .build/mutation-report.json
+markdown-output: .build/mutation-summary.md
+# Only the libraries are mutated: the executables are thin host tools, and the tests, plugins and corpus are not shipped.
+exclude:
+  - "/Tests/"
+  - "/Plugins/"
+  - "/Differential/"
+  - "/hubrules-swift/"
+  - "/winekit-quality/"
+operator-tier: default

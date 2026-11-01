@@ -1,0 +1,20 @@
+# project-hooks (github.com/g-cqd/project-hooks): custom tasks run only in a trusted repository
+# (git config project-hooks.trusted true).
+#
+# WineKit's gates, scoped to what the commit or the push changes in winekit/: format and lint read the changed Swift files,
+# the analyzers report only them, and mutation testing mutates only the changed library sources (QualityKit's Hook).
+# --disable-sandbox: swift-mutation-testing and the nested test builds run SwiftPM, whose manifest sandbox can't nest
+# inside the plugin's.
+pre-commit:
+  tasks:
+    - name: winekit
+      run: "cd winekit && WINEKIT_DEV=1 swift package --disable-sandbox quality changed pre-commit"
+      on-files: ["winekit/*"]
+      timeout: 3600
+
+pre-push:
+  tasks:
+    - name: winekit
+      run: "cd winekit && WINEKIT_DEV=1 swift package --disable-sandbox quality changed pre-push"
+      on-files: ["winekit/*"]
+      timeout: 3600

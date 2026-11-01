@@ -1,0 +1,63 @@
+{
+  "createdAt": "2026-11-01T11:23:54Z",
+  "formatVersion": 1,
+  "scope": {
+    "excludePatterns": [
+      "/Differential/",
+      "/Plugins/",
+      "/Tests/",
+      "/hubrules-swift/",
+      "/winekit-quality/"
+    ],
+    "operators": [
+      "ArithmeticOperatorReplacement",
+      "BooleanLiteralReplacement",
+      "LogicalOperatorReplacement",
+      "NegateConditional",
+      "RelationalOperatorReplacement",
+      "RemoveSideEffects",
+      "SwapTernary"
+    ],
+    "sourcesPath": "Sources"
+  },
+  "score": 98.31649831649831,
+  "toolVersion": "1.6.4",
+  "undetected": [
+    {
+      "file": "Sources/HubRules/PEFacts.swift",
+      "fingerprint": "1b11f1a33626ed7d7c1ee2f733882a55",
+      "line": 15,
+      "operator": "RelationalOperatorReplacement",
+      "original": ">",
+      "replacement": ">=",
+      "status": "survived"
+    },
+    {
+      "file": "Sources/HubRules/PEFacts.swift",
+      "fingerprint": "b97cfafe8509105892472f33c2e41fc5",
+      "line": 15,
+      "operator": "RelationalOperatorReplacement",
+      "original": "<",
+      "replacement": "<=",
+      "status": "survived"
+    },
+    {
+      "file": "Sources/HubRules/PEFacts.swift",
+      "fingerprint": "8317e859cc3cb425b289e063d0609c72",
+      "line": 47,
+      "operator": "RelationalOperatorReplacement",
+      "original": ">=",
+      "replacement": ">",
+      "status": "survived"
+    },
+    {
+      "file": "Sources/HubRules/PEFacts.swift",
+      "fingerprint": "fab48323cdb698665b0393fa52a8c0ce",
+      "line": 75,
+      "operator": "RelationalOperatorReplacement",
+      "original": "<",
+      "replacement": "<=",
+      "status": "survived"
+    }
+  ]
+}

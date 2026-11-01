@@ -1,0 +1,4 @@
+# The tool Aemi's scripts/analyzers.lock doesn't pin, in the same format: name version macos-arm64-sha linux-x86_64-sha.
+# github.com/ericodx/swift-mutation-testing publishes macOS only. The hash was computed from the downloaded archive
+# (2026-11-01, the latest release). To upgrade: change the line, run `swift package quality mutation`, read the survivors.
+swift-mutation-testing 1.6.4 c8a0690598766bba4a5f4616f8f99b8909ddf884bbcdb41c83ace62451cd8303 -

@@ -1,0 +1,4 @@
+v=3
+name=a;exe=a.exe;dxgi=dxmt
+name=default;exe=*;d3d9=mtld3d;dxgi=dxmt
+
