@@ -82,6 +82,11 @@ A memory of how a launcher "usually" behaves is not evidence, and neither is a c
 3. **Record the result.** Small results go in the diary. A result that decides something goes in an ADR.
 4. **Act only then.** A claim with no evidence is written down as an open question, never as a fact.
 
+**Reference first.** When a known-good integration exists (CrossOver's runtime, an earlier hub runtime, a working
+bundle), reproduce it unchanged before building anything, then change one variable at a time against it. Don't
+assemble a stack from parts and debug the symptoms. After two experiments that don't change the outcome, stop and
+look for the reference (diary 2026-10-31-07).
+
 **Unverified is said plainly.** Every report says what was built, what was checked and what was not run. If a game
 was not launched, the report says "not launched" and never "should work". If another agent's report claims
 something, it is checked before it is repeated (the owner: "check whenever you get answers back from the other guy
