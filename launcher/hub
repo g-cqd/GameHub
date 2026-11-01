@@ -861,8 +861,50 @@ def prep_steam():
         cfg.unlink()
 
 
+STEAM_LOGON_LIMIT = 600   # s: a self-update and the web helpers' first start can take minutes
+STEAM_GONE_GRACE = 10     # s without steam.exe before it counts as dead (it relaunches itself after an update)
+
+
+def steam_start_verdict(logged_on, alive, gone_for, elapsed, limit=STEAM_LOGON_LIMIT, grace=STEAM_GONE_GRACE):
+    """What `hub` does while Steam starts: "ok" once logged on, "died" when steam.exe has been gone for `grace`
+    seconds, "timeout" past `limit`, else "wait". Roadmap 0031."""
+    if logged_on:
+        return "ok"
+    if not alive and gone_for >= grace:
+        return "died"
+    if elapsed >= limit:
+        return "timeout"
+    return "wait"
+
+
+def wait_for_steam_logon(conn, off):
+    t0 = time.time()
+    gone_since = None
+    last_note = 0
+    while True:
+        now = time.time()
+        alive = "steam" in provider_running()
+        gone_since = None if alive else (gone_since or now)
+        verdict = steam_start_verdict("Logged On" in log_tail_from(conn, off), alive,
+                                      now - gone_since if gone_since else 0, now - t0)
+        if verdict != "wait":
+            return verdict
+        if now - last_note >= 60:
+            if last_note:
+                print(f"  still waiting for Steam to log on ({int(now - t0)} s; it may be updating)")
+            last_note = now
+        time.sleep(3)
+
+
+def record_session(rt, provider, opts):
+    """The options the store was started with: a retry while it is still starting must not restart it (0031)."""
+    STATE.mkdir(parents=True, exist_ok=True)
+    (STATE / "session.json").write_text(json.dumps(signature(rt, provider, opts)))
+
+
 def start_provider(provider, rt, opts):
     env = session_env(rt, provider, opts)
+    record_session(rt, provider, opts)
     if provider == "steam":
         if not (STEAM / "steam.exe").exists():
             die(f"Steam not found at {STEAM}")
@@ -871,9 +913,11 @@ def start_provider(provider, rt, opts):
         off, log = size(conn), LOGS / f"steam-{stamp()}.log"
         spawn(rt, env, ["E:\\Library\\Steam\\steam.exe"], log)
         print(f"starting Steam on {rt} (log {log})")
-        ok = wait_for(lambda: "Logged On" in log_tail_from(conn, off), 120, "Steam to log on")
-        if not ok:
-            die("Steam did not log on; see the log above")
+        verdict = wait_for_steam_logon(conn, off)
+        if verdict == "died":
+            die(f"Steam exited while starting; see {log}")
+        if verdict == "timeout":
+            die(f"Steam did not log on within {STEAM_LOGON_LIMIT} s; it is still running (see {log}), run the command again later")
     elif provider == "ea":
         exe = ea_client()
         if not exe:
@@ -921,8 +965,6 @@ def start_provider(provider, rt, opts):
         spawn(rt, env, [unix_to_win(exe), "-SkipBuildPatchPrereq"], log)
         print(f"starting Epic Games Launcher on {rt} (log {log})")
         time.sleep(10)
-    STATE.mkdir(parents=True, exist_ok=True)
-    (STATE / "session.json").write_text(json.dumps(signature(rt, provider, opts)))
     return env
 
 

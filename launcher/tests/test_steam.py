@@ -38,5 +38,24 @@ class SteamOverlayTests(unittest.TestCase):
             self.assertFalse((Path(d) / "_overlay-disabled").exists())
 
 
+class SteamStartTests(unittest.TestCase):
+    """Roadmap 0031: a slow Steam start is waited for, a dead one is reported."""
+
+    def test_logged_on_is_done_whatever_else(self):
+        self.assertEqual(hub.steam_start_verdict(True, False, 999, 999), "ok")
+
+    def test_a_slow_but_alive_steam_is_waited_for(self):
+        self.assertEqual(hub.steam_start_verdict(False, True, 0, 300), "wait")
+
+    def test_a_short_disappearance_is_a_relaunch_not_a_death(self):
+        self.assertEqual(hub.steam_start_verdict(False, False, 5, 40), "wait")
+
+    def test_steam_gone_past_the_grace_period_died(self):
+        self.assertEqual(hub.steam_start_verdict(False, False, 10, 40), "died")
+
+    def test_the_limit_ends_the_wait(self):
+        self.assertEqual(hub.steam_start_verdict(False, True, 0, hub.STEAM_LOGON_LIMIT), "timeout")
+
+
 if __name__ == "__main__":
     unittest.main()
