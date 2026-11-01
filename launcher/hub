@@ -878,6 +878,23 @@ def ubisoft_install_registrations(config_text, folders):
     return found
 
 
+def ubisoft_executable_registrations(config_text, known):
+    """HKCU ExecutableName values (relative to the install dir) that a game's own updater ("evil_updater ... -write_registry") is meant to write
+    and that Ubisoft Connect's Play reads (roadmap 0009). Far Cry 3's updater crashes under Wine probing D3D11, so
+    the hub writes the path to the executable it launches itself. `known` maps folder -> exe relative to the
+    folder. Returns [(key under HKCU, value name, folder, exe)]."""
+    found = []
+    for rec in re.split(r"^version: 2\.0\s*$", config_text, flags=re.M):
+        gid = re.search(r'^\s*game_identifier:\s*"?([^"\n]+?)"?\s*$', rec, re.M)
+        reg = re.search(r'register:\s*HKEY_CURRENT_USER\\(.+?)\\(ExecutableName)\s*$', rec, re.M)
+        if not gid or not reg or "evil_updater:" not in rec:
+            continue
+        folder = next((f for f in known if f.lower() == gid.group(1).strip().lower()), None)
+        if folder and (reg.group(1), reg.group(2), folder, known[folder]) not in found:
+            found.append((reg.group(1), reg.group(2), folder, known[folder]))
+    return found
+
+
 def register_ubisoft_installs(rt, env):
     """Write the install-dir values of the games in Library/Ubisoft/games that Ubisoft Connect can't find yet."""
     cfg, games = UBISOFT / "cache/configuration/configurations", UBISOFT / "games"
@@ -894,6 +911,18 @@ def register_ubisoft_installs(rt, env):
         r = subprocess.run([wine, "reg", "add", f"HKLM\\{key}", "/v", value, "/d", data, "/f", "/reg:32"], env=env,
                            cwd=str(TEMP), capture_output=True, text=True, check=False)
         print(f"registered {folder} for Ubisoft Connect" if r.returncode == 0 else f"hub: could not register {folder}: {r.stderr.strip()[:200]}")
+    on_disk = {p.name for p in games.iterdir() if p.is_dir()}
+    known = {k: v["exe"] for k, v in OTHER_KNOWN.items() if k in on_disk and v.get("exe")}
+    for key, value, folder, exe in ubisoft_executable_registrations(text, known):
+        data = exe   # relative: Connect joins it to the install dir, as the updater writes it ("/bin/farcry3.exe")
+        q = subprocess.run([wine, "reg", "query", f"HKCU\\{key}", "/v", value], env=env, cwd=str(TEMP),
+                           capture_output=True, text=True, check=False)
+        if q.returncode == 0 and ":" not in q.stdout.split("REG_SZ")[-1]:
+            continue   # a relative value, written by the game's updater or earlier: leave it
+        r = subprocess.run([wine, "reg", "add", f"HKCU\\{key}", "/v", value, "/d", data, "/f"], env=env,
+                           cwd=str(TEMP), capture_output=True, text=True, check=False)
+        print(f"set {folder}'s executable for Ubisoft Connect's Play: {exe}" if r.returncode == 0
+              else f"hub: could not set {folder}'s executable: {r.stderr.strip()[:200]}")
 
 
 STEAM_LOGON_LIMIT = 600   # s: a self-update and the web helpers' first start can take minutes

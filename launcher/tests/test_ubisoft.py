@@ -17,6 +17,10 @@ root:
             register: HKEY_CURRENT_USER\SOFTWARE\UBISOFT\Far Cry 3\ExecutableName
           working_directory:
             register: HKEY_LOCAL_MACHINE\SOFTWARE\UBISOFT\Far Cry 3\InstallDir
+          evil_updater:
+            path:
+              relative: bin\FC3Updater.exe
+            arguments: -write_registry
   installer:
     game_identifier: Far Cry 3
 ---
@@ -55,6 +59,11 @@ class UbisoftRegistrationTests(unittest.TestCase):
 
     def test_games_that_are_not_on_disk_are_left_alone(self):
         self.assertEqual(hub.ubisoft_install_registrations(CONFIG, []), [])
+
+
+    def test_an_updater_written_executable_name_is_relative_to_the_install_dir(self):
+        regs = hub.ubisoft_executable_registrations(CONFIG, {"Far Cry 3": "bin/farcry3_d3d11.exe", "Assassin's Creed Unity": "ACU.exe"})
+        self.assertEqual(regs, [("SOFTWARE\\UBISOFT\\Far Cry 3", "ExecutableName", "Far Cry 3", "bin/farcry3_d3d11.exe")])
 
 
 if __name__ == "__main__":

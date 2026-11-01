@@ -1,5 +1,5 @@
 ---
-status: not-started
+status: in-progress
 blocked-by: []
 date: 2026-10-31
 ---
@@ -24,3 +24,24 @@ The key is under HKCU, while the 2026-10-31 registration wrote only HKLM.
 
 ## Done when
 Far Cry 3 reaches its menu, and Play in Ubisoft Connect starts it.
+
+## Progress (2026-11-01)
+**Far Cry 3 starts through Ubisoft Connect** and shows its full-screen window. The cause was the missing
+`HKCU\SOFTWARE\UBISOFT\Far Cry 3\ExecutableName`, which `FC3Updater.exe -write_registry` should write but
+can't, because it crashes probing D3D11.
+
+The updater's own strings give the format: a path relative to the install dir (`/bin/farcry3_d3d11.exe` when
+D3D11 is used, else `/bin/farcry3.exe`). Connect joins it to `InstallDir`. An absolute value failed with "Game
+executable is not found at E:/.../Far Cry 3/E:/.../bin/farcry3_d3d11.exe".
+
+The hub now writes the relative path to the executable it launches, for records that rely on an `evil_updater`
+(only Far Cry 3 among the installed games). It does this in `register_ubisoft_installs`, which has unit tests.
+
+`hub play "Far Cry 3"` starts the exe, which hands off to Connect. On a cold start Connect may need a second request;
+`uplay://launch/46/0` from the session started it.
+
+## Still open
+- Verify: the gameplay itself, and that `hub play "Far Cry 3"` alone starts it every time.
+- Verify files: Ubisoft's `UplayService generic failure`.
+- `StartArguments` is missing (Connect only notes it).
+
