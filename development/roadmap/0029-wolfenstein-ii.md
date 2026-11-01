@@ -47,6 +47,29 @@ next session there were 2 SUBOPTIMAL results at startup (the window still sizing
 
 Owner-confirmed after these: the resolution is right and there is no flashing on Cmd-Tab.
 
+## Regression on 2026-11-01: window wrong after Wine 24a06557322
+The owner: "the window handling of wolfenstein is atrocious": not fullscreen, wrong ratio, black areas over Steam,
+lost on a Space switch, mouse problems. With the win32u and winemac from before 24a06557322 the game stayed
+fullscreen for a 54-minute session (14:22–15:16, no Space switch tried).
+
+- **Cause of the mode change:** the game saves its resolution as an index into the mode list (`r_mode "19"` in
+  `Wolfenstein II The New ColossusConfig.local`). Before the commit the list had 25 modes and index 19 was 2560x1440,
+  the display's "looks like" size, which emulation maps 2:1 onto the 5120x2880 panel, so it looked native. With
+  the host modes the list has 49 and the game ended at **1440x900** (EnumDisplaySettings during play): 16:10,
+  pillarboxed on the 16:9 screen.
+- **Black areas over Steam:** reproduced. During the game's 1440x900 mode Steam's web view was drawn small in the
+  top-left with the rest of its window black, and it stayed that way after the game exited (the top-level window
+  had its normal size; a child didn't). fstest holding 1440x900 for 60 s showed a related effect: Steam's window
+  grew to 4419x2453 points during the mode (Win32 coordinates scaled by the emulated ratio, as when a real mode
+  shrinks the Windows desktop) and came back intact, so the stuck child is not reproduced by fstest.
+- **Fixed (Wine f5f21d89665):** an emulated mode now belongs to the process that set it. Other processes load the
+  physical mode, so Steam keeps its window (1381x767 points during the game) and is drawn whole after it (1% black
+  in its content against 78% before). The cost is a deliberate difference from Windows: a mode set by one process
+  isn't seen by another (18 new failures in user32's monitor test, all of that kind).
+- **Still open:** the game remembers `r_mode 19`, which is now 1440x900, so it is pillarboxed until 2560x1440 (or
+  3840x2160) is picked again in its video options. Space switching and the mouse were not retested: they need
+  someone playing.
+
 ## Open
 - **Mouse after Cmd-Tab:** the hidden cursor is not confined again after switching back. On deactivation winemac
   probably un-hides the cursor, and the game never hides it again, because on Windows that state persists. Trace
