@@ -861,6 +861,41 @@ def prep_steam():
         cfg.unlink()
 
 
+def ubisoft_install_registrations(config_text, folders):
+    """Registry values Ubisoft Connect reads to find installed games (roadmap 0008): for each record of its
+    configuration whose installer game_identifier names a folder in `folders`, the HKLM install-dir value of that
+    record. Returns [(key under HKLM, value name, folder)]."""
+    found = []
+    for rec in re.split(r"^version: 2\.0\s*$", config_text, flags=re.M):
+        gid = re.search(r'^\s*game_identifier:\s*"?([^"\n]+?)"?\s*$', rec, re.M)
+        reg = re.search(r'register:\s*HKEY_LOCAL_MACHINE\\(.+?)\\(InstallDir|installdir)\s*$', rec, re.M | re.I)
+        if not gid or not reg:
+            continue
+        name = gid.group(1).strip()
+        folder = next((f for f in folders if f.lower() == name.lower()), None)
+        if folder and (reg.group(1), reg.group(2), folder) not in found:
+            found.append((reg.group(1), reg.group(2), folder))
+    return found
+
+
+def register_ubisoft_installs(rt, env):
+    """Write the install-dir values of the games in Library/Ubisoft/games that Ubisoft Connect can't find yet."""
+    cfg, games = UBISOFT / "cache/configuration/configurations", UBISOFT / "games"
+    if not cfg.is_file() or not games.is_dir():
+        return
+    text = subprocess.run(["strings", "-n", "3", str(cfg)], capture_output=True, text=True, check=False).stdout
+    wine = str(RUNTIMES / rt / "bin/wine")
+    for key, value, folder in ubisoft_install_registrations(text, [p.name for p in games.iterdir() if p.is_dir()]):
+        data = f"E:\\Library\\Ubisoft\\games\\{folder}\\"
+        q = subprocess.run([wine, "reg", "query", f"HKLM\\{key}", "/v", value, "/reg:32"], env=env, cwd=str(TEMP),
+                           capture_output=True, text=True, check=False)
+        if q.returncode == 0 and data.lower() in q.stdout.lower():
+            continue
+        r = subprocess.run([wine, "reg", "add", f"HKLM\\{key}", "/v", value, "/d", data, "/f", "/reg:32"], env=env,
+                           cwd=str(TEMP), capture_output=True, text=True, check=False)
+        print(f"registered {folder} for Ubisoft Connect" if r.returncode == 0 else f"hub: could not register {folder}: {r.stderr.strip()[:200]}")
+
+
 STEAM_LOGON_LIMIT = 600   # s: a self-update and the web helpers' first start can take minutes
 STEAM_GONE_GRACE = 10     # s without steam.exe before it counts as dead (it relaunches itself after an update)
 
@@ -959,6 +994,7 @@ def start_provider(provider, rt, opts):
             exe = UBISOFT / "UbisoftConnect.exe"
         if not exe.exists():
             die("Ubisoft Connect not found")
+        register_ubisoft_installs(rt, env)
         spawn(rt, env, [unix_to_win(exe), "--in-process-gpu"], LOGS / f"ubisoft-{stamp()}.log")
         print(f"starting Ubisoft Connect on {rt}")
         time.sleep(15)

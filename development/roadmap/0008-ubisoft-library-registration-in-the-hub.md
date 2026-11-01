@@ -1,5 +1,5 @@
 ---
-status: not-started
+status: done
 blocked-by: []
 date: 2026-10-31
 ---
@@ -29,3 +29,17 @@ A prefix with no such values gets them from `hub start ubisoft`, and Ubisoft Con
 | `Ubisoft\WatchDogs2` | `InstallDir` | `E:\Library\Ubisoft\games\WATCH_DOGS2\` |
 
 The value names, and their case, come from each game's `register:` entry in Ubisoft's configuration.
+
+## Result (2026-11-01)
+`hub start ubisoft` (and any Ubisoft game) first runs `register_ubisoft_installs`. For every folder in
+`Library/Ubisoft/games` it finds the configuration record whose installer `game_identifier` names the folder, and
+writes that record's HKLM install-dir value in the 32-bit view if it is missing or different. It reproduces exactly
+the four values written by hand on 2026-10-31.
+
+Checked live:
+- with all four present, it writes nothing;
+- with Far Cry 2's value deleted, it restores it (`E:\Library\Ubisoft\games\Far Cry 2\`).
+
+It has unit tests in `launcher/tests/test_ubisoft.py`. Not written: HKCU `ExecutableName` and `StartArguments`,
+whose format is unknown (roadmap 0009).
+
