@@ -36,3 +36,10 @@ nothing, because the handoff itself is a moment of focus loss. Each run is logge
 Checked: an active app is left alone, and a process with no window gives up after 20 s without touching
 activation. The handoff to a game that isn't active hasn't been watched yet.
 
+Correction, the same evening: the 22:36 HITMAN 3 session that showed the problems was started with `--no-wait`, which
+returned before the activation step, so that step did not cause them; the cause of that session's problems is not
+known. The next session (22:43, Steam already running) was fine. Two gaps found on the way, fixed:
+- `--no-wait` now schedules the activation step too (`_activate_game` waits for the game's first process).
+- `game_procs` missed games started by a relative command line (`retail\hitman3.exe`, from Launcher.exe's folder):
+  a relative path that exists in the install folder, compared without case (ExT2 is case-sensitive), is the game.
+

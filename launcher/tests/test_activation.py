@@ -3,7 +3,10 @@
 
 import importlib.machinery
 import os
+import tempfile
+import types
 import unittest
+from pathlib import Path
 
 hub = importlib.machinery.SourceFileLoader("hub", os.path.join(os.path.dirname(__file__), "..", "hub")).load_module()
 
@@ -50,6 +53,42 @@ class ActivationCandidateTests(unittest.TestCase):
         self.assertEqual(hub.etime_seconds("03:04"), 184)
         self.assertEqual(hub.etime_seconds("02:03:04"), 7384)
         self.assertEqual(hub.etime_seconds("1-02:03:04"), 93784)
+
+
+class GameProcessTests(unittest.TestCase):
+
+    def setUp(self):
+        self.dir = tempfile.TemporaryDirectory()
+        self.game = Path(self.dir.name) / "HITMAN 3"
+        (self.game / "Retail").mkdir(parents=True)
+        (self.game / "Retail/HITMAN3.exe").write_text("")
+        (self.game / "Launcher.exe").write_text("")
+        self.g = types.SimpleNamespace(path=self.game, name="HITMAN 3")
+        self.saved = hub.ps
+
+    def tearDown(self):
+        hub.ps = self.saved
+        self.dir.cleanup()
+
+    def pids(self, rows):
+        hub.ps = lambda: rows
+        return [pid for pid, _, _ in hub.game_procs(self.g)]
+
+    def test_a_relative_command_line_inside_the_install_folder_is_the_game_whatever_its_case(self):
+        rows = [(1, "01:00", r"retail\hitman3.exe -SKIP_LAUNCHER"),
+                (2, "01:00", r'"E:\Library\Steam\steamapps\common\HITMAN 3\Launcher.exe" -SKIP_LAUNCHER')]
+        self.assertEqual(self.pids(rows), [1, 2])
+
+    def test_other_processes_are_not_the_game(self):
+        rows = [(3, "01:00", r"retail\other.exe"), (4, "01:00", r"C:\windows\system32\conhost.exe"),
+                (5, "01:00", r"C:\Games\HITMAN 3 Tools\x.exe"), (6, "01:00", "/usr/bin/HITMAN3"),
+                (7, "01:00", r"E:\x87sidecar\retail\hitman3.exe")]
+        self.assertEqual(self.pids(rows), [])
+
+    def test_the_executable_of_a_command_line(self):
+        self.assertEqual(hub.exe_of(r'"E:\a b\Launcher.exe" -X'), r"E:\a b\Launcher.exe")
+        self.assertEqual(hub.exe_of(r"retail\hitman3.exe -SKIP_LAUNCHER"), r"retail\hitman3.exe")
+        self.assertEqual(hub.exe_of("game.exe"), "game.exe")
 
 
 if __name__ == "__main__":

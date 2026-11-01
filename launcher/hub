@@ -568,11 +568,44 @@ def provider_running():
     return found
 
 
+def exe_of(cmd):
+    """The executable a Windows command line starts: the quoted first token, or everything up to the first .exe."""
+    if cmd.startswith('"'):
+        return cmd[1:].split('"', 1)[0]
+    m = re.match(r"(.*?\.exe)\b", cmd, re.I)
+    return m.group(1) if m else cmd.split(" ", 1)[0]
+
+
+def find_ci(base, rel):
+    """`rel` (a Windows path, any case) under `base` on a case-sensitive volume, as a file, or None."""
+    here = base
+    for part in [p for p in re.split(r"[\\/]", rel) if p]:
+        try:
+            names = {n.lower(): n for n in os.listdir(here)}
+        except OSError:
+            return None
+        if part.lower() not in names:
+            return None
+        here = here / names[part.lower()]
+    return here if here.is_file() else None
+
+
 def game_procs(g):
+    """The game's processes: those started from its install folder, by full path or by a path relative to it (a
+    launcher that starts the game from its own folder: HITMAN 3's retail\\hitman3.exe)."""
     if not g.path:
         return []
     key = ("\\" + g.path.name + "\\").lower()   # \Zero Hour\ must not match "...Generals - Zero Hour\"
-    return [(pid, et, cmd) for pid, et, cmd in ps() if key in cmd.lower() and ".exe" in cmd.lower() and "x87sidecar" not in cmd]
+    found = []
+    for pid, et, cmd in ps():
+        low = cmd.lower()
+        if ".exe" not in low or "x87sidecar" in cmd:
+            continue
+        exe = exe_of(cmd)
+        relative = not re.match(r"^[a-z]:[\\/]|^[\\/]", exe, re.I)
+        if key in low or (relative and find_ci(g.path, exe)):
+            found.append((pid, et, cmd))
+    return found
 
 
 def all_running_games(games):
@@ -1165,6 +1198,9 @@ def play(args):
         spawn(rt, env, [unix_to_win(exe)], plog, cwd=exe.parent)
     print(f"launching {g.name} via {provider} (log {plog})")
     if args.no_wait:
+        if os.environ.get("HUB_NO_ACTIVATE") != "1":   # activation still follows, once the game shows up
+            subprocess.Popen([sys.executable, str(Path(__file__).resolve()), "_activate_game", g.name, str(ACTIVATE_DELAY)],
+                             start_new_session=True, stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         return
 
     repaired_dlf = False
@@ -1261,6 +1297,18 @@ def activation_candidates(first_pid, rows):
         return [first_pid]
     return [pid for pid, et, cmd in rows
             if ".exe" in cmd.lower() and not NOT_GAME.search(cmd) and etime_seconds(et) <= first]
+
+
+def activate_game_later(name, delay, timeout=300):
+    """`play --no-wait`'s activation step: wait for the game's first process, then as `activate_later`."""
+    games = [g for g in discover() if g.name == name]
+    deadline = time.time() + timeout
+    while games and time.time() < deadline:
+        procs = game_procs(games[0])
+        if procs:
+            activate_later(procs[0][0], delay)
+            return
+        time.sleep(3)
 
 
 def activate_later(pid, delay):
@@ -1425,6 +1473,8 @@ def main():
     p = sub.add_parser("_keep"); p.add_argument("gid"); p.set_defaults(f=lambda a: keep_settings(a.gid))
     p = sub.add_parser("_activate"); p.add_argument("pid"); p.add_argument("delay")
     p.set_defaults(f=lambda a: activate_later(a.pid, a.delay))
+    p = sub.add_parser("_activate_game"); p.add_argument("game"); p.add_argument("delay")
+    p.set_defaults(f=lambda a: activate_game_later(a.game, a.delay))
     p = sub.add_parser("_trim_later"); p.add_argument("provider"); p.add_argument("delay"); p.set_defaults(f=lambda a: trim_later(a.provider, a.delay))
     p = sub.add_parser("_watch_display"); p.add_argument("game"); p.set_defaults(f=lambda a: watch_display_loop(a.game))
     args = ap.parse_args()

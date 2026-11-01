@@ -32,8 +32,9 @@ frame rate, a whole mission, saving and loading.
 
 ## 2026-11-01
 Started with `hub play`, it lost keyboard focus and mouse capture, and Enter took it out of fullscreen; started
-from the Steam UI (17:28–22:32) it was fine. The cause was the hub's activation step (roadmap 0016), which activated
-`Launcher.exe` instead of `hitman3.exe`.
+from the Steam UI (17:28–22:32) it was fine, and a second `hub play` at 22:43 was fine too. Not explained: that
+launch skipped the activation step (`--no-wait`), so the step's wrong target (roadmap 0016, fixed) wasn't the cause.
+The hub didn't see `retail\hitman3.exe` as the game (fixed in `game_procs`).
 
 ## Next
 - Play a mission, then note frame rate and any graphical issue here.
