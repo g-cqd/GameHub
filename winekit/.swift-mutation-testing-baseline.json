@@ -1,5 +1,5 @@
 {
-  "createdAt": "2026-11-01T11:23:54Z",
+  "createdAt": "2026-11-01T12:14:18Z",
   "formatVersion": 1,
   "scope": {
     "excludePatterns": [
@@ -20,7 +20,7 @@
     ],
     "sourcesPath": "Sources"
   },
-  "score": 98.31649831649831,
+  "score": 98.01980198019803,
   "toolVersion": "1.6.4",
   "undetected": [
     {
@@ -53,7 +53,16 @@
     {
       "file": "Sources/HubRules/PEFacts.swift",
       "fingerprint": "fab48323cdb698665b0393fa52a8c0ce",
-      "line": 75,
+      "line": 79,
+      "operator": "RelationalOperatorReplacement",
+      "original": "<",
+      "replacement": "<=",
+      "status": "survived"
+    },
+    {
+      "file": "Sources/QualityKit/MutationVerdict.swift",
+      "fingerprint": "d1e454e7c7dd52287e3cb480a6b6b224",
+      "line": 32,
       "operator": "RelationalOperatorReplacement",
       "original": "<",
       "replacement": "<=",

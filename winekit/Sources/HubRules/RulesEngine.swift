@@ -45,7 +45,11 @@ public enum RulesEngine {
 
     /// The compatdb line of a matching detection rule, or nil. Capabilities found in it are recorded in `result`.
     private static func detection(
-        _ line: ArraySlice<UInt8>, number: Int, exe: Bytes, facts: PEFacts?, into result: inout RulesResult
+        _ line: ArraySlice<UInt8>,
+        number: Int,
+        exe: Bytes,
+        facts: PEFacts?,
+        into result: inout RulesResult
     ) -> Bytes? {
         guard let arrow = ASCII.firstRange(of: Bytes("=>".utf8), in: line) else { return nil }
         guard Predicates.hold(line[(line.startIndex + 5) ..< arrow.lowerBound], exe: exe, facts: facts) else {

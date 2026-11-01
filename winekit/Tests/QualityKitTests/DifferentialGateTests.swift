@@ -24,7 +24,13 @@ import Testing
     }
 
     func quality(_ runner: FakeRunner, _ files: FakeFileSystem, wine: URL? = wineRoot) -> Quality {
-        Quality(workspace: workspace(wine: wine), runner: runner, fileSystem: files, reporter: FakeReporter())
+        Quality(
+            workspace: workspace(wine: wine),
+            runner: runner,
+            fileSystem: files,
+            reporter: FakeReporter(),
+            platform: .macOSArm64
+        )
     }
 
     @Test func identicalOutputsPassEveryCase() throws {
@@ -38,7 +44,8 @@ import Testing
                     "/pkg/.build/quality/differential/rules/hub-rules.txt", "/pkg/game.exe",
                     "/pkg/Differential/launchers/v3"
                 ]
-            ])
+            ]
+        )
         #expect(runner.calls(to: "clang").first?.arguments.contains("-I/wine/include") == true)
     }
 

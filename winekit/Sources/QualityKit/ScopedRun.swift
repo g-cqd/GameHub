@@ -6,7 +6,11 @@ extension Quality {
         var base: String?
         if hook == .prePush {
             let upstream = try runner.run(
-                "git", ["rev-parse", "--verify", "-q", "@{upstream}"], in: workspace.root, echo: false)
+                "git",
+                ["rev-parse", "--verify", "-q", "@{upstream}"],
+                in: workspace.root,
+                echo: false
+            )
             base = upstream.succeeded ? upstream.output.trimmed : nil
         }
         let diff = try runner.run("git", ChangeSet.gitArguments(for: hook, base: base), in: workspace.root, echo: false)
@@ -42,6 +46,6 @@ extension Quality {
             try embedded()
         }
         if changes.touchesDifferential { try differential() }
-        if !changes.librarySources.isEmpty { try mutation(changed: changes.librarySources) }
+        if !changes.librarySources.isEmpty { try mutation(.changed(changes.librarySources)) }
     }
 }

@@ -79,6 +79,23 @@ func workspace(aemi: URL? = aemiRoot, wine: URL? = wineRoot) -> Workspace {
 let sha = String(repeating: "a", count: 64)
 let otherSHA = String(repeating: "b", count: 64)
 
+/// A mutation report, as swift-mutation-testing writes it, with one mutant per (path, status, fingerprint).
+func mutationReport(_ mutants: [(path: String, status: String, fingerprint: String)] = []) -> String {
+    let files = Dictionary(grouping: mutants, by: \.path)
+        .map { path, list in
+            let entries = list.map {
+                """
+                {"fingerprint": "\($0.fingerprint)", "status": "\($0.status)", "mutatorName": "RelationalOperatorReplacement",
+                 "description": "< → <=", "location": {"start": {"line": 15, "column": 3}, "end": {"line": 15, "column": 4}}}
+                """
+            }
+            return "\"\(path)\": {\"mutants\": [\(entries.joined(separator: ","))]}"
+        }
+    return "{\"files\": {\(files.joined(separator: ","))}, \"schemaVersion\": \"1\"}"
+}
+
+let reportPath = "/pkg/.build/quality/mutation-report.json"
+
 /// Aemi's lock with every analyzer at version 1.0.0, all already installed in `files`.
 func installedAnalyzers(_ files: FakeFileSystem) {
     let tools = ["deadwood", "dolly", "arcleak", "fcheck", "modeler"]

@@ -27,7 +27,9 @@ let isDev = Context.environment["WINEKIT_DEV"] != nil
 let devPlugins: [Target.PluginUsage] = isDev ? [.plugin(name: "LintBuild", package: "aemi")] : []
 
 let aemi: Package.Dependency = .package(
-    url: "https://github.com/Aemi-Studio/aemi.git", revision: "8475434abab0493d9bda746f78e33087899391c3")
+    url: "https://github.com/Aemi-Studio/aemi.git",
+    revision: "c06c050dd13fa737fac9d173113c727d3212c5b8"
+)
 
 let package = Package(
     name: "WineKit",
@@ -52,10 +54,14 @@ let package = Package(
                 intent: .custom(verb: "quality", description: "Run WineKit's quality gates (see QualityKit's Gate)"),
                 permissions: [
                     .allowNetworkConnections(
-                        scope: .all(ports: [443]), reason: "Download the pinned analyzers and swift-mutation-testing"),
+                        scope: .all(ports: [443]),
+                        reason: "Download the pinned analyzers and swift-mutation-testing"
+                    ),
                     .writeToPackageDirectory(reason: "Build and test in .build/quality, write the mutation reports")
-                ]),
-            dependencies: ["winekit-quality"]),
+                ]
+            ),
+            dependencies: ["winekit-quality"]
+        ),
         .testTarget(name: "QualityKitTests", dependencies: ["QualityKit"], swiftSettings: strictSettings)
     ]
 )

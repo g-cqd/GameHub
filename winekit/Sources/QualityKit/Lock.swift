@@ -23,8 +23,12 @@ public enum Lock {
             }
             tools.append(
                 PinnedTool(
-                    name: fields[0], version: fields[1], macOSArm64SHA: fields[2] == "-" ? nil : fields[2],
-                    linuxX86SHA: fields[3] == "-" ? nil : fields[3]))
+                    name: fields[0],
+                    version: fields[1],
+                    macOSArm64SHA: fields[2] == "-" ? nil : fields[2],
+                    linuxX86SHA: fields[3] == "-" ? nil : fields[3]
+                )
+            )
         }
         return tools
     }

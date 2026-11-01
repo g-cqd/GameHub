@@ -6,11 +6,17 @@ import Testing
 /// What each gate tells the person running it, and which commands print to the terminal.
 @Suite struct ReportingTests {
     func run(
-        _ request: Request, files: FakeFileSystem = FakeFileSystem(), runner: FakeRunner = FakeRunner()
+        _ request: Request,
+        files: FakeFileSystem = FakeFileSystem(),
+        runner: FakeRunner = FakeRunner()
     ) throws -> [String] {
         let reporter = FakeReporter()
         try Quality(
-            workspace: workspace(), runner: runner, fileSystem: files, reporter: reporter, platform: .macOSArm64
+            workspace: workspace(),
+            runner: runner,
+            fileSystem: files,
+            reporter: reporter,
+            platform: .macOSArm64
         )
         .run(request)
         return reporter.lines
@@ -31,8 +37,14 @@ import Testing
         installedAnalyzers(files)
         #expect(try run(.gate(.analyzers), files: files).first == "==> deadwood 1.0.0")
         let reporter = FakeReporter()
-        try Quality(workspace: workspace(), runner: FakeRunner(), fileSystem: files, reporter: reporter)
-            .analyzers(onlyFrom: URL(fileURLWithPath: "/list"))
+        try Quality(
+            workspace: workspace(),
+            runner: FakeRunner(),
+            fileSystem: files,
+            reporter: reporter,
+            platform: .macOSArm64
+        )
+        .analyzers(onlyFrom: URL(fileURLWithPath: "/list"))
         #expect(reporter.lines.last == "==> modeler 1.0.0 (reporting the changed files)")
     }
 
@@ -44,12 +56,19 @@ import Testing
     @Test func mutationSaysWhatItMutates() throws {
         let files = FakeFileSystem([
             "/pkg/Quality/tools.lock": "swift-mutation-testing 1.6.4 \(sha) -",
-            "/cache/swift-mutation-testing-1.6.4/swift-mutation-testing": "", "/pkg/Sources/HubRules/A.swift": ""
+            "/cache/swift-mutation-testing-1.6.4/swift-mutation-testing": "", "/pkg/Sources/HubRules/A.swift": "",
+            reportPath: mutationReport()
         ])
         #expect(try run(.gate(.mutation), files: files) == ["==> swift-mutation-testing on every library source"])
         let reporter = FakeReporter()
-        try Quality(workspace: workspace(), runner: FakeRunner(), fileSystem: files, reporter: reporter)
-            .mutation(changed: ["Sources/HubRules/A.swift", "Sources/HubRules/B.swift"])
+        try Quality(
+            workspace: workspace(),
+            runner: FakeRunner(),
+            fileSystem: files,
+            reporter: reporter,
+            platform: .macOSArm64
+        )
+        .mutation(.changed(["Sources/HubRules/A.swift", "Sources/HubRules/B.swift"]))
         #expect(reporter.lines == ["==> swift-mutation-testing on Sources/HubRules/A.swift Sources/HubRules/B.swift"])
     }
 
@@ -68,19 +87,27 @@ import Testing
             try run(.gate(.differential), files: files) == [
                 "==> building Wine's hubrules.c into the C harness", "==> building hubrules-swift",
                 "1 cases, 0 different"
-            ])
+            ]
+        )
         let differing = FakeRunner {
             $0.executable.hasSuffix("/harness") ? CommandResult(status: 0, output: "x") : CommandResult(status: 0)
         }
         let reporter = FakeReporter()
         #expect(throws: QualityError.self) {
-            try Quality(workspace: workspace(), runner: differing, fileSystem: files, reporter: reporter)
-                .run(.gate(.differential))
+            try Quality(
+                workspace: workspace(),
+                runner: differing,
+                fileSystem: files,
+                reporter: reporter,
+                platform: .macOSArm64
+            )
+            .run(.gate(.differential))
         }
         #expect(
             reporter.lines.suffix(2) == [
                 "[DIFF] /pkg/Differential/rules/a.txt | /pkg/g.exe | no launcher", "1 cases, 1 different"
-            ])
+            ]
+        )
     }
 
     @Test func onlyTheGateToolsPrintAndEveryHelperIsCaptured() throws {
@@ -89,7 +116,7 @@ import Testing
             "/pkg/Differential/rules/a.txt": "",
             "/pkg/Differential/executables": "/pkg/Sources/HubRules/A.swift",
             "/pkg/Quality/tools.lock": "swift-mutation-testing 1.6.4 \(sha) -",
-            "/cache/.download-swift-mutation-testing-1.6.4/swift-mutation-testing": ""
+            "/cache/.download-swift-mutation-testing-1.6.4/swift-mutation-testing": "", reportPath: mutationReport()
         ])
         installedAnalyzers(files)
         let runner = FakeRunner { call in
@@ -107,7 +134,7 @@ import Testing
             "clang", "env"
         ]
         for call in runner.calls {
-            let name = (call.executable as NSString).lastPathComponent
+            let name = URL(fileURLWithPath: call.executable).lastPathComponent
             #expect(call.echo == printing.contains(name), "\(name) \(call.arguments)")
         }
     }

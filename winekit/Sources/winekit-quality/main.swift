@@ -4,12 +4,18 @@ import QualityKit
 
 do {
     let invocation = try Invocation.parse(
-        Array(CommandLine.arguments.dropFirst()), environment: ProcessInfo.processInfo.environment,
+        Array(CommandLine.arguments.dropFirst()),
+        environment: ProcessInfo.processInfo.environment,
         currentDirectory: URL(fileURLWithPath: FileManager.default.currentDirectoryPath),
-        home: FileManager.default.homeDirectoryForCurrentUser)
+        home: FileManager.default.homeDirectoryForCurrentUser
+    )
     let quality = Quality(
-        workspace: invocation.workspace, runner: ProcessRunner(), fileSystem: LocalFileSystem(),
-        reporter: ConsoleReporter())
+        workspace: invocation.workspace,
+        runner: ProcessRunner(),
+        fileSystem: LocalFileSystem(),
+        reporter: ConsoleReporter(),
+        platform: .current
+    )
     try quality.run(invocation.request)
     print("[OK] \(invocation.request)")
 } catch let error as QualityError {

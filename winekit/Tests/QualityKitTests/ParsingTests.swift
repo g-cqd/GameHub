@@ -27,31 +27,48 @@ import Testing
     @Test func invocationReadsOptionsAnywhere() throws {
         let invocation = try Invocation.parse(
             ["--package", "/p", "changed", "--aemi", "/a", "pre-push", "--tool-cache", "/c", "--wine-source", "/w"],
-            environment: ["WINE_SRC": "/env"], currentDirectory: URL(fileURLWithPath: "/cwd"),
-            home: URL(fileURLWithPath: "/h"))
+            environment: ["WINE_SRC": "/env"],
+            currentDirectory: URL(fileURLWithPath: "/cwd"),
+            home: URL(fileURLWithPath: "/h")
+        )
         #expect(invocation.request == .changed(.prePush))
         #expect(invocation.workspace.toolchain == nil)
         let withToolchain = try Invocation.parse(
-            ["test", "--toolchain", "/tc/bin"], environment: [:], currentDirectory: root, home: root)
+            ["test", "--toolchain", "/tc/bin"],
+            environment: [:],
+            currentDirectory: root,
+            home: root
+        )
         #expect(withToolchain.workspace.toolchain?.path == "/tc/bin")
         #expect(
             invocation.workspace
                 == Workspace(
-                    root: URL(fileURLWithPath: "/p"), aemi: URL(fileURLWithPath: "/a"),
+                    root: URL(fileURLWithPath: "/p"),
+                    aemi: URL(fileURLWithPath: "/a"),
                     toolCache: URL(fileURLWithPath: "/c"),
-                    wineSource: URL(fileURLWithPath: "/w")))
+                    wineSource: URL(fileURLWithPath: "/w")
+                )
+        )
     }
 
     @Test func invocationDefaults() throws {
         let home = URL(fileURLWithPath: "/h")
         let plain = try Invocation.parse(
-            ["test"], environment: [:], currentDirectory: URL(fileURLWithPath: "/cwd"), home: home)
+            ["test"],
+            environment: [:],
+            currentDirectory: URL(fileURLWithPath: "/cwd"),
+            home: home
+        )
         #expect(plain.workspace.root.path == "/cwd")
         #expect(plain.workspace.aemi == nil)
         #expect(plain.workspace.toolCache.path == "/h/Library/Caches/winekit/tools")
         #expect(plain.workspace.wineSource?.path == "/h/Developer/wine")
         let fromEnvironment = try Invocation.parse(
-            ["test"], environment: ["WINE_SRC": "/env"], currentDirectory: URL(fileURLWithPath: "/cwd"), home: home)
+            ["test"],
+            environment: ["WINE_SRC": "/env"],
+            currentDirectory: URL(fileURLWithPath: "/cwd"),
+            home: home
+        )
         #expect(fromEnvironment.workspace.wineSource?.path == "/env")
     }
 
@@ -70,12 +87,14 @@ import Testing
 
     @Test func locksReadAemisFormat() throws {
         let tools = try Lock.parse(
-            "# comment\n\narcleak 0.15.0 \(sha) \(otherSHA)  # trailing\nmutation 1.6.4 \(sha) -\n")
+            "# comment\n\narcleak 0.15.0 \(sha) \(otherSHA)  # trailing\nmutation 1.6.4 \(sha) -\n"
+        )
         #expect(
             tools == [
                 PinnedTool(name: "arcleak", version: "0.15.0", macOSArm64SHA: sha, linuxX86SHA: otherSHA),
                 PinnedTool(name: "mutation", version: "1.6.4", macOSArm64SHA: sha, linuxX86SHA: nil)
-            ])
+            ]
+        )
     }
 
     @Test func malformedLockLinesAreRefused() {

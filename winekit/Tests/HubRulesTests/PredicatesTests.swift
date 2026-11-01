@@ -4,8 +4,10 @@ import Testing
 
 @Suite struct PredicatesTests {
     let amd64 = PEFacts(
-        machine: PEFacts.machineAMD64, sections: [Bytes(".text".utf8), Bytes(".bind".utf8)],
-        imports: [Bytes("KERNEL32.dll".utf8), Bytes("d3d11".utf8)])
+        machine: PEFacts.machineAMD64,
+        sections: [Bytes(".text".utf8), Bytes(".bind".utf8)],
+        imports: [Bytes("KERNEL32.dll".utf8), Bytes("d3d11".utf8)]
+    )
 
     func holds(_ list: String, exe: String = "Game.exe", facts: PEFacts?) -> Bool {
         Predicates.hold(Bytes(list.utf8)[...], exe: Bytes(exe.utf8), facts: facts)

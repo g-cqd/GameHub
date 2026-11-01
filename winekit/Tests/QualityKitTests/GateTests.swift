@@ -5,11 +5,18 @@ import Testing
 
 @Suite struct GateTests {
     func quality(
-        _ runner: FakeRunner, _ files: FakeFileSystem, aemi: URL? = aemiRoot, platform: Platform? = .macOSArm64
+        _ runner: FakeRunner,
+        _ files: FakeFileSystem,
+        aemi: URL? = aemiRoot,
+        platform: Platform? = .macOSArm64
     ) -> Quality {
         Quality(
-            workspace: workspace(aemi: aemi), runner: runner, fileSystem: files, reporter: FakeReporter(),
-            platform: platform)
+            workspace: workspace(aemi: aemi),
+            runner: runner,
+            fileSystem: files,
+            reporter: FakeReporter(),
+            platform: platform
+        )
     }
 
     @Test func configMatchesAemisFiles() throws {
@@ -21,7 +28,8 @@ import Testing
         files.add("/pkg/.swiftlint.yml", "changed")
         #expect(
             throws: QualityError.gateFailed(
-                ".swiftlint.yml differs from Aemi's; run  sh /aemi/scripts/sync-config.sh .")
+                ".swiftlint.yml differs from Aemi's; run  sh /aemi/scripts/sync-config.sh ."
+            )
         ) {
             try quality(FakeRunner(), files).run(.gate(.config))
         }
@@ -44,7 +52,8 @@ import Testing
         #expect(
             runner.calls.map(\.arguments) == [
                 ["/aemi/scripts/check-manifest-settings.sh", "Package.swift"], ["/aemi/scripts/check-tags.sh", "all"]
-            ])
+            ]
+        )
     }
 
     @Test func aFailingCommandFailsItsGate() {
@@ -66,7 +75,8 @@ import Testing
         try quality(runner, FakeFileSystem()).run(.gate(.lint))
         #expect(runner.calls[0].arguments == ["lint", "--strict", "-r", "Sources", "Tests", "Plugins", "Package.swift"])
         #expect(
-            runner.calls[1].arguments == ["lint", "--strict", "--quiet", "--no-cache", "--config", ".swiftlint.yml"])
+            runner.calls[1].arguments == ["lint", "--strict", "--quiet", "--no-cache", "--config", ".swiftlint.yml"]
+        )
         #expect(runner.calls.allSatisfy { $0.echo })
     }
 
@@ -76,13 +86,15 @@ import Testing
         let runner = FakeRunner()
         try quality(runner, files).run(.gate(.analyzers))
         #expect(
-            runner.calls.map { ($0.executable as NSString).lastPathComponent } == [
+            runner.calls.map { URL(fileURLWithPath: $0.executable).lastPathComponent } == [
                 "deadwood", "dolly", "arcleak", "fcheck", "modeler"
-            ])
+            ]
+        )
         #expect(
             runner.calls[0].arguments == [
                 "analyze", "--strict", "--no-cache", "--relative-to", ".", "Sources", "Tests", "Plugins"
-            ])
+            ]
+        )
         #expect(runner.calls[4].arguments == ["check", "--strict", "--no-cache", "--relative-to", ".", "Sources"])
     }
 
@@ -125,15 +137,22 @@ import Testing
                     "test", "-c", "release", "-Xswiftc", "-enable-testing", "--scratch-path", "/pkg/.build/quality",
                     "--disable-sandbox"
                 ]
-            ])
+            ]
+        )
     }
 
     @Test func aGivenToolchainReplacesTheOneOnPath() throws {
         var space = workspace()
         space.toolchain = URL(fileURLWithPath: "/tc/bin")
         let runner = FakeRunner()
-        try Quality(workspace: space, runner: runner, fileSystem: FakeFileSystem(), reporter: FakeReporter())
-            .run(.gate(.test))
+        try Quality(
+            workspace: space,
+            runner: runner,
+            fileSystem: FakeFileSystem(),
+            reporter: FakeReporter(),
+            platform: .macOSArm64
+        )
+        .run(.gate(.test))
         #expect(runner.calls.map(\.executable) == ["/tc/bin/swift", "/tc/bin/swift"])
         #expect(space.toolchainTool("swiftc") == "/tc/bin/swiftc")
         #expect(workspace().toolchainTool("swiftc") == "swiftc")
@@ -149,7 +168,8 @@ import Testing
         let compile = try #require(clean.calls(to: "swiftc").first)
         #expect(
             compile.arguments.contains("Sources/HubRules/A.swift")
-                && !compile.arguments.contains("Sources/HubRules/notes.md"))
+                && !compile.arguments.contains("Sources/HubRules/notes.md")
+        )
         let runtime = FakeRunner {
             $0.executable == "nm"
                 ? CommandResult(status: 0, output: "                 U _swift_retain\n") : CommandResult(status: 0)
@@ -171,7 +191,9 @@ import Testing
         let files = FakeFileSystem([
             "/pkg/Quality/tools.lock": "swift-mutation-testing 1.6.4 \(sha) -",
             "/cache/swift-mutation-testing-1.6.4/swift-mutation-testing": "",
-            "/pkg/Sources/HubRules/A.swift": "", "/pkg/Sources/HubRules/B.swift": "", "/pkg/Sources/tool/main.swift": ""
+            "/pkg/Sources/HubRules/A.swift": "", "/pkg/Sources/HubRules/B.swift": "",
+            "/pkg/Sources/tool/main.swift": "",
+            reportPath: mutationReport()
         ])
         if baseline { files.add("/pkg/.swift-mutation-testing-baseline.json", "{}") }
         return files
@@ -185,19 +207,25 @@ import Testing
         #expect(
             call.arguments.prefix(3) == [
                 "-u", "WINEKIT_DEV", "/cache/swift-mutation-testing-1.6.4/swift-mutation-testing"
-            ])
+            ]
+        )
         let arguments = call.arguments
         #expect(arguments.contains("--no-cache") && !arguments.contains("--exclude"))
         #expect(
-            arguments.suffix(4) == ["--baseline", ".swift-mutation-testing-baseline.json", "--max-new-survivors", "0"])
+            arguments.suffix(4) == ["--baseline", ".swift-mutation-testing-baseline.json", "--max-new-survivors", "0"]
+        )
     }
 
     @Test func aScopedMutationRunExcludesTheRestAndKeepsTheCache() throws {
         let runner = FakeRunner()
-        try quality(runner, mutationFiles(baseline: false)).mutation(changed: ["Sources/HubRules/A.swift"])
+        try quality(runner, mutationFiles(baseline: false))
+            .mutation(.changed(["Sources/HubRules/A.swift"]))
         let arguments = try #require(runner.calls.first).arguments
         #expect(!arguments.contains("--no-cache") && !arguments.contains("--baseline"))
-        #expect(arguments.suffix(2) == ["--exclude", "/Sources/HubRules/B.swift"])
+        // every other source is excluded, the executable's included: the command line replaces the configuration's list
+        #expect(
+            arguments.suffix(4) == ["--exclude", "/Sources/HubRules/B.swift", "--exclude", "/Sources/tool/main.swift"]
+        )
     }
 
     @Test func writingTheBaselineRunsEverythingAndRecordsIt() throws {

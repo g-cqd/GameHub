@@ -33,6 +33,12 @@ public enum EmbeddedCheck {
 
 /// Which sources a mutation run mutates.
 public enum MutationScope {
+    /// A run over every library source (writing the baseline, or checked against it), or over the changed ones only.
+    public enum Run: Equatable, Sendable {
+        case full(writeBaseline: Bool)
+        case changed([String])
+    }
+
     /// `--exclude` arguments that leave every library source out except `changed`. Each path is excluded by its path from
     /// the package root, which the tool matches as a fragment of the absolute path.
     public static func excludeArguments(allSources: [String], changed: [String]) -> [String] {

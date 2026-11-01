@@ -8,7 +8,8 @@ import Testing
             "Sources/HubRules/PEFacts.swift", "Sources/hubrules-swift/main.swift", "Sources/QualityKit/Lock.swift",
             "Tests/HubRulesTests/X.swift", "Package.swift", "README.md", "Differential/rules/edges.txt"
         ],
-        libraryTargets: ["HubRules", "QualityKit"])
+        libraryTargets: ["HubRules", "QualityKit"]
+    )
 
     @Test func sortsTheFilesForEachGate() {
         #expect(changes.swiftFiles.count == 5)
@@ -36,10 +37,12 @@ import Testing
     @Test func gitListsStagedFilesForACommitAndTheBranchForAPush() {
         #expect(
             ChangeSet.gitArguments(for: .preCommit, base: "ignored")
-                == ["diff", "--cached", "--relative", "--name-only", "--diff-filter=ACMR", "--", "."])
+                == ["diff", "--cached", "--relative", "--name-only", "--diff-filter=ACMR", "--", "."]
+        )
         #expect(
             ChangeSet.gitArguments(for: .prePush, base: "origin/topic")
-                == ["diff", "--relative", "--name-only", "--diff-filter=ACMR", "origin/topic...HEAD", "--", "."])
+                == ["diff", "--relative", "--name-only", "--diff-filter=ACMR", "origin/topic...HEAD", "--", "."]
+        )
         #expect(ChangeSet.gitArguments(for: .prePush, base: nil).contains("origin/main...HEAD"))
     }
 
@@ -66,15 +69,21 @@ import Testing
 
     @Test func mutationExcludesEveryUnchangedSource() {
         let arguments = MutationScope.excludeArguments(
-            allSources: ["Sources/A/z.swift", "Sources/A/a.swift", "Sources/B/b.swift"], changed: ["Sources/A/a.swift"])
+            allSources: ["Sources/A/z.swift", "Sources/A/a.swift", "Sources/B/b.swift"],
+            changed: ["Sources/A/a.swift"]
+        )
         #expect(arguments == ["--exclude", "/Sources/A/z.swift", "--exclude", "/Sources/B/b.swift"].sortedPairs())
         #expect(MutationScope.excludeArguments(allSources: ["x"], changed: ["x"]).isEmpty)
     }
 
     @Test func differentialCasesCrossRulesExecutablesAndLaunchers() {
         let cases = Differential.cases(
-            rules: ["/r/b.txt", "/r/a.txt"], executablesList: "# comment\n\n$ROOT/x.exe\n/missing.exe\n /y.exe \n",
-            launchers: ["/l/2", "/l/1"], root: "/pkg", exists: { $0 != "/missing.exe" })
+            rules: ["/r/b.txt", "/r/a.txt"],
+            executablesList: "# comment\n\n$ROOT/x.exe\n/missing.exe\n /y.exe \n",
+            launchers: ["/l/2", "/l/1"],
+            root: "/pkg",
+            exists: { $0 != "/missing.exe" }
+        )
         #expect(cases.count == 2 * 2 * 3)
         #expect(cases.first == DifferentialCase(rules: "/r/a.txt", executable: "/pkg/x.exe", launcher: nil))
         #expect(cases[1].launcher == "/l/1")
@@ -87,7 +96,8 @@ import Testing
         #expect(
             Differential.swiftCall(testCase, rulesFile: "/w/rules/hub-rules.txt") == [
                 "/w/rules/hub-rules.txt", "/e.exe", "/l/1"
-            ])
+            ]
+        )
         let bare = DifferentialCase(rules: "/r/a.txt", executable: "/e.exe", launcher: nil)
         #expect(Differential.harnessCall(bare, rulesDirectory: "/w") == ["/w", "/e.exe"])
         #expect(Differential.swiftCall(bare, rulesFile: "/w/h") == ["/w/h", "/e.exe"])

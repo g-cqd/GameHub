@@ -11,7 +11,10 @@ public struct Invocation: Equatable, Sendable {
     public var workspace: Workspace
 
     public static func parse(
-        _ arguments: [String], environment: [String: String], currentDirectory: URL, home: URL
+        _ arguments: [String],
+        environment: [String: String],
+        currentDirectory: URL,
+        home: URL
     ) throws -> Invocation {
         var rest: [String] = []
         var options: [String: String] = [:]
@@ -34,7 +37,8 @@ public struct Invocation: Equatable, Sendable {
             toolCache: options["--tool-cache"].map(url) ?? home.appendingPathComponent("Library/Caches/winekit/tools"),
             wineSource: (options["--wine-source"] ?? environment["WINE_SRC"]).map(url)
                 ?? home.appendingPathComponent("Developer/wine"),
-            toolchain: options["--toolchain"].map(url))
+            toolchain: options["--toolchain"].map(url)
+        )
         return Invocation(request: try Request.parse(rest), workspace: workspace)
     }
 }

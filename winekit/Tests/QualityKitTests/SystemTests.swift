@@ -39,7 +39,9 @@ import Testing
         defer { try? FileManager.default.removeItem(at: directory) }
         let files = LocalFileSystem()
         try FileManager.default.createDirectory(
-            at: directory.appendingPathComponent("b/c"), withIntermediateDirectories: true)
+            at: directory.appendingPathComponent("b/c"),
+            withIntermediateDirectories: true
+        )
         for path in ["z.txt", "b/c/a.swift", ".hidden", "b/y.swift"] {
             try files.write(Data(path.utf8), to: directory.appendingPathComponent(path))
         }

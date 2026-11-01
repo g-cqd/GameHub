@@ -36,10 +36,12 @@ import Testing
         let curl = try #require(runner.calls(to: "curl").first)
         #expect(
             curl.arguments.last
-                == "https://github.com/g-cqd/dolly/releases/download/v0.13.0/dolly-0.13.0-macos-arm64.tar.gz")
+                == "https://github.com/g-cqd/dolly/releases/download/v0.13.0/dolly-0.13.0-macos-arm64.tar.gz"
+        )
         let copy = try #require(runner.calls(to: "cp").first)
         #expect(
-            copy.arguments == ["-R", "/cache/.download-dolly-0.13.0/dolly-0.13.0-macos-arm64/.", "/cache/dolly-0.13.0"])
+            copy.arguments == ["-R", "/cache/.download-dolly-0.13.0/dolly-0.13.0-macos-arm64/.", "/cache/dolly-0.13.0"]
+        )
         #expect(runner.calls.last?.arguments == ["-rf", "/cache/.download-dolly-0.13.0"])  // the scratch is removed
     }
 
@@ -86,7 +88,11 @@ import Testing
 
     @Test func releaseSourcesNameTheirArchives() {
         let mutation = PinnedTool(
-            name: "swift-mutation-testing", version: "1.6.4", macOSArm64SHA: sha, linuxX86SHA: nil)
+            name: "swift-mutation-testing",
+            version: "1.6.4",
+            macOSArm64SHA: sha,
+            linuxX86SHA: nil
+        )
         #expect(
             ReleaseSource.swiftMutationTesting.url(mutation, .macOSArm64)
                 == "https://github.com/ericodx/swift-mutation-testing/releases/download/v1.6.4/swift-mutation-testing-v1.6.4-macos.tar.gz"

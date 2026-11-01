@@ -8,7 +8,8 @@ extension Quality {
             let ours = try? fileSystem.contents(workspace.root.appendingPathComponent(name))
             guard canonical == ours else {
                 throw QualityError.gateFailed(
-                    "\(name) differs from Aemi's; run  sh \(aemi.path)/scripts/sync-config.sh .")
+                    "\(name) differs from Aemi's; run  sh \(aemi.path)/scripts/sync-config.sh ."
+                )
             }
         }
         reporter.note("[OK] configuration is Aemi's")
@@ -17,8 +18,10 @@ extension Quality {
     func format(_ paths: [String], recursive: Bool) throws {
         reporter.step("swift-format lint --strict (\(paths.count) path(s))")
         try gate(
-            "swift-format", ["lint", "--strict"] + (recursive ? ["-r"] : []) + paths,
-            failure: "formatting: run  swift-format format -i on the files above")
+            "swift-format",
+            ["lint", "--strict"] + (recursive ? ["-r"] : []) + paths,
+            failure: "formatting: run  swift-format format -i on the files above"
+        )
     }
 
     /// SwiftLint over the package, or over `files` only.
@@ -28,7 +31,8 @@ extension Quality {
             "swiftlint",
             ["lint", "--strict", "--quiet", "--no-cache", "--config", ".swiftlint.yml"]
                 + (files.map { ["--force-exclude"] + $0 } ?? []),
-            failure: "SwiftLint metrics")
+            failure: "SwiftLint metrics"
+        )
     }
 
     /// The analyzers over the whole corpus (reachability and clones are whole-program), reporting every finding or only
@@ -37,13 +41,19 @@ extension Quality {
         let aemi = try aemiDirectory()
         let tools = try Lock.parse(
             String(
-                decoding: try fileSystem.contents(aemi.appendingPathComponent("scripts/analyzers.lock")), as: UTF8.self)
+                decoding: try fileSystem.contents(aemi.appendingPathComponent("scripts/analyzers.lock")),
+                as: UTF8.self
+            )
         )
         guard let platform else {
             throw QualityError.unavailable("the analyzers publish macOS arm64 and Linux x86_64 archives only")
         }
         let installer = ToolInstaller(
-            runner: runner, fileSystem: fileSystem, cache: workspace.toolCache, platform: platform)
+            runner: runner,
+            fileSystem: fileSystem,
+            cache: workspace.toolCache,
+            platform: platform
+        )
         var failed: [String] = []
         for name in ["deadwood", "dolly", "arcleak", "fcheck", "modeler"] {
             guard let tool = tools.first(where: { $0.name == name }) else {
@@ -55,8 +65,11 @@ extension Quality {
             let corpus = name == "modeler" ? ["Sources"] : Workspace.corpus
             let scope = onlyFrom.map { ["--only-from", $0.path] } ?? []
             let result = try runner.run(
-                executable.path, [command, "--strict", "--no-cache", "--relative-to", "."] + scope + corpus,
-                in: workspace.root, echo: true)
+                executable.path,
+                [command, "--strict", "--no-cache", "--relative-to", "."] + scope + corpus,
+                in: workspace.root,
+                echo: true
+            )
             if !result.succeeded { failed.append(name) }
         }
         guard failed.isEmpty else { throw QualityError.gateFailed("findings from \(failed.joined(separator: ", "))") }
@@ -69,8 +82,10 @@ extension Quality {
         guard release else { return }
         reporter.step("swift test -c release")
         try gate(
-            workspace.toolchainTool("swift"), ["test", "-c", "release", "-Xswiftc", "-enable-testing"] + scratch,
-            failure: "tests failed in release")
+            workspace.toolchainTool("swift"),
+            ["test", "-c", "release", "-Xswiftc", "-enable-testing"] + scratch,
+            failure: "tests failed in release"
+        )
     }
 
     func embedded() throws {
@@ -83,7 +98,8 @@ extension Quality {
             try gate(
                 workspace.toolchainTool("swiftc"),
                 EmbeddedCheck.compileArguments(module: module, sources: sources, object: object),
-                failure: "\(module) does not compile as Embedded Swift")
+                failure: "\(module) does not compile as Embedded Swift"
+            )
             let symbols = try runner.run("nm", [object], in: workspace.root, echo: false)
             let outside = EmbeddedCheck.disallowed(nmOutput: symbols.output)
             guard outside.isEmpty else {
@@ -94,40 +110,66 @@ extension Quality {
 
     /// Mutation testing over the library sources, or only over `changed`. A scoped run keeps the tool's result cache, so a
     /// push reuses what the commit already ran. The gate: no survivor the committed baseline doesn't hold, score ≥ 90.
-    func mutation(changed: [String]?, writeBaseline: Bool = false) throws {
+    func mutation(_ scope: MutationScope.Run) throws {
         guard platform == .macOSArm64 else {
             throw QualityError.unavailable("swift-mutation-testing is published for macOS arm64 only")
         }
         let lockText = String(
             decoding: try fileSystem.contents(workspace.root.appendingPathComponent("Quality/tools.lock")),
-            as: UTF8.self)
+            as: UTF8.self
+        )
         guard let tool = try Lock.parse(lockText).first(where: { $0.name == "swift-mutation-testing" }) else {
             throw QualityError.unavailable("swift-mutation-testing is not in Quality/tools.lock")
         }
         let installer = ToolInstaller(
-            runner: runner, fileSystem: fileSystem, cache: workspace.toolCache, platform: .macOSArm64)
+            runner: runner,
+            fileSystem: fileSystem,
+            cache: workspace.toolCache,
+            platform: .macOSArm64
+        )
         let executable = try installer.executable(for: tool, from: .swiftMutationTesting)
-        let all = libraryTargets.flatMap(swiftSources(of:))
+        let report = workspace.scratch.appendingPathComponent("mutation-report.json")
+        let baseline = workspace.root.appendingPathComponent(".swift-mutation-testing-baseline.json")
         var arguments = [
-            "run", ".", "--sources-path", "Sources", "--operator-tier", "experimental", "--min-score", "90"
+            "run", ".", "--sources-path", "Sources", "--operator-tier", "experimental", "--min-score", "90",
+            "--output", report.path
         ]
-        if let changed {
-            arguments += MutationScope.excludeArguments(allSources: all, changed: changed)
+        if case .changed(let changed) = scope {
+            // The tool refuses a baseline of another scope: the scoped run is compared with it below.
+            // The command line's excludes replace the configuration's: every other Swift file under Sources is listed,
+            // the executables' included.
+            let everySource = fileSystem.files(under: workspace.root.appendingPathComponent("Sources"))
+                .filter { $0.hasSuffix(".swift") }.map { "Sources/\($0)" }
+            arguments += MutationScope.excludeArguments(allSources: everySource, changed: changed)
             reporter.step("swift-mutation-testing on \(changed.joined(separator: " "))")
         } else {
             arguments += ["--no-cache"]
             reporter.step("swift-mutation-testing on every library source")
-        }
-        if writeBaseline {
-            arguments += ["--write-baseline", ".swift-mutation-testing-baseline.json"]
-        } else if fileSystem.fileExists(workspace.root.appendingPathComponent(".swift-mutation-testing-baseline.json"))
-        {
-            arguments += ["--baseline", ".swift-mutation-testing-baseline.json", "--max-new-survivors", "0"]
+            if scope == .full(writeBaseline: true) {
+                arguments += ["--write-baseline", ".swift-mutation-testing-baseline.json"]
+            } else if fileSystem.fileExists(baseline) {
+                arguments += ["--baseline", ".swift-mutation-testing-baseline.json", "--max-new-survivors", "0"]
+            }
         }
         // Without WINEKIT_DEV: the dev plugins would lint every mutated build, and a lint failure would read as an
         // unviable mutant rather than a result.
         try gate(
-            "env", ["-u", "WINEKIT_DEV", executable.path] + arguments,
-            failure: "mutation: a mutant survived that the baseline does not hold, or the score is under 90")
+            "env",
+            ["-u", "WINEKIT_DEV", executable.path] + arguments,
+            failure: "mutation: a mutant survived that the baseline does not hold, or the score is under 90"
+        )
+        guard case .changed = scope else { return }
+        guard fileSystem.fileExists(report) else {
+            throw QualityError.unavailable("the mutation run wrote no report at \(report.path)")
+        }
+        let new = try MutationVerdict.newUndetected(
+            report: try fileSystem.contents(report),
+            baseline: fileSystem.fileExists(baseline) ? try fileSystem.contents(baseline) : nil
+        )
+        guard new.isEmpty else {
+            throw QualityError.gateFailed(
+                "mutation: undetected mutants the baseline doesn't hold: \(new.map(\.description).joined(separator: "; "))"
+            )
+        }
     }
 }

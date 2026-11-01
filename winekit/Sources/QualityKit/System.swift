@@ -79,8 +79,8 @@ public struct ProcessRunner: CommandRunning {
             try? FileManager.default.removeItem(at: errURL)
         }
         if !echo {
-            FileManager.default.createFile(atPath: outURL.path, contents: nil)
-            FileManager.default.createFile(atPath: errURL.path, contents: nil)
+            _ = FileManager.default.createFile(atPath: outURL.path, contents: nil)
+            _ = FileManager.default.createFile(atPath: errURL.path, contents: nil)
             process.standardOutput = try FileHandle(forWritingTo: outURL)
             process.standardError = try FileHandle(forWritingTo: errURL)
         }
@@ -89,8 +89,10 @@ public struct ProcessRunner: CommandRunning {
         let out = echo ? Data() : (try? Data(contentsOf: outURL)) ?? Data()
         let err = echo ? Data() : (try? Data(contentsOf: errURL)) ?? Data()
         return CommandResult(
-            status: process.terminationStatus, output: String(decoding: out, as: UTF8.self),
-            errors: String(decoding: err, as: UTF8.self))
+            status: process.terminationStatus,
+            output: String(decoding: out, as: UTF8.self),
+            errors: String(decoding: err, as: UTF8.self)
+        )
     }
 }
 
@@ -106,7 +108,10 @@ public struct LocalFileSystem: FileSystem {
         let base = directory.standardizedFileURL.path + "/"
         guard
             let walker = FileManager.default.enumerator(
-                at: directory, includingPropertiesForKeys: [.isRegularFileKey], options: [.skipsHiddenFiles])
+                at: directory,
+                includingPropertiesForKeys: [.isRegularFileKey],
+                options: [.skipsHiddenFiles]
+            )
         else { return [] }
         var found: [String] = []
         for case let url as URL in walker

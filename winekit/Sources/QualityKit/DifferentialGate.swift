@@ -20,22 +20,29 @@ extension Quality {
         try helper("cp", inputs + [work.path], failure: "could not copy the C sources")
         reporter.step("building Wine's hubrules.c into the C harness")
         try gate(
-            "clang", Differential.harnessArguments(work: work.path, wineSource: wine.path),
-            failure: "the C harness did not build")
+            "clang",
+            Differential.harnessArguments(work: work.path, wineSource: wine.path),
+            failure: "the C harness did not build"
+        )
         reporter.step("building hubrules-swift")
         try gate(
             workspace.toolchainTool("swift"),
             ["build"] + workspace.nestedBuildArguments + ["--product", "hubrules-swift"],
-            failure: "hubrules-swift did not build")
+            failure: "hubrules-swift did not build"
+        )
 
         let cases = Differential.cases(
             rules: fileSystem.files(under: corpus.appendingPathComponent("rules")).filter { $0.hasSuffix(".txt") }
                 .map { corpus.appendingPathComponent("rules/\($0)").path },
             executablesList: String(
-                decoding: try fileSystem.contents(corpus.appendingPathComponent("executables")), as: UTF8.self),
+                decoding: try fileSystem.contents(corpus.appendingPathComponent("executables")),
+                as: UTF8.self
+            ),
             launchers: fileSystem.files(under: corpus.appendingPathComponent("launchers"))
                 .map { corpus.appendingPathComponent("launchers/\($0)").path },
-            root: root.path, exists: { fileSystem.fileExists(URL(fileURLWithPath: $0)) })
+            root: root.path,
+            exists: { fileSystem.fileExists(URL(fileURLWithPath: $0)) }
+        )
         guard !cases.isEmpty else { throw QualityError.gateFailed("the differential corpus has no case") }
 
         let rulesDirectory = work.appendingPathComponent("rules")
@@ -46,13 +53,22 @@ extension Quality {
         for testCase in cases {
             try helper("cp", [testCase.rules, rulesFile], failure: "could not stage \(testCase.rules)")
             let c = try runner.run(
-                harness, Differential.harnessCall(testCase, rulesDirectory: rulesDirectory.path), in: root, echo: false)
+                harness,
+                Differential.harnessCall(testCase, rulesDirectory: rulesDirectory.path),
+                in: root,
+                echo: false
+            )
             let swift = try runner.run(
-                swiftTool, Differential.swiftCall(testCase, rulesFile: rulesFile), in: root, echo: false)
+                swiftTool,
+                Differential.swiftCall(testCase, rulesFile: rulesFile),
+                in: root,
+                echo: false
+            )
             if c.output != swift.output || !c.succeeded || !swift.succeeded {
                 different.append(testCase)
                 reporter.note(
-                    "[DIFF] \(testCase.rules) | \(testCase.executable) | \(testCase.launcher ?? "no launcher")")
+                    "[DIFF] \(testCase.rules) | \(testCase.executable) | \(testCase.launcher ?? "no launcher")"
+                )
             }
         }
         reporter.note("\(cases.count) cases, \(different.count) different")

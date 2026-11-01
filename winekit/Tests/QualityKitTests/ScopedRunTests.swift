@@ -11,7 +11,7 @@ import Testing
             "/pkg/Sources/HubRules/A.swift": "", "/pkg/Sources/QualityKit/Q.swift": "",
             "/pkg/Sources/tool/main.swift": "",
             "/pkg/Quality/tools.lock": "swift-mutation-testing 1.6.4 \(sha) -",
-            "/cache/swift-mutation-testing-1.6.4/swift-mutation-testing": ""
+            "/cache/swift-mutation-testing-1.6.4/swift-mutation-testing": "", reportPath: mutationReport()
         ])
         installedAnalyzers(files)
         let runner = FakeRunner { call in
@@ -22,13 +22,18 @@ import Testing
             return CommandResult(status: 0, output: changed.joined(separator: "\n"))
         }
         let quality = Quality(
-            workspace: workspace(wine: nil), runner: runner, fileSystem: files, reporter: FakeReporter(),
-            platform: .macOSArm64)
+            workspace: workspace(wine: nil),
+            runner: runner,
+            fileSystem: files,
+            reporter: FakeReporter(),
+            platform: .macOSArm64
+        )
         return (quality, runner, files)
     }
 
     func tools(_ runner: FakeRunner) -> [String] {
-        runner.calls.map { ($0.executable as NSString).lastPathComponent }.filter { !["git", "mkdir"].contains($0) }
+        runner.calls.map { URL(fileURLWithPath: $0.executable).lastPathComponent }
+            .filter { !["git", "mkdir"].contains($0) }
     }
 
     @Test func nothingChangedRunsNothing() throws {
@@ -44,7 +49,12 @@ import Testing
             ("/pkg/Differential/executables", "$ROOT/Sources/tool/main.swift\n")
         ] { files.add(path, text) }
         let quality = Quality(
-            workspace: workspace(), runner: runner, fileSystem: files, reporter: FakeReporter(), platform: .macOSArm64)
+            workspace: workspace(),
+            runner: runner,
+            fileSystem: files,
+            reporter: FakeReporter(),
+            platform: .macOSArm64
+        )
         try quality.run(.changed(.preCommit))
         let order = [
             "sh", "swift-format", "swiftlint", "deadwood", "dolly", "arcleak", "fcheck", "modeler", "swift", "swiftc",
@@ -57,13 +67,16 @@ import Testing
         #expect(runner.calls(to: "sh").first?.arguments == ["/aemi/scripts/check-tags.sh", "staged"])
         #expect(runner.calls(to: "swift-format").first?.arguments == ["lint", "--strict", "Sources/HubRules/A.swift"])
         #expect(
-            runner.calls(to: "swiftlint").first?.arguments.suffix(2) == ["--force-exclude", "Sources/HubRules/A.swift"])
+            runner.calls(to: "swiftlint").first?.arguments.suffix(2) == ["--force-exclude", "Sources/HubRules/A.swift"]
+        )
         #expect(runner.calls(to: "deadwood").first?.arguments.contains("/pkg/.build/quality/changed-files") == true)
         #expect(files.text("/pkg/.build/quality/changed-files") == "Sources/HubRules/A.swift\n")
         // debug only before a commit
         #expect(runner.calls(to: "swift").filter { $0.arguments.first == "test" }.count == 1)
         let mutation = try #require(runner.calls(to: "env").first).arguments
-        #expect(mutation.suffix(2) == ["--exclude", "/Sources/QualityKit/Q.swift"])
+        #expect(
+            mutation.suffix(4) == ["--exclude", "/Sources/QualityKit/Q.swift", "--exclude", "/Sources/tool/main.swift"]
+        )
     }
 
     @Test func aPushComparesWithTheUpstreamAndTestsInReleaseToo() throws {
@@ -91,14 +104,20 @@ import Testing
         }
         try quality.run(.changed(.prePush))
         #expect(
-            runner.calls(to: "sh").first?.arguments == ["/aemi/scripts/check-manifest-settings.sh", "Package.swift"])
+            runner.calls(to: "sh").first?.arguments == ["/aemi/scripts/check-manifest-settings.sh", "Package.swift"]
+        )
         #expect(runner.calls(to: "swift-format").first?.arguments.last == "Package.swift")
     }
 
     @Test func aFailedGitDiffIsUnavailable() {
         let runner = FakeRunner { _ in CommandResult(status: 128, errors: "not a git repository\n") }
         let quality = Quality(
-            workspace: workspace(), runner: runner, fileSystem: FakeFileSystem(), reporter: FakeReporter())
+            workspace: workspace(),
+            runner: runner,
+            fileSystem: FakeFileSystem(),
+            reporter: FakeReporter(),
+            platform: .macOSArm64
+        )
         #expect(throws: QualityError.unavailable("git diff failed: not a git repository")) {
             try quality.run(.changed(.preCommit))
         }

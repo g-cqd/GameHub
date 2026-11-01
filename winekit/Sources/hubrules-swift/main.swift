@@ -7,7 +7,8 @@ import HubRules
 let arguments = CommandLine.arguments
 guard arguments.count >= 3 else {
     FileHandle.standardError.write(
-        Data("usage: hubrules-swift <rules-file> <executable> [launcher-compatdb-file]\n".utf8))
+        Data("usage: hubrules-swift <rules-file> <executable> [launcher-compatdb-file]\n".utf8)
+    )
     exit(2)
 }
 

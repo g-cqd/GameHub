@@ -14,7 +14,8 @@ import Testing
     @Test func compatdbRulesPassThroughAfterTheHeader() {
         #expect(
             text(apply("name=a;exe=a.exe;dxgi=dxmt\n  \tname=b;exe=b.exe"))
-                == "v=3\nname=a;exe=a.exe;dxgi=dxmt\nname=b;exe=b.exe")
+                == "v=3\nname=a;exe=a.exe;dxgi=dxmt\nname=b;exe=b.exe"
+        )
     }
 
     @Test func blankAndCommentLinesAreSkipped() {

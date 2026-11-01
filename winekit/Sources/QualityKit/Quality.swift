@@ -6,7 +6,7 @@ public enum Gate: String, CaseIterable, Sendable {
     case config
     /// Package.swift has the family's canonical compiler settings (Aemi's scripts/check-manifest-settings.sh).
     case manifest
-    /// No TODO/FIXME or planning shorthand in the sources (Aemi's scripts/check-tags.sh).
+    /// No work-in-progress markers or planning shorthand in the sources (Aemi's scripts/check-tags.sh).
     case tags
     /// swift-format lint --strict.
     case format
@@ -113,8 +113,11 @@ public struct Quality: Sendable {
     let platform: Platform?
 
     public init(
-        workspace: Workspace, runner: any CommandRunning, fileSystem: any FileSystem, reporter: any Reporting,
-        platform: Platform? = .current
+        workspace: Workspace,
+        runner: any CommandRunning,
+        fileSystem: any FileSystem,
+        reporter: any Reporting,
+        platform: Platform?
     ) {
         self.workspace = workspace
         self.runner = runner
@@ -129,7 +132,7 @@ public struct Quality: Sendable {
             case .fast: for gate in Request.fastGates { try run(gate) }
             case .all: for gate in Request.allGates { try run(gate) }
             case .changed(let hook): try runChanged(hook)
-            case .mutationBaseline: try mutation(changed: nil, writeBaseline: true)
+            case .mutationBaseline: try mutation(.full(writeBaseline: true))
         }
     }
 
@@ -145,7 +148,7 @@ public struct Quality: Sendable {
             case .test: try test(release: true)
             case .embedded: try embedded()
             case .differential: try differential()
-            case .mutation: try mutation(changed: nil, writeBaseline: false)
+            case .mutation: try mutation(.full(writeBaseline: false))
         }
     }
 
@@ -154,7 +157,8 @@ public struct Quality: Sendable {
         let files = fileSystem.files(under: workspace.root.appendingPathComponent("Sources"))
         let targets = Set(files.compactMap { $0.split(separator: "/").first.map(String.init) })
         let executables = Set(
-            files.filter { $0.hasSuffix("/main.swift") }.compactMap { $0.split(separator: "/").first })
+            files.filter { $0.hasSuffix("/main.swift") }.compactMap { $0.split(separator: "/").first }
+        )
         return targets.filter { !executables.contains(Substring($0)) }.sorted()
     }
 

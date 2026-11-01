@@ -57,7 +57,11 @@ public struct PEFacts: Equatable, Sendable {
     }
 
     private static func readImports(
-        _ file: some PEFile, ntOffset: Int, magic: UInt16, optionalSize: Int, _ sections: [Section]
+        _ file: some PEFile,
+        ntOffset: Int,
+        magic: UInt16,
+        optionalSize: Int,
+        _ sections: [Section]
     ) -> [Bytes] {
         // DataDirectory[1] (imports): optional header offsets 112 (PE32+) and 96 (PE32), each directory 8 bytes.
         let directories: Int

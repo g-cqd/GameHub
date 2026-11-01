@@ -18,7 +18,7 @@ concurrency:
 jobs:
   quality:
     # Lint gate, build and test on macOS and Linux, coverage: Aemi's reusable workflow, pinned like Package.swift's aemi.
-    uses: Aemi-Studio/aemi/.github/workflows/swift-quality.yml@8475434abab0493d9bda746f78e33087899391c3 # aemi 8475434
+    uses: Aemi-Studio/aemi/.github/workflows/swift-quality.yml@c06c050dd13fa737fac9d173113c727d3212c5b8 # aemi c06c050
     with:
       dev-env-var: WINEKIT_DEV
       package-path: winekit

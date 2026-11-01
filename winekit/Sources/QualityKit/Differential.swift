@@ -14,7 +14,11 @@ public enum Differential {
     /// The cases of a corpus: every rules file × every listed executable that exists × no launcher and every launcher file.
     /// Executable lines may use `$ROOT` (the package directory); blank lines and `#` comments are skipped.
     public static func cases(
-        rules: [String], executablesList: String, launchers: [String], root: String, exists: (String) -> Bool
+        rules: [String],
+        executablesList: String,
+        launchers: [String],
+        root: String,
+        exists: (String) -> Bool
     ) -> [DifferentialCase] {
         let executables = executablesList.split(separator: "\n").map { String($0).trimmed }
             .filter { !$0.isEmpty && !$0.hasPrefix("#") }

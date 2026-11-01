@@ -77,8 +77,15 @@ public struct ToolInstaller: Sendable {
         defer { _ = try? runner.run("rm", ["-rf", scratch], in: Self.anywhere, echo: false) }
 
         try step(
-            "download \(tool.name) \(tool.version)", "curl", "-fsSL", "--retry", "3", "-o", archive,
-            source.url(tool, platform))
+            "download \(tool.name) \(tool.version)",
+            "curl",
+            "-fsSL",
+            "--retry",
+            "3",
+            "-o",
+            archive,
+            source.url(tool, platform)
+        )
         let actual =
             try step("hash", "shasum", "-a", "256", archive).output.split(separator: " ").first.map(String.init) ?? ""
         guard actual == sha else {
@@ -88,12 +95,18 @@ public struct ToolInstaller: Sendable {
 
         // The binary's directory goes whole: the Linux archives carry the Swift runtime libraries beside it.
         let files = fileSystem.files(under: URL(fileURLWithPath: scratch))
-        guard let binary = files.first(where: { ($0 as NSString).lastPathComponent == tool.name }) else {
+        guard let binary = files.first(where: { URL(fileURLWithPath: $0).lastPathComponent == tool.name }) else {
             throw QualityError.unavailable("\(tool.name): no binary in the archive")
         }
         let target = directory(for: tool).path
         try step("create \(target)", "mkdir", "-p", target)
-        try step("install", "cp", "-R", ((scratch + "/" + binary) as NSString).deletingLastPathComponent + "/.", target)
+        try step(
+            "install",
+            "cp",
+            "-R",
+            URL(fileURLWithPath: scratch + "/" + binary).deletingLastPathComponent().path + "/.",
+            target
+        )
 
         let reported = try runner.run(installed.path, ["--version"], in: Self.anywhere, echo: false)
         guard reported.succeeded, reported.output.contains(tool.version) else {

@@ -30,7 +30,9 @@ import Testing
         image.sections[1].virtualSize = 0x4000
         image.sections[1].rawSize = 0x4000
         let bytes = Self.relocatedImports(
-            (0 ..< 300).map { "d\($0)" }, into: image.bytes + [UInt8](repeating: 0, count: 0x4000))
+            (0 ..< 300).map { "d\($0)" },
+            into: image.bytes + [UInt8](repeating: 0, count: 0x4000)
+        )
         let read = try #require(PEFacts.read(from: PEBytes(bytes)))
         #expect(read.imports.count == 256)
         #expect(names(read.imports).last == "d255")
