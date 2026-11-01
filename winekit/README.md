@@ -39,8 +39,11 @@ WINEKIT_DEV=1 swift package --disable-sandbox quality changed pre-commit
 | `fast` / `all` | the static gates / everything but mutation |
 | `changed pre-commit\|pre-push` | every gate scoped to the change: format and lint read the changed files, the analyzers report only them; a push also mutates the changed HubRules sources (a commit doesn't wait for it) |
 
-`WINEKIT_DEV=1` resolves Aemi (Aemi-Studio/aemi, pinned in `Package.swift`): its LintBuild plugin, scripts, lock and
-configuration. swift-mutation-testing, which Aemi doesn't pin, is pinned in `Quality/tools.lock`. Every download is
+Aemi (Aemi-Studio/aemi, pinned in `Package.swift`) is a regular dependency: QualityKit builds on AemiFileSystem, and the
+gates use Aemi's scripts, analyzers lock and configuration. HubRules doesn't use it, because it links into ntdll as Embedded
+Swift and AemiKernel isn't Embedded-clean yet (`../development/reports/aemi-embedded-kernel.md`). `WINEKIT_DEV=1` adds
+Aemi's LintBuild plugin to every build; Wine's build leaves it out. Resolving Aemi also fetches swift-syntax,
+swift-collections and swift-system, including for Wine's `wine-objects` step. swift-mutation-testing, which Aemi doesn't pin, is pinned in `Quality/tools.lock`. Every download is
 checked against its pinned SHA-256 and the binary's reported version before it runs.
 
 GameHub's `.project-hooks.yml` runs `quality changed` on commit and push once the repository is trusted

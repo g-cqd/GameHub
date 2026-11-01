@@ -1,3 +1,4 @@
+import AemiFileSystem
 public import Foundation
 
 /// What a command printed and how it ended.
@@ -96,7 +97,7 @@ public struct ProcessRunner: CommandRunning {
     }
 }
 
-/// Foundation's `FileManager`.
+/// The local disk: Foundation for files, Aemi's `DirectoryWalk` for listing.
 public struct LocalFileSystem: FileSystem {
     public init() {}
 
@@ -104,22 +105,12 @@ public struct LocalFileSystem: FileSystem {
 
     public func contents(_ url: URL) throws -> Data { try Data(contentsOf: url) }
 
+    /// Hidden entries are skipped and links aren't followed; a directory that can't be opened lists nothing.
     public func files(under directory: URL) -> [String] {
-        let base = directory.standardizedFileURL.path + "/"
-        guard
-            let walker = FileManager.default.enumerator(
-                at: directory,
-                includingPropertiesForKeys: [.isRegularFileKey],
-                options: [.skipsHiddenFiles]
-            )
-        else { return [] }
-        var found: [String] = []
-        for case let url as URL in walker
-        where (try? url.resourceValues(forKeys: [.isRegularFileKey]).isRegularFile) == true {
-            let path = url.standardizedFileURL.path
-            found.append(path.hasPrefix(base) ? String(path.dropFirst(base.count)) : path)
+        guard let walk = try? DirectoryWalk.walk(directory.path, policy: DirectoryWalk.Policy(links: .never)) else {
+            return []
         }
-        return found.sorted()
+        return walk.entries.filter { $0.kind == .file }.map(\.relativePath)
     }
 
     public func write(_ data: Data, to url: URL) throws { try data.write(to: url) }

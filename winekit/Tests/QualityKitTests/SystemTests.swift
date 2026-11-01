@@ -52,6 +52,28 @@ import Testing
         #expect(files.files(under: directory.appendingPathComponent("missing")).isEmpty)
     }
 
+    @Test func hiddenDirectoriesAndLinksAreNotListed() throws {
+        let directory = here.appendingPathComponent("winekit-fs-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let files = LocalFileSystem()
+        let manager = FileManager.default
+        for path in ["src", ".build/debug"] {
+            try manager.createDirectory(at: directory.appendingPathComponent(path), withIntermediateDirectories: true)
+        }
+        for path in ["src/a.swift", ".build/debug/b.swift"] {
+            try files.write(Data(), to: directory.appendingPathComponent(path))
+        }
+        try manager.createSymbolicLink(
+            atPath: directory.appendingPathComponent("linked").path,
+            withDestinationPath: "src"
+        )
+        try manager.createSymbolicLink(
+            atPath: directory.appendingPathComponent("src/c.swift").path,
+            withDestinationPath: "a.swift"
+        )
+        #expect(files.files(under: directory) == ["src/a.swift"])
+    }
+
     @Test func theConsoleReporterMarksSteps() {
         let lines = Mutex<[String]>([])
         let reporter = ConsoleReporter { line in lines.withLock { $0.append(line) } }

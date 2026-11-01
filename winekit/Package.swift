@@ -20,9 +20,11 @@ let strictSettings: [SwiftSetting] = [
 // The rules engine reads executables a game ships, so every unsafe construct in it must be marked `unsafe`.
 let librarySettings: [SwiftSetting] = strictSettings + [.strictMemorySafety()]
 
-// Dev-only tooling behind WINEKIT_DEV, so a consumer never resolves it: Aemi's shared LintBuild plugin (swift-format lint
-// --strict as a prebuild step), its scripts (check-manifest-settings.sh, check-tags.sh, analyzers.lock) and its canonical
-// configuration, pinned to one revision.
+// Aemi, pinned to one revision: QualityKit builds on its libraries (AemiFileSystem), and the gates use its scripts
+// (check-manifest-settings.sh, check-tags.sh, analyzers.lock) and canonical configuration. HubRules doesn't depend on it:
+// it links into ntdll as Embedded Swift, which AemiKernel doesn't support yet (development/reports/aemi-embedded-kernel.md).
+// Aemi's LintBuild plugin (swift-format lint --strict as a prebuild step) only runs behind WINEKIT_DEV, so Wine's build
+// doesn't lint.
 let isDev = Context.environment["WINEKIT_DEV"] != nil
 let devPlugins: [Target.PluginUsage] = isDev ? [.plugin(name: "LintBuild", package: "aemi")] : []
 
@@ -39,13 +41,18 @@ let package = Package(
         .plugin(name: "Quality", targets: ["Quality"]),
         .plugin(name: "WineObjects", targets: ["WineObjects"])
     ],
-    dependencies: isDev ? [aemi] : [],
+    dependencies: [aemi],
     targets: [
         .target(name: "HubRules", swiftSettings: librarySettings, plugins: devPlugins),
         .testTarget(name: "HubRulesTests", dependencies: ["HubRules"], swiftSettings: strictSettings),
 
         // The quality gates: QualityKit decides, winekit-quality runs it, the Quality plugin hands it the package.
-        .target(name: "QualityKit", swiftSettings: strictSettings, plugins: devPlugins),
+        .target(
+            name: "QualityKit",
+            dependencies: [.product(name: "AemiFileSystem", package: "aemi")],
+            swiftSettings: strictSettings,
+            plugins: devPlugins
+        ),
         .executableTarget(name: "winekit-quality", dependencies: ["QualityKit"], swiftSettings: strictSettings),
         .plugin(
             name: "Quality",
