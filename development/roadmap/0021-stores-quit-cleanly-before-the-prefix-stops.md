@@ -1,5 +1,5 @@
 ---
-status: in-progress
+status: done
 blocked-by: []
 date: 2026-10-31
 ---
@@ -22,3 +22,8 @@ Steam's log shows a clean shutdown after `hub stop`, and `hub stop` refuses whil
 - `hub stop` refuses while a game runs, unless `--force`.
 
 Not run yet, because the owner was playing.
+
+## Result (2026-11-01)
+Three polite shutdowns (`steam-shutdown-*.log`, 2026-10-31 23:39 and 23:49, 2026-11-01 02:10) each made Steam log
+"Log session ended" within a second, before the prefix was stopped. Refusing while a game runs is in `cmd_stop`;
+that has not been exercised live.

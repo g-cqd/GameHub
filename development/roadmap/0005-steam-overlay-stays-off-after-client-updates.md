@@ -1,5 +1,5 @@
 ---
-status: in-progress
+status: done
 blocked-by: []
 date: 2026-10-31
 ---
@@ -24,3 +24,9 @@ date: 2026-10-31
 at Steam start and again before every Steam game launch. A file the client restored replaces the copy disabled
 earlier. It has unit tests (`launcher/tests/test_steam.py`). Not run yet, because the owner was playing; the "Done
 when" still needs a client update and `hub doctor`.
+
+## Result (2026-11-01)
+The overlay files are moved before every Steam game. On 2026-10-31 each launch moved the 7 files the client had
+restored, and two HITMAN 3 sessions traced with `+loaddll` loaded no `GameOverlayRenderer`. `hub doctor` now fails
+only when Steam is stopped and the files are present; while Steam runs, restored files are reported as info.
+Not yet run: Act of Aggression's intro with the hub (the original crash).

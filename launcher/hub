@@ -1294,7 +1294,12 @@ def cmd_doctor(args):
     chk("no stale SteamOld references", "steamold" not in reg.lower())
     chk("EA Desktop client", ea_client() is not None)
     chk("Epic Games Launcher client", epic_client() is not None)
-    chk("Steam overlay disabled", not (STEAM / "GameOverlayRenderer.dll").exists())
+    # A running Steam restores the overlay files; hub moves them again before every Steam game (ADR-0011, 0005)
+    overlay_back = [n for n in STEAM_OVERLAY_FILES if (STEAM / n).exists()]
+    if overlay_back and "steam" in provider_running():
+        print(f"[info] Steam overlay: {len(overlay_back)} file(s) restored by the running client; moved before each game")
+    else:
+        chk("Steam overlay disabled", not overlay_back)
     for rt in sorted(set(PROVIDER_RUNTIME.values())):
         for api, b in (("dxgi", "dxmt"), ("dxgi", "wined3d"), ("d3d9", "mtld3d")):
             chk(f"{rt}: {api}/{b} backend", backend_ok(rt, api, b))
