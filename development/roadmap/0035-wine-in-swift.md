@@ -27,5 +27,4 @@ date: 2026-11-01
    before it replaces anything.
 
 ## Not decided
-- **Repository:** whether `winekit/` gets its own repository, and its name and visibility (the owner's call).
 - **Trust:** the hooks need `git config project-hooks.trusted true` in GameHub, the owner's call.

@@ -37,7 +37,9 @@ Facts measured on 2026-11-01:
      Embedded Swift with libc only, and mutation testing with a score of at least 90;
   3. replace the C only after that, in a commit of its own.
 - **The Windows side** stays C until roadmap 0035's spike shows Embedded Swift working for Windows targets.
-- **The package** is `winekit/` in this repository, until it gets a repository of its own.
+- **The package** is `winekit/`, a code workspace of GameHub beside `launcher/` and `apps/bundler/`, with its own
+  `Package.swift`, gates, hooks and CI workflow. It stays in GameHub (the owner, 2026-11-01): the Wine fork builds
+  from it, and the runtime that ships it is assembled here.
 
 ## The first piece
 `HubRules` ports `dlls/ntdll/unix/hubrules.c`: rules parsing, predicate matching and reading facts from the PE

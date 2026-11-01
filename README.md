@@ -28,6 +28,7 @@ See [`launcher/README.md`](launcher/README.md) for the layout of the volume, the
 | `runtime/` | `hub-rules.txt`: per-program rules (renderer backend, environment, arguments) shipped inside the runtime |
 | `scripts/` | Runtime assembly (`assemble_runtime.sh`), media bundling, mtld3d install, `check_links.py` for the docs, and the static-analysis checkers in `static-analysis/` |
 | `toolchains/` | `provision.sh`: the build toolchains (Rust, MSVC headers, llvm-mingw, Wine SDK) on the external volume |
+| `winekit/` | Swift package: parts of Wine rewritten in Swift, one boundary at a time ([ADR-0020](development/adr/0020-wine-is-rewritten-in-swift-one-boundary-at-a-time.md)), with its quality gates (`swift package quality`); see [`winekit/README.md`](winekit/README.md) |
 | `apps/bundler/` | Swift package: native starters and signed, notarized bundles for Need for Speed, Call of Duty 4, Far Cry 2 and Battlefield 3, plus the GameHub app and `gamehub-cli` |
 | `docs/` | Documentation of how things work today; start at [`docs/README.md`](docs/README.md) |
 | `development/` | The project's rules ([`WHITE-PAPER.md`](development/WHITE-PAPER.md)), decisions (`adr/`), work items (`roadmap/`) and the day-by-day `diary/` |
