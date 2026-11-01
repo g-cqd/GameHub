@@ -23,3 +23,16 @@ frontmost with keyboard focus.
 - Games started from the Steam UI without the hub still need the same in winemac: activation requested by the
   app's first visible window, using the cooperative `yieldActivation` path.
 
+## Wrong process activated (2026-11-01)
+The first real run through the hub hurt: HITMAN 3 started with `hub play` lost keyboard focus and mouse capture, and
+Enter took it out of fullscreen, while the same game started from the Steam UI had played for five hours. `hub play`
+handed activation to the first process `game_procs` found, `Launcher.exe`, which has no window: the game's own
+process, `retail\hitman3.exe` (a relative command line the install-folder match misses), lost focus to it 6 s into
+its start, the same path as a Cmd-Tab away. Wolfenstein II's run at 14:16 went through the same step.
+
+Now the hub offers every Windows process started since the game's first one, without the stores' and Wine's, and
+the helper activates the one that owns the largest on-screen window. When that one is already active, it does
+nothing, because the handoff itself is a moment of focus loss. Each run is logged in `Hub/Logs/activate.log`.
+Checked: an active app is left alone, and a process with no window gives up after 20 s without touching
+activation. The handoff to a game that isn't active hasn't been watched yet.
+

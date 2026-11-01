@@ -1237,12 +1237,43 @@ def activation_helper():
     return out
 
 
+# Processes that are never the game's window: the stores' clients and helpers, and Wine's own.
+NOT_GAME = re.compile(r"\\Steam\\(steam\.exe|bin\\)|steamwebhelper|gameoverlayui|EADesktop|EABackgroundService|Link2EA|EALauncher|"
+                      r"upc\.exe|UbisoftConnect|UplayWebCore|UplayService|UbisoftGameLauncher|"
+                      r"EpicGamesLauncher|EpicWebHelper|EpicOnlineServices|EOSOverlayRenderer|EpicGamesUpdater|"
+                      r"\\windows\\(system32|syswow64)\\|x87sidecar", re.I)
+
+
+def etime_seconds(et):
+    """ps's elapsed time, [[dd-]hh:]mm:ss, in seconds."""
+    days, _, rest = et.rpartition("-")
+    parts = [int(x) for x in rest.split(":")]
+    while len(parts) < 3:
+        parts.insert(0, 0)
+    return (int(days) if days else 0) * 86400 + parts[0] * 3600 + parts[1] * 60 + parts[2]
+
+
+def activation_candidates(first_pid, rows):
+    """The Windows processes started with or after the game's first one, other than the stores' and Wine's: the game's
+    window is shown by one of them, not necessarily by the first (HITMAN 3: Launcher.exe, then retail\\hitman3.exe)."""
+    first = next((etime_seconds(et) for pid, et, _ in rows if pid == first_pid), None)
+    if first is None:
+        return [first_pid]
+    return [pid for pid, et, cmd in rows
+            if ".exe" in cmd.lower() and not NOT_GAME.search(cmd) and etime_seconds(et) <= first]
+
+
 def activate_later(pid, delay):
-    """Background step of `play`: make the game's Wine process the active macOS app (roadmap 0016)."""
+    """Background step of `play`: make the Wine process showing the game's window the active macOS app (roadmap 0016).
+    The helper chooses among the candidates by window and leaves an already active game alone."""
     time.sleep(float(delay))
     helper = activation_helper()
-    if helper:
-        subprocess.run([str(helper), str(pid)], capture_output=True, timeout=30, check=False)
+    if not helper:
+        return
+    pids = activation_candidates(int(pid), ps())
+    r = subprocess.run([str(helper)] + [str(p) for p in pids], capture_output=True, text=True, timeout=60, check=False)
+    with open(LOGS / "activate.log", "a") as log:
+        log.write(f"{time.strftime('%Y-%m-%d %H:%M:%S')} candidates {pids}: {(r.stdout + r.stderr).strip()} (exit {r.returncode})\n")
 
 
 def keep_settings(gid):

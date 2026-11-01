@@ -30,6 +30,11 @@ HITMAN 3 runs and plays on hub-2 with D3DMetal 4.0b2, installed as CrossOver shi
 `when exe=HITMAN3.exe => hub_dll_dir=dxgi/d3dmetal`. The owner: "it's working rather good". Not yet measured:
 frame rate, a whole mission, saving and loading.
 
+## 2026-11-01
+Started with `hub play`, it lost keyboard focus and mouse capture, and Enter took it out of fullscreen; started
+from the Steam UI (17:28–22:32) it was fine. The cause was the hub's activation step (roadmap 0016), which activated
+`Launcher.exe` instead of `hitman3.exe`.
+
 ## Next
 - Play a mission, then note frame rate and any graphical issue here.
 - The DXMT D3D12 path stays useful for every D3D12 game without D3DMetal. Its next gap is DXIL wave operations.
