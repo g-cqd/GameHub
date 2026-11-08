@@ -43,3 +43,6 @@ name=default;exe=*;d3d9=mtld3d;dxgi=dxmt
 # D3DMetal as CrossOver 26.3 ships it (its own glue + D3DMetal 4.0b2): Apple's GPTK redist glue is built for
 # Apple's evaluation Wine and fails in ours
 when exe=HITMAN3.exe => hub_dll_dir=dxgi/d3dmetal
+
+# WRC 10: DXMT tessellation hits unsupported mesh pipelines in indirect command buffers.
+when exe=WRC10.exe => hub_dll_dir=dxgi/d3dmetal
