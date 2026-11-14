@@ -46,3 +46,7 @@ when exe=HITMAN3.exe => hub_dll_dir=dxgi/d3dmetal
 
 # WRC 10: DXMT tessellation hits unsupported mesh pipelines in indirect command buffers.
 when exe=WRC10.exe => hub_dll_dir=dxgi/d3dmetal
+
+# Red Dead Redemption 2: use D3DMetal for the DirectX 12 renderer.
+when exe=RDR2.exe => hub_dll_dir=dxgi/d3dmetal
+name=rdr2-dx12;exe=RDR2.exe;arguments=-dx12
