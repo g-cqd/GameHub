@@ -58,5 +58,18 @@ class RockstarProcessTests(unittest.TestCase):
         self.assertEqual(hub.activation_candidates(40, rows), [40])
 
 
+class RockstarSignInTests(unittest.TestCase):
+
+    LOG = ('[2026-11-14 22:32:37.052] [DISPLAY] [Main ] [minmode] Starting up normally.\n'
+           '[2026-11-14 22:32:54.364] [DISPLAY] [Main ] [rline_presence] Gamer:"x"[handle=SC 1] SIGNED ONLINE\n')
+
+    def test_a_sign_in_of_this_start_counts(self):
+        self.assertTrue(hub.rockstar_online(self.LOG, "2026-11-14 22:32:30"))
+
+    def test_the_previous_sessions_sign_in_does_not(self):
+        self.assertFalse(hub.rockstar_online(self.LOG, "2026-11-14 22:40:00"))
+        self.assertFalse(hub.rockstar_online("", "2026-11-14 22:40:00"))
+
+
 if __name__ == "__main__":
     unittest.main()

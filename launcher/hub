@@ -775,6 +775,12 @@ def rockstar_client():
     return p if p.is_file() else None
 
 
+def rockstar_online(text, since):
+    """Whether the launcher's own log (`text`; lines start with "[YYYY-MM-DD HH:MM:SS.mmm]") shows a sign-in at or after
+    `since` ("YYYY-MM-DD HH:MM:SS"). The file is replaced at each start, and may still be the previous session's."""
+    return any("SIGNED ONLINE" in line and line[1:20] >= since for line in text.splitlines())
+
+
 def epic_client():
     for p in [
         PREFIX / "drive_c/Program Files/Epic Games/Launcher/Portal/Binaries/Win64/EpicGamesLauncher.exe",
@@ -1172,8 +1178,12 @@ def start_provider(provider, rt, opts):
         if not exe:
             die("Rockstar Games Launcher not found in the prefix")
         log = LOGS / f"rockstar-{stamp()}.log"
+        own = PREFIX / "drive_c/users/crossover/Documents/Rockstar Games/Launcher/launcher.log"
+        since = time.strftime("%Y-%m-%d %H:%M:%S")
         spawn(rt, env, [unix_to_win(exe)], log)
         print(f"starting Rockstar Games Launcher on {rt} (log {log})")
+        # a request to start a game sent before the launcher listens is dropped: its second instance just exits
+        wait_for(lambda: rockstar_online(log_tail_from(own, 0), since), 120, "the Rockstar launcher to sign in (sign in if it asks)")
     return env
 
 
