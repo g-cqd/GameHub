@@ -3,7 +3,7 @@
 
   hub list                       installed games, which launcher each needs, and how well it is known to work
   hub play <game> [options]      start the right launcher (if needed) and the game
-  hub start <steam|ea|ubisoft>   start only a launcher
+  hub start <steam|ea|ubisoft|rockstar>   start only a launcher
   hub status                     what is running in the prefix
   hub stop [game]                stop one game, or everything in the prefix (wineserver -k)
   hub trim epic                  stop the Epic launcher's processes while a game runs, to free memory (the game keeps running)
@@ -33,7 +33,7 @@ UBISOFT = ROOT / "Library/Ubisoft"
 EA_GAMES = ROOT / "EA Games"
 
 # Which runtime each launcher runs on (override with --runtime / HUB_RUNTIME). Every launcher runs on hub-2 (hub-1 was retired).
-PROVIDER_RUNTIME = {"steam": "hub-2", "ea": "hub-2", "ubisoft": "hub-2", "direct": "hub-2", "epic": "hub-2"}
+PROVIDER_RUNTIME = {"steam": "hub-2", "ea": "hub-2", "ubisoft": "hub-2", "direct": "hub-2", "epic": "hub-2", "rockstar": "hub-2"}
 
 # Knowledge about specific games. status: verified (seen working), unverified (never confirmed), blocked (needs anti-cheat that is not bypassed).
 EA_KNOWN = {
@@ -49,12 +49,18 @@ OTHER_KNOWN = {  # standalone installs under Library/Ubisoft/games and Library/E
     "WATCH_DOGS2": dict(exe="bin/WatchDogs2.exe", status="unverified", note="ships EasyAntiCheat"),
     "GTAV": dict(exe="PlayGTAV.exe", status="unverified", note="starts via the Epic launcher and Rockstar Launcher; args.txt carries -nobattleye -noBE"),
 }
+ROCKSTAR_GAMES = {
+    # Installed under the Rockstar Games launcher (hub start rockstar); the launcher is the single entry point.
+    # app is the title id Rockstar's command line expects (launcher logs show `-minmodeApp=rdr2`).
+    "Red Dead Redemption 2": dict(exe="RDR2.exe", app="rdr2"),
+}
 # Game processes that get DXMT settings of their own as env= fields of a compat rule: DXMT's info log in Hub/Logs/dxmt-<folder>/,
 # launcher/settings/<folder>/dxmt.conf when it exists, the HUB_DXMT_HUD/HUB_DXMT_DUMP switches and, under SCOPED_FX, --metalfx.
 # exe -> folder. (EA may start its games with a clean environment; settings that must always hold go in DXMT's own app profiles.)
 GAME_PROCS = {
     "epic": {"GTA5.exe": "GTAV"},
     "steam": {"Zero Hour.exe": "ZeroHour", "Crysis2Remastered.exe": "Crysis2Remastered"},
+    "rockstar": {"RDR2.exe": "RDR2"},
     "ea": {"bf3.exe": "BF3", "Crysis3.exe": "Crysis3"},
 }
 # Providers whose launcher breaks under a session-wide MetalFX swapchain: there --metalfx reaches only the GAME_PROCS exes.
@@ -65,6 +71,7 @@ ALIASES = {
     "aoa": "318020", "ron": "287450", "generals": "2229870", "zh": "2732960", "wd": "243470",
     "bf3": "Battlefield 3", "bf4": "Battlefield 4", "bf1": "Battlefield 1", "bfv": "Battlefield V",
     "nfs": "Need for Speed", "nfs2015": "Need for Speed", "c3": "Crysis 3", "f124": "F1 24",
+    "rdr2": "Red Dead Redemption 2", "reddead": "Red Dead Redemption 2",
     "c2r": "2096600", "crysis2": "2096600", "c2": "2096600",
     "fc2": "Far Cry 2", "fc3": "Far Cry 3", "acu": "Assassin's Creed Unity", "wd2": "WATCH_DOGS2",
 }
@@ -512,8 +519,24 @@ def discover_other():
     return games
 
 
+def discover_rockstar():
+    base = PREFIX / "drive_c/Program Files/Rockstar Games"
+    games = []
+    if not base.is_dir():
+        return games
+    for d in sorted(base.iterdir()) if base.is_dir() else []:
+        if str(d).lower().endswith("launcher"):
+            continue   # the launcher itself is started with `hub start rockstar`, not played as a game
+        k = ROCKSTAR_GAMES.get(d.name, {})
+        exe = d / k.get("exe") if "exe" in k else None
+        games.append(Game(k.get("name", d.name), "rockstar", "-", d, bool(exe and exe.exists()),
+                          k.get("status", "unverified"), k.get("note", "" if exe else "main exe unknown"),
+                          exe=exe, app=k.get("app")))
+    return games
+
+
 def discover():
-    return discover_steam() + discover_ea() + discover_other()
+    return discover_steam() + discover_ea() + discover_other() + discover_rockstar()
 
 
 def find_game(games, query):
@@ -557,7 +580,8 @@ def running_runtime():
 
 
 def provider_running():
-    pats = {"steam": r"Library\\Steam\\steam\.exe", "ea": r"EADesktop\.exe", "ubisoft": r"UbisoftConnect\.exe|upc\.exe", "epic": r"EpicGamesLauncher\.exe"}
+    pats = {"steam": r"Library\\Steam\\steam\.exe", "ea": r"EADesktop\.exe", "ubisoft": r"UbisoftConnect\.exe|upc\.exe",
+            "epic": r"EpicGamesLauncher\.exe", "rockstar": r"Rockstar Games\\Launcher\\Launcher\.exe"}
     found = set()
     for _, _, cmd in ps():
         if "x87sidecar" in cmd:
@@ -737,6 +761,11 @@ def ea_client():
     cands = [p for p in root.glob("[0-9]*/EA Desktop/EADesktop.exe") if p.is_file()]
     ver = lambda p: [int(x) for x in re.findall(r"\d+", p.parts[-3].split("-")[0])]
     return sorted(cands, key=ver)[-1] if cands else None
+
+
+def rockstar_client():
+    p = PREFIX / "drive_c/Program Files/Rockstar Games/Launcher/Launcher.exe"
+    return p if p.is_file() else None
 
 
 def epic_client():
@@ -1067,6 +1096,13 @@ def start_provider(provider, rt, opts):
         spawn(rt, env, [unix_to_win(exe), "-SkipBuildPatchPrereq"], log)
         print(f"starting Epic Games Launcher on {rt} (log {log})")
         time.sleep(10)
+    elif provider == "rockstar":
+        exe = rockstar_client()
+        if not exe:
+            die("Rockstar Games Launcher not found in the prefix")
+        log = LOGS / f"rockstar-{stamp()}.log"
+        spawn(rt, env, [unix_to_win(exe)], log)
+        print(f"starting Rockstar Games Launcher on {rt} (log {log})")
     return env
 
 
@@ -1149,7 +1185,7 @@ def play(args):
         stop_all(cur_rt)
         up = set()
     env = session_env(rt, provider, args)
-    need = provider if provider in ("steam", "ea", "epic") else ("ubisoft" if provider == "ubisoft" else None)
+    need = provider if provider in ("steam", "ea", "epic", "rockstar") else ("ubisoft" if provider == "ubisoft" else None)
     if need and need not in provider_running():
         env = start_provider(need, rt, args)
     if provider == "ea" and not ea_booted():
@@ -1193,6 +1229,9 @@ def play(args):
         if not app:
             die(f"{g.name} is not registered in the Epic launcher; run `hub start epic` once so it adopts {g.path}")
         spawn(rt, env, ["start", f"com.epicgames.launcher://apps/{app}?action=launch&silent=true"], plog)
+    elif provider == "rockstar":   # the launcher owns authentication and Cloud Save: ask it to start the title
+        app = g.extra.get("app") or g.name.lower().replace(" ", "")
+        spawn(rt, env, [unix_to_win(rockstar_client()), "-minmodeApp", app], plog)
     else:
         exe = g.extra.get("exe")
         spawn(rt, env, [unix_to_win(exe)], plog, cwd=exe.parent)
@@ -1277,6 +1316,7 @@ def activation_helper():
 NOT_GAME = re.compile(r"\\Steam\\(steam\.exe|bin\\)|steamwebhelper|gameoverlayui|EADesktop|EABackgroundService|Link2EA|EALauncher|"
                       r"upc\.exe|UbisoftConnect|UplayWebCore|UplayService|UbisoftGameLauncher|"
                       r"EpicGamesLauncher|EpicWebHelper|EpicOnlineServices|EOSOverlayRenderer|EpicGamesUpdater|"
+                      r"Rockstar Games\\Launcher\\|SocialClubHelper\.exe|RockstarService\.exe|RockstarErrorHandler\.exe|"
                       r"\\windows\\(system32|syswow64)\\|x87sidecar", re.I)
 
 
@@ -1436,6 +1476,7 @@ def cmd_doctor(args):
     chk("no stale SteamOld references", "steamold" not in reg.lower())
     chk("EA Desktop client", ea_client() is not None)
     chk("Epic Games Launcher client", epic_client() is not None)
+    chk("Rockstar Games Launcher client", rockstar_client() is not None)
     # A running Steam restores the overlay files; hub moves them again before every Steam game (ADR-0011, 0005)
     overlay_back = [n for n in STEAM_OVERLAY_FILES if (STEAM / n).exists()]
     if overlay_back and "steam" in provider_running():
@@ -1463,7 +1504,7 @@ def main():
     p = sub.add_parser("play"); p.add_argument("game"); common(p)
     p.add_argument("--restart", action="store_true"); p.add_argument("--no-wait", action="store_true"); p.add_argument("--force", action="store_true"); p.add_argument("--keep-launcher", action="store_true")
     p.set_defaults(f=play)
-    p = sub.add_parser("start"); p.add_argument("provider", choices=["steam", "ea", "ubisoft", "epic"]); common(p); p.set_defaults(f=cmd_start)
+    p = sub.add_parser("start"); p.add_argument("provider", choices=["steam", "ea", "ubisoft", "epic", "rockstar"]); common(p); p.set_defaults(f=cmd_start)
     sub.add_parser("status").set_defaults(f=cmd_status)
     p = sub.add_parser("trim", help="stop a store launcher while its game runs, to free memory"); p.add_argument("provider", choices=sorted(TRIM_PATTERNS)); p.set_defaults(f=cmd_trim)
     p = sub.add_parser("stop"); p.add_argument("game", nargs="?")

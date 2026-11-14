@@ -34,6 +34,7 @@ name=rockstar-launcher;exe=Launcher.exe;company=Rockstar Games;dxgi=wined3d;env=
 when machine=i386;section=.ubx2 => gate_selector_fixup=true
 
 # Defaults for every process: mtld3d for D3D8/9, DXMT for D3D10/11
+name=zero-hour-metalfx;exe=Zero Hour.exe;dxgi=dxmt;env=DXMT_METALFX_SPATIAL_SWAPCHAIN=1;env=DXMT_CONFIG=d3d11.metalSpatialUpscaleFactor=1.40625
 name=default;exe=*;d3d9=mtld3d;dxgi=dxmt
 
 # D3D12 games DXMT's D3D12 can't run yet (DXIL wave operations, ...): Apple's D3DMetal from the Game Porting
