@@ -63,6 +63,13 @@ GAME_PROCS = {
     "rockstar": {"RDR2.exe": "RDR2"},
     "ea": {"bf3.exe": "BF3", "Crysis3.exe": "Crysis3"},
 }
+# DualShock 4 / DualSense: the prefix pins these WineBus devices to Wine's SDL-mapped XInput device (Hidraw=0, the
+# NFS 2015 recipe: games that only read XInput). Rockstar's engine also reads a Sony pad itself through DirectInput by
+# its ids, so there the mapped device is one pad seen twice, a DualShock in DirectInput and an Xbox pad in XInput, and
+# RDR2's button prompts flip between the two sets every time either reports. Sessions of these providers get the raw
+# HID device instead (Hidraw=1: DirectInput only, as on Windows); the next session of another provider puts it back.
+PAD_KEYS = ("054C/05C4", "054C/0CE6")
+RAW_PAD_PROVIDERS = {"rockstar"}
 # Providers whose launcher breaks under a session-wide MetalFX swapchain: there --metalfx reaches only the GAME_PROCS exes.
 # Elsewhere it stays session-wide, so a game without a GAME_PROCS entry (Act of Aggression) still gets it.
 SCOPED_FX = {"epic"}
@@ -1026,8 +1033,72 @@ def record_session(rt, provider, opts):
     (STATE / "session.json").write_text(json.dumps(signature(rt, provider, opts)))
 
 
+def pad_hidraw():
+    """{device: Hidraw value, or None when unset} for PAD_KEYS, from system.reg (current while no session runs)."""
+    try:
+        text = (PREFIX / "system.reg").read_text(errors="replace")
+    except OSError:
+        return {}
+    found = {}
+    for key in PAD_KEYS:
+        m = re.search(r"^\[System\\\\(?:Current)?ControlSet\d*\\\\Services\\\\winebus\\\\Devices\\\\" + re.escape(key)
+                      + r"\][^\[]*?^\"Hidraw\"=dword:([0-9a-fA-F]{8})", text, re.M | re.S | re.I)
+        found[key] = int(m.group(1), 16) if m else None
+    return found
+
+
+def pad_mode_changes(provider, current, saved):
+    """The Hidraw values to write before a session of `provider` starts: {device: value, or None to delete}.
+    `saved` is what the hub replaced when it last switched to the raw device (None when it has not)."""
+    if provider in RAW_PAD_PROVIDERS:
+        return {k: 1 for k in PAD_KEYS if current.get(k) != 1}
+    if saved is None:
+        return {}
+    return {k: saved.get(k) for k in PAD_KEYS if current.get(k) != saved.get(k)}
+
+
+def set_pad_mode(rt, env, provider):
+    """Give the session about to start the pad device its games need (see PAD_KEYS). WineBus reads the keys when the
+    session starts, so they are written with the prefix stopped again afterwards."""
+    keep = STATE / "pad-hidraw.json"
+    try:
+        saved = json.loads(keep.read_text())
+    except (OSError, ValueError):
+        saved = None
+    current = pad_hidraw()
+    changes = pad_mode_changes(provider, current, saved)
+    raw = provider in RAW_PAD_PROVIDERS
+    if not changes:
+        if not raw and saved is not None:
+            keep.unlink(missing_ok=True)
+        return
+    if running_runtime():
+        print("note: the controller device mode cannot change while the prefix is running; "
+              "`hub stop`, then start again, to switch DualShock pads " + ("to their own profile" if raw else "back to XInput"))
+        return
+    wine, ws = str(RUNTIMES / rt / "bin/wine"), str(RUNTIMES / rt / "bin/wineserver")
+    base = "HKLM\\System\\CurrentControlSet\\Services\\winebus\\Devices\\"
+    for key, value in changes.items():
+        cmd = ["reg", "delete", base + key, "/v", "Hidraw", "/f"] if value is None else \
+              ["reg", "add", base + key, "/v", "Hidraw", "/t", "REG_DWORD", "/d", str(value), "/f"]
+        r = subprocess.run([wine] + cmd, env=env, cwd=str(TEMP), stdin=subprocess.DEVNULL, capture_output=True, text=True, timeout=120, check=False)
+        if r.returncode:
+            print(f"hub: could not set the controller mode for {key}: {r.stderr.strip()[-200:]}", file=sys.stderr)
+            return
+    subprocess.run([ws, "-k"], env=env, capture_output=True, check=False)   # WineBus is already up with the old values
+    subprocess.run([ws, "-w"], env=env, capture_output=True, timeout=90, check=False)
+    if raw:
+        if saved is None:
+            keep.write_text(json.dumps(current))
+        print("DualShock pads: their own HID device for this session (PlayStation prompts; not visible to XInput)")
+    else:
+        keep.unlink(missing_ok=True)
+        print("DualShock pads: back to the XInput mapping")
+
+
 def start_provider(provider, rt, opts):
     env = session_env(rt, provider, opts)
+    set_pad_mode(rt, env, provider)
     record_session(rt, provider, opts)
     if provider == "steam":
         if not (STEAM / "steam.exe").exists():
@@ -1231,7 +1302,7 @@ def play(args):
         spawn(rt, env, ["start", f"com.epicgames.launcher://apps/{app}?action=launch&silent=true"], plog)
     elif provider == "rockstar":   # the launcher owns authentication and Cloud Save: ask it to start the title
         app = g.extra.get("app") or g.name.lower().replace(" ", "")
-        spawn(rt, env, [unix_to_win(rockstar_client()), "-minmodeApp", app], plog)
+        spawn(rt, env, [unix_to_win(rockstar_client()), f"-minmodeApp={app}"], plog)
     else:
         exe = g.extra.get("exe")
         spawn(rt, env, [unix_to_win(exe)], plog, cwd=exe.parent)
