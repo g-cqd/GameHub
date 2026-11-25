@@ -41,7 +41,7 @@ jobs:
       WINEKIT_DEV: "1"
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - uses: g-cqd/swift-ci/setup-swift@2f915b39ab7ff1438e2cd6f998e517eabc875053 # swift-ci 2f915b3
+      - uses: g-cqd/swift-ci/setup-swift@077676883cebb19f6febec70d980be464a3c9d18 # swift-ci 0776768
         with:
           swift-version: "6.4.2"
       - run: brew install swiftlint
